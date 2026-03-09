@@ -1,0 +1,67 @@
+version: 2
+
+# Publish the binaries directly, without any archiving
+archives:
+  - formats: ["binary"]
+
+builds:
+  - id: "pingcli-terraformer"
+    binary: "pingcli-terraformer"
+    env:
+      - "CGO_ENABLED=0"
+    goos:
+      - "darwin"
+      - "linux"
+      - "windows"
+    goarch:
+      - "386"
+      - "amd64"
+      - "arm64"
+    ignore:
+      - goos: "linux"
+        goarch: "386"
+
+checksum:
+  algorithm: "sha256"
+  split: false
+  disable: false
+
+brews:
+  - commit_author:
+      name: "goreleaserbot"
+      email: "bot@goreleaser.com"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    directory: "Formula"
+    homepage: "https://github.com/pingidentity/pingcli-plugin-terraformer"
+    description: "Ping CLI plugin for converting PingOne DaVinci flows to Terraform HCL"
+    license: "Apache License 2.0"
+    skip_upload: "auto"
+    repository:
+      owner: "pingidentity"
+      name: "homebrew-pingcli"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+nfpms:
+  - id: "pingcli-terraformer"
+    package_name: "pingcli-terraformer"
+    vendor: "Ping Identity Corporation"
+    homepage: "https://github.com/pingidentity/pingcli-plugin-terraformer"
+    maintainer: "Ping Identity Corporation"
+    description: "Ping CLI plugin for converting PingOne DaVinci flows to Terraform HCL"
+    license: "Apache 2.0"
+    formats:
+      - "apk"
+      - "deb"
+      - "rpm"
+    rpm:
+      summary: "Ping CLI plugin for converting PingOne DaVinci flows to Terraform HCL"
+      packager: "Ping Identity Corporation"
+    deb:
+      fields:
+        Bugs: "https://github.com/pingidentity/pingcli-plugin-terraformer/issues"
+    apk:
+      signature:
+        key_name: "origin"
+
+release:
+  prerelease: auto

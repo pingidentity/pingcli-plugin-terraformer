@@ -1,0 +1,66 @@
+# DaVinci Flow Enable Resource Definition
+#
+# Manages the enabled/disabled state of a DaVinci flow.
+# Data is derived from the Flow API — each flow produces one flow_enable resource.
+# Import ID format: {env_id}/{flow_id}
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_flow_enable
+  api_type: Flow
+  name: DaVinci Flow Enable
+  short_name: flow_enable
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/davinci
+  sdk_type: Flow
+  list_method: Flows.GetAll
+  get_method: Flows.Get
+  id_field: flow_id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # Name - computed only, used for resource label generation
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Flow ID - required, references parent flow
+  - name: FlowID
+    terraform_name: flow_id
+    type: string
+    source_path: Id
+    required: true
+    references_type: pingone_davinci_flow
+    reference_field: id
+
+  # Enabled - required bool
+  - name: Enabled
+    terraform_name: enabled
+    type: bool
+    source_path: Enabled
+    required: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_davinci_flow
+      field_path: Id
+      lookup_field: id
+      reference_format: "pingone_davinci_flow.{name}.id"
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

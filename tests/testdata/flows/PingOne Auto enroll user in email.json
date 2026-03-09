@@ -1,0 +1,1678 @@
+{
+  "companyId": "5e4b5c7b-636d-492e-ad93-f736f905c9cf",
+  "authTokenExpireIds": [],
+  "connectorIds": [
+    "annotationConnector",
+    "variablesConnector",
+    "pingOneMfaConnector",
+    "httpConnector",
+    "functionsConnector",
+    "nodeConnector",
+    "analyticsConnector"
+  ],
+  "createdDate": 1729785245673,
+  "currentVersion": 7,
+  "customerId": "7103642ff587ecb4de6b6c332453ca73",
+  "description": "Imported on Wed Oct 02 2024 12:17:35 GMT+0000 (Coordinated Universal Time)",
+  "flowStatus": "enabled",
+  "inputSchemaCompiled": {
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "p1UserId": {
+          "description": "",
+          "isExpanded": true,
+          "preferredDataType": "string",
+          "type": "string",
+          "name": "p1UserId"
+        },
+        "p1Email": {
+          "description": "",
+          "isExpanded": true,
+          "preferredDataType": "string",
+          "type": "string",
+          "name": "p1Email"
+        },
+        "mf-configObject": {
+          "description": "",
+          "isExpanded": true,
+          "preferredDataType": "object",
+          "type": "object",
+          "name": "mf-configObject"
+        }
+      },
+      "additionalProperties": false,
+      "required": []
+    }
+  },
+  "isInputSchemaSaved": true,
+  "isOutputSchemaSaved": false,
+  "name": "PingOne Auto enroll user in email",
+  "publishedVersion": 7,
+  "settings": {
+    "csp": "worker-src 'self' blob:; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://devsdk.singularkey.com http://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval';",
+    "intermediateLoadingScreenCSS": "",
+    "intermediateLoadingScreenHTML": "",
+    "logLevel": 3,
+    "useCustomCSS": true,
+    "css": "\n  :root {\n    /********************************************************\n    * COMPANY LOGO\n    *********************************************************/\n    --company-logo-img-url: url(\"https://avatars.githubusercontent.com/u/93611276?v=4\");\n    --company-logo-max-height: 95px;\n\n    /********************************************************\n    * PAGE BACKGROUND \n    *********************************************************/\n    --background-image-url: url(\"\");\n\n    /********************************************************\n    * CARD BODY\n    *********************************************************/\n    --card-background-color: rgb(242, 221, 184);\n    --card-shadow-color: rgba(146, 55, 25, .35);\n\n    /********************************************************\n    * BODY\n    *********************************************************/\n    --body-font-family: Helvetica;\n    --body-font-size: .8rem;\n\n    /********************************************************\n    * TEXT FONT COLORS\n    *********************************************************/\n\n    /*  PRIMARY FONT COLOR (RGB) */\n    --text-color-primary: 181, 119, 87;\n\n    /* HEADING FONT COLR (RBG) */\n    --heading-text-color: 61, 69, 77;\n    \n    /*  MUTED TEXT ALPHA  */\n    --text-color-muted-apha: 0.75;\n\n    /*  ERROR FONT COLOR  */\n    --text-color-error: rgb(185, 35, 32);\n\n    /********************************************************\n    * BUTTON ATTRIBUTES\n    *********************************************************/\n\n    /*  BUTTON FONT COLOR  */\n    --button-primary-text-color: rgb(255, 255, 255);\n\n    /*  BUTTON BACKGROUND COLOR (RGB)  */\n    --button-primary-background-color: 146, 57, 23;\n    \n    /* LINK BUTTON FONT COLOR (RGB)  */\n    --link-button-primary-color: 146, 23, 48;\n\n    /* BUTTON BORDER RADIUS */\n    --button-primary-border-radius: 20px;\n\n    /*  BUTTON HOVER ALPHA  */\n    --button-hover-alpha: 0.70;\n\n    /*  BUTTON ACTIVE ALPHA  */\n    --button-active-alpha: 0.80;\n\n    /*  BUTTON DISABLED ALPHA  */\n    --button-disabled-alpha: 0.65;\n\n    /********************************************************\n     * FORM CONTROLS\n     *********************************************************/\n    --form-control-border-radius: 20px;\n    --card-body-border-radius: 25px;\n    --focus-highlight-color: 105, 242, 121;\n\n    /********************************************************\n    * ACTIVITY INDICATOR & BUTTON SPINNER COLOR\n    *********************************************************/\n\n    --activity-indicator-color: rgb(207, 173, 126);\n\n    --polling-indicator-color: rgb(237, 69, 69);\n\n    /********************************************************\n    * APPLYING TEXT COLOR - DO NOT CHANGE\n    *********************************************************/\n    /* H1,H2, H3, Body text color */\n    --bs-body-color: rgb(var(--text-color-main)) !important;\n    --bs-danger-rgb: var(--text-color-error);\n  }\n\n  \n  \n/********************************************************\n* CLASSES BELOW ARE DERIVED FROM VALUES ABOVE\n* DO NOT CHANGE UNLESS YOU HAVE CSS 'SKILLZ' :)\n*********************************************************/\n\n/*  COMPANY LOGO  */\n.card-body.p-5.d-flex.flex-column > img:first-child,\n.companyLogo {\n  content: var(--company-logo-img-url) !important;\n  height: var(--company-logo-max-height) !important;\n  width: auto !important;\n}\n\n/*  BACKGROUND IMAGE  */\ndiv.bg-light {\n  background-image:       var(--background-image-url);\n  background-size:        cover;\n  background-repeat:      no-repeat;\n}\n\n/*  HEADING TEXT  */\nh1, h2, h3, h4 {\n  color: rgb(var(--heading-text-color)) !important;\n}\n\n/*  BODY FONT & COLOR  */\n.card-body {\n  /*  font family */\n  font-family: var(--body-font-family) !important;\n  /*  font size */\n  font-size: var(--body-font-size) !important;\n  /*  font color */\n  color: rgb(var(--text-color-primary)) !important;\n  /*  background color */\n  background-color: var(--card-background-color) !important;\n}\n\n/*  MUTED PARAGRAPH  */\np.text-muted {\n  color: rgba(var(--text-color-primary), var(--text-color-muted-apha)) !important;\n}\n\n/*  ERROR MESSAGE PARAGRAPH  */\n.card .text-danger {\n  color: var(--text-color-error) !important;\n}\n\n/*  FORM CONTROL FONT COLOR  */\n.form-control,\n.form-control:focus {\n  color: var(--text-color-primary) !important;\n  border-radius: var(--form-control-border-radius) !important;\n}\n\n/*  FORM CONTROL PLACEHOLDER FONT COLOR  */\n.form-floating input+label {\n  color: rgba(var(--text-color-primary), var(--text-color-muted-apha)) !important;\n}\n\n/*  FORM CONTROL HIGHLIGHT  */\n.form-control:focus {\n  border-color: rgba(var(--focus-highlight-color), .5) !important;\n  box-shadow: 0 0 0 0.25rem rgba(var(--focus-highlight-color), 0.25) !important;\n}\n\n/*  PRIMARY BUTTON  */\n.btn-primary {\n  /*  font color  */\n  --bs-btn-color: var(--button-primary-text-color) !important;\n  /*  font color when hovering  */\n  --bs-btn-hover-color: var(--button-primary-text-color) !important;\n  /*  border color  */\n  --bs-btn-border-color: var(--button-primary-background-color) !important;\n  /*  background color  */\n  --bs-btn-bg: rgb(var(--button-primary-background-color)) !important;\n  /*  background color when hovering  */\n  --bs-btn-hover-bg: rgba(var(--button-primary-background-color), var(--button-hover-alpha)) !important;\n  /*  background color when active  */\n  --bs-btn-active-bg: rgba(var(--button-primary-background-color), var(--button-active-alpha)) !important;\n  /*  background color when disabled  */\n  --bs-btn-disabled-bg: rgba(var(--button-primary-background-color), var(--button-disabled-alpha)) !important;\n  background-color: rgb(var(--button-primary-background-color)) !important;\n  border-color: rgb(var(--button-primary-background-color)) !important;\n  color: var(--button-primary-text-color) !important;\n  border-radius: var(--button-primary-border-radius);\n}\n\n\n.btn-primary:hover {\n  background-color: rgba(var(--button-primary-background-color), var(--button-hover-alpha)) !important;\n  border-color: rgba(var(--button-primary-background-color), var(--button-hover-alpha)) !important;\n  color: var(--button-primary-text-color) !important;\n}\n\n/*  LINK BUTTON  */\n.btn-link {\n  /*  button font color  */\n  --bs-btn-color: rgb(var(--link-button-primary-color)) !important;\n  /*  button font color when active  */\n  --bs-btn-active-color: rgba(var(--link-button-primary-color), var(--button-active-alpha)) !important;\n  /*  button font color when hovering  */\n  --bs-btn-hover-color: rgba(var(--link-button-primary-color), var(--button-hover-alpha)) !important;\n  /*  button font color when disabled  */\n  --bs-btn-disabled-color: rgba(var(--link-button-primary-color), var(--button-disabled-alpha)) !important;\n  color: rgb(var(--link-button-primary-color)) !important;\n}\n\n/*  POLLING INDICATORS  */\n.css-11k6vsm,\n.css-17zi2ag,\n.css-139roxj {\n  /* width: 20px; */\n  /* height: 20px; */\n  /* animation-duration: 0.75s; */\n  /*  circle background color  */\n  background-color: var(--polling-indicator-color) !important;\n}\n\n/*  BUTTON ACTIVITY INDICATOR, PROGRESS SPINNER  */\n.css-sw2ho0 {\n  /*  spinning circle color  */\n  --primary-color: var(--activity-indicator-color) !important;\n}\n\n/* PROGRESS SPINNER */\n.spinner-color {\n  color: var(--polling-indicator-color) !important;\n}\n\n.card-body.p-5.d-flex.flex-column {\n  border-radius: var(--card-body-border-radius);\n}\n\n.card.shadow.mb-5 {\n  border-radius: var(--card-body-border-radius);\n  box-shadow: 1px 1px 3px 1px var(--card-shadow-color) !important;\n}",
+    "cssLinks": [
+      "https://assets.pingone.com/ux/astro-nano/0.1.0-alpha.11/icons.css",
+      "https://assets.pingone.com/ux/end-user-nano/0.1.0-alpha.9/end-user-nano.css"
+    ]
+  },
+  "timeouts": "null",
+  "updatedDate": 1729785247009,
+  "flowId": "50ce4842453050f309b5614053d55d5a",
+  "versionId": 7,
+  "graphData": {
+    "elements": {
+      "nodes": [
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "708dc6aow8",
+            "idUnique": "9630iuy76i",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Register email auto enroll"
+              },
+              "annotationTextColor": {
+                "value": "#ffffffff"
+              },
+              "backgroundColor": {
+                "value": "#5D00D6ff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 14
+              },
+              "fontStyle": {
+                "value": "bold"
+              },
+              "width": {
+                "value": 1000
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 484,
+            "y": 364
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "saveValue",
+            "connectionId": "06922a684039827499bdbdd97f49827b",
+            "connectorId": "variablesConnector",
+            "id": "4nwm10m3zr",
+            "idUnique": "ise4buxf5v",
+            "label": "Variables",
+            "name": "Variables",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "nodeTitle": {
+                "value": "Start"
+              },
+              "saveVariables": {
+                "value": [
+                  {
+                    "key": 0.07362258110117392,
+                    "label": "mf-configObject (object - flowInstance)",
+                    "name": "mf-configObject",
+                    "nameDefault": "mf-configObject",
+                    "type": "object",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"mf-configObject\",\n        \"data\": \"{{global.parameters.mf-configObject}}\",\n        \"tooltip\": \"{{global.parameters.mf-configObject}}\",\n        \"children\": [\n          {\n            \"text\": \"mf-configObject\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 300,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createDevice",
+            "connectionId": "b72bd44e6be8180bd5988ac74cd9c949",
+            "connectorId": "pingOneMfaConnector",
+            "id": "2q8o7ctrmj",
+            "idUnique": "4ytf7sjllf",
+            "label": "PingOne MFA - nuka",
+            "name": "PingOne MFA",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "customDeviceType": {
+                "value": "{}"
+              },
+              "customNotificationPolicyId": {
+                "value": "{}"
+              },
+              "customTemplateVariant": {
+                "value": "{}"
+              },
+              "device": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"functions.svg\",\n        \"url\": \"device\",\n        \"data\": \"{{local.t6ik0u7i4i.payload.output.device}}\",\n        \"tooltip\": \"{{local.t6ik0u7i4i.payload.output.device}}\",\n        \"children\": [\n          {\n            \"text\": \"device\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "deviceType": {
+                "value": "EMAIL"
+              },
+              "email": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"p1Email\",\n        \"data\": \"{{global.parameters.p1Email}}\",\n        \"tooltip\": \"{{global.parameters.p1Email}}\",\n        \"children\": [\n          {\n            \"text\": \"p1Email\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "Auto register Email"
+              },
+              "notificationPolicyId": {
+                "value": "a62f6445-147b-4249-86d1-c73ccdcedfd6"
+              },
+              "status": {
+                "value": "ACTIVE"
+              },
+              "templateVariables": {
+                "value": [
+                  {
+                    "name": "companyLogo",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"variable.svg\",\n        \"url\": \"gv-companyLogo\",\n        \"data\": \"{{global.company.variables.gv-companyLogo}}\",\n        \"tooltip\": \"{{global.company.variables.gv-companyLogo}}\",\n        \"children\": [\n          {\n            \"text\": \"gv-companyLogo\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "templateVariant": {
+                "value": "OTP"
+              },
+              "userId": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"p1UserId\",\n        \"data\": \"{{global.parameters.p1UserId}}\",\n        \"tooltip\": \"{{global.parameters.p1UserId}}\",\n        \"children\": [\n          {\n            \"text\": \"p1UserId\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2010,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "n0quwyscsi",
+            "label": "Evaluator",
+            "nodeType": "EVAL",
+            "properties": {
+              "y2g6mnx0bh": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 2130,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createSuccessResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "zy9zqsq8ow",
+            "idUnique": "b5so287gsn",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#9dc967ff"
+              },
+              "nodeTitle": {
+                "value": "Return success"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2580,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "AEqualsB",
+            "connectionId": "de650ca45593b82c49064ead10b9fe17",
+            "connectorId": "functionsConnector",
+            "id": "9y0nnf59o3",
+            "label": "Functions",
+            "name": "Functions",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "caseSensitive": {
+                "value": false
+              },
+              "leftValueA": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"variable.svg\",\n        \"url\": \"gv-autoEnrollEmail\",\n        \"data\": \"{{global.company.variables.gv-autoEnrollEmail}}\",\n        \"tooltip\": \"{{global.company.variables.gv-autoEnrollEmail}}\",\n        \"children\": [\n          {\n            \"text\": \"gv-autoEnrollEmail\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "Check if we should autoenroll Email -gv-autoEnrollEmail"
+              },
+              "rightValueB": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"true\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 1260,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "brsc2k7uj4",
+            "nodeType": "EVAL",
+            "properties": {
+              "w547kv0b67": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 1830,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createErrorResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "w547kv0b67",
+            "idUnique": "bu59qx9fq6",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#ffc8c1ff"
+              },
+              "nodeTitle": {
+                "value": "Return on false"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 1980,
+            "y": 1080
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "gztz8fez9l",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Auto Enroll Email"
+              },
+              "annotationTextColor": {
+                "value": "#ffffffff"
+              },
+              "backgroundColor": {
+                "value": "#4462edff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 16
+              },
+              "fontStyle": {
+                "value": "bold"
+              },
+              "width": {
+                "value": 1800
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 214,
+            "y": 214
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createErrorResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "y2g6mnx0bh",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#ffc8c1ff"
+              },
+              "claimsNameValuePairs": {
+                "value": [
+                  {
+                    "key": 0.3193554648015937,
+                    "label": "errorReturn (string - flowInstance)",
+                    "name": "errorReturn",
+                    "nameDefault": "message",
+                    "type": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"pingIdentity.svg\",\n        \"url\": \"message\",\n        \"data\": \"{{local.2q8o7ctrmj.payload.error.message}}\",\n        \"tooltip\": \"{{local.2q8o7ctrmj.payload.error.message}}\",\n        \"children\": [\n          {\n            \"text\": \"message\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "nodeTitle": {
+                "value": "Return error"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2340,
+            "y": 1050
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "readAllDevices",
+            "connectionId": "b72bd44e6be8180bd5988ac74cd9c949",
+            "connectorId": "pingOneMfaConnector",
+            "id": "bpkvxton27",
+            "label": "PingOne MFA",
+            "name": "PingOne MFA",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "userId": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"p1UserId\",\n        \"data\": \"{{global.parameters.p1UserId}}\",\n        \"tooltip\": \"{{global.parameters.p1UserId}}\",\n        \"children\": [\n          {\n            \"text\": \"p1UserId\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 1590,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "sy5ji6r90v",
+            "label": "Evaluator",
+            "nodeType": "EVAL",
+            "properties": {
+              "qibog9r3as": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 1710,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "customFunction",
+            "connectionId": "de650ca45593b82c49064ead10b9fe17",
+            "connectorId": "functionsConnector",
+            "id": "gn1zfrbhfn",
+            "label": "Functions",
+            "name": "Functions",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "code": {
+                "value": "module.exports = async ({ params }) => {\n  console.log('params: ', params);\n\n  const devices = params.devices;\n\n  for (const device of devices) {\n    if (device.type.toUpperCase() === \"EMAIL\" && device.status === \"ACTIVE\") {\n      return { 'emailExists': true };\n    }\n  }\n}"
+              },
+              "nodeTitle": {
+                "value": "Does an email device exist"
+              },
+              "outputSchema": {
+                "value": "{\n\t\"output\": {\n\t\t\"type\": \"object\",\n\t\t\"properties\": {\n\t\t\t\"emailExists\": {\n\t\t\t\t\"type\": \"boolean\"\n\t\t\t}\n\t\t}\n\t}\n}"
+              },
+              "variableInputList": {
+                "value": [
+                  {
+                    "name": "devices",
+                    "preferredDataType": "object",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"pingIdentity.svg\",\n        \"url\": \"devices\",\n        \"data\": \"{{local.bpkvxton27.payload.output.rawResponse._embedded.devices}}\",\n        \"tooltip\": \"{{local.bpkvxton27.payload.output.rawResponse._embedded.devices}}\",\n        \"children\": [\n          {\n            \"text\": \"devices\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 1890,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "fcvwwpmkeq",
+            "label": "Evaluator",
+            "nodeType": "EVAL",
+            "properties": {
+              "d60car20if": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 1380,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "ic158vw0c0",
+            "label": "Evaluator",
+            "nodeType": "EVAL",
+            "properties": {
+              "mnjtf03g2b": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 2040,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "AEqualsB",
+            "connectionId": "de650ca45593b82c49064ead10b9fe17",
+            "connectorId": "functionsConnector",
+            "id": "l8brhyefwk",
+            "idUnique": "nxej26wueh",
+            "label": "Functions",
+            "name": "Functions",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "leftValueA": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"functions.svg\",\n        \"url\": \"emailExists\",\n        \"data\": \"{{local.gn1zfrbhfn.payload.output.emailExists}}\",\n        \"tooltip\": \"{{local.gn1zfrbhfn.payload.output.emailExists}}\",\n        \"children\": [\n          {\n            \"text\": \"emailExists\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "Check if email exists"
+              },
+              "rightValueB": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"true\"\n      }\n    ]\n  }\n]"
+              },
+              "type": {
+                "value": "boolean"
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 2190,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createErrorResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "qibog9r3as",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#ffc8c1ff"
+              },
+              "claimsNameValuePairs": {
+                "value": [
+                  {
+                    "key": 0.6376188939461238,
+                    "label": "errorReturn (string - flowInstance)",
+                    "name": "errorReturn",
+                    "type": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Read all devices failed, collecting MFA devices\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "nodeTitle": {
+                "value": "Error from PingOne MFA read all devices"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 1890,
+            "y": 630
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createErrorResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "mnjtf03g2b",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#ffc8c1ff"
+              },
+              "claimsNameValuePairs": {
+                "value": [
+                  {
+                    "key": 0.719965513478507,
+                    "label": "errorReturn (string - flowInstance)",
+                    "name": "errorReturn",
+                    "type": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"You all ready have Email registered\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "nodeTitle": {
+                "value": "Return, user already has email device"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2220,
+            "y": 600
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "mm221k8mtu",
+            "label": "Evaluator",
+            "nodeType": "EVAL",
+            "properties": {
+              "81w4xznzc9": {
+                "value": "allTriggersTrue"
+              },
+              "hrnf7vf4v0": {
+                "value": "anyTriggersFalse"
+              },
+              "ur10bxtnoi": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 2370,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "startNode",
+            "connectionId": "3566e86a35c26e575396dcfb89a3dcc0",
+            "connectorId": "nodeConnector",
+            "id": "muahcq7bwo",
+            "label": "Teleport",
+            "name": "Teleport",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "nodeTitle": {
+                "value": "Create Device "
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 1680,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "goToNode",
+            "connectionId": "3566e86a35c26e575396dcfb89a3dcc0",
+            "connectorId": "nodeConnector",
+            "id": "hrnf7vf4v0",
+            "label": "Teleport",
+            "name": "Teleport",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "nodeInstanceId": {
+                "value": "muahcq7bwo"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2550,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createSuccessResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "d60car20if",
+            "idUnique": "q0qimobp25",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#9dc967ff"
+              },
+              "nodeTitle": {
+                "value": "Auto enroll turned off"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 1590,
+            "y": 630
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createSuccessResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "81w4xznzc9",
+            "idUnique": "lvre97oyia",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#9dc967ff"
+              },
+              "nodeTitle": {
+                "value": "Email already exists"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2550,
+            "y": 630
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "customHTMLTemplate",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "j496qxzd0c",
+            "idUnique": "g9fybbwj88",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "customCSS": {},
+              "customHTML": {
+                "value": "<div class=\"end-user-nano\">\n    <div\n        class=\"bg-light d-flex flex-column justify-content-center align-items-center position-absolute top-0 start-0 bottom-0 end-0 overflow-auto\">\n        <div class=\"d-none\" \n            data-skcomponent=\"skpolling\" \n            data-skpollInterval=\"10\" \n            data-skpollRetries=\"1\"\n            data-skpollChallengeStatus=\"false\"></div>\n    </div>\n</div>"
+              },
+              "customScript": {},
+              "formFieldsList": {
+                "value": []
+              },
+              "nodeTitle": {
+                "value": "NOP UI Page"
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 600,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "bfqa87ad8l",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 435,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "0en8bx28v3",
+            "nodeType": "EVAL",
+            "label": "Evaluator"
+          },
+          "position": {
+            "x": 738,
+            "y": 507.75
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "yoyebr3xak",
+            "nodeType": "CONNECTION",
+            "connectionId": "c4b2032a1b63d370c5fbdd205522f1c5",
+            "connectorId": "analyticsConnector",
+            "name": "Flow Analytics",
+            "label": "Flow Analytics",
+            "status": "configured",
+            "capabilityName": "logOutcome",
+            "type": "action",
+            "properties": {
+              "outcomeType": {
+                "value": "login"
+              },
+              "outcomeStatus": {
+                "value": "success"
+              },
+              "shouldContinueOnError": {
+                "value": true
+              },
+              "nodeTitle": {
+                "value": "Start AutoEnroll Email"
+              },
+              "outcomeStatusDetail": {
+                "value": "Start AutoEnroll Email"
+              },
+              "outcomeDescription": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Start AutoEnroll Email\"\n      }\n    ]\n  }\n]"
+              }
+            }
+          },
+          "position": {
+            "x": 900,
+            "y": 510
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "bt9mi7lvtm",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 1068,
+            "y": 507.75
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "xutqggmdor",
+            "nodeType": "CONNECTION",
+            "connectionId": "c4b2032a1b63d370c5fbdd205522f1c5",
+            "connectorId": "analyticsConnector",
+            "name": "Flow Analytics",
+            "label": "Flow Analytics",
+            "status": "configured",
+            "capabilityName": "logOutcome",
+            "type": "action",
+            "properties": {
+              "outcomeType": {
+                "value": "login"
+              },
+              "outcomeStatus": {
+                "value": "success"
+              },
+              "shouldContinueOnError": {
+                "value": true
+              },
+              "nodeTitle": {
+                "value": "Finish AutoEnroll Email"
+              },
+              "outcomeStatusDetail": {
+                "value": "Finish AutoEnroll Email"
+              },
+              "outcomeDescription": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Finish AutoEnroll Email\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "idUnique": "wzw9fmg34r"
+          },
+          "position": {
+            "x": 2310,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "20z4jp0qx3",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 2430,
+            "y": 870
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        }
+      ],
+      "edges": [
+        {
+          "data": {
+            "id": "eu52bdvlsj",
+            "source": "bfqa87ad8l",
+            "target": "j496qxzd0c"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "gl8bj0xgor",
+            "source": "muahcq7bwo",
+            "target": "brsc2k7uj4"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "texm5u5y7n",
+            "source": "fcvwwpmkeq",
+            "target": "d60car20if"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "ulp0m7atfu",
+            "source": "sy5ji6r90v",
+            "target": "qibog9r3as"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "lbnoequqbj",
+            "source": "gn1zfrbhfn",
+            "target": "ic158vw0c0"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "ed7ho0tvsz",
+            "source": "l8brhyefwk",
+            "target": "mm221k8mtu"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "n6f186dru0",
+            "source": "sy5ji6r90v",
+            "target": "gn1zfrbhfn"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "3p0o9pu2tl",
+            "source": "mm221k8mtu",
+            "target": "hrnf7vf4v0"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "10c1becs0c",
+            "source": "brsc2k7uj4",
+            "target": "w547kv0b67"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "lykt574vkn",
+            "source": "brsc2k7uj4",
+            "target": "2q8o7ctrmj"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "xskt09ze46",
+            "source": "bt9mi7lvtm",
+            "target": "9y0nnf59o3"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "aoolsxyauo",
+            "source": "2q8o7ctrmj",
+            "target": "n0quwyscsi"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "8llh4pzxrv",
+            "source": "mm221k8mtu",
+            "target": "81w4xznzc9"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "4eqwxmmyj4",
+            "source": "n0quwyscsi",
+            "target": "y2g6mnx0bh"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "cjn90rnsln",
+            "source": "ic158vw0c0",
+            "target": "mnjtf03g2b"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "mq5ag6l6tr",
+            "source": "ic158vw0c0",
+            "target": "l8brhyefwk"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "do0dtf6n8n",
+            "source": "bpkvxton27",
+            "target": "sy5ji6r90v"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "2e5jafhrh8",
+            "source": "9y0nnf59o3",
+            "target": "fcvwwpmkeq"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "8jt6k2gmj8",
+            "source": "fcvwwpmkeq",
+            "target": "bpkvxton27"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "1xqqe83o46",
+            "source": "4nwm10m3zr",
+            "target": "bfqa87ad8l"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "tljzkyh8kd",
+            "source": "j496qxzd0c",
+            "target": "0en8bx28v3"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "qana81rwwo",
+            "source": "0en8bx28v3",
+            "target": "yoyebr3xak"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "5bcal1a6rr",
+            "source": "yoyebr3xak",
+            "target": "bt9mi7lvtm"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "6w7nbwp5oe",
+            "source": "n0quwyscsi",
+            "target": "xutqggmdor"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "nepp8j0djm",
+            "source": "xutqggmdor",
+            "target": "20z4jp0qx3"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "8xvp7xl070",
+            "source": "20z4jp0qx3",
+            "target": "zy9zqsq8ow"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        }
+      ]
+    },
+    "data": {},
+    "zoomingEnabled": true,
+    "userZoomingEnabled": true,
+    "zoom": 1,
+    "minZoom": 1E-50,
+    "maxZoom": 1E+50,
+    "panningEnabled": true,
+    "userPanningEnabled": true,
+    "pan": {
+      "x": 0,
+      "y": 0
+    },
+    "boxSelectionEnabled": true,
+    "renderer": {
+      "name": "null"
+    }
+  },
+  "inputSchema": [
+    {
+      "description": "",
+      "isExpanded": true,
+      "preferredControlType": "textField",
+      "preferredDataType": "string",
+      "propertyName": "p1UserId"
+    },
+    {
+      "description": "",
+      "isExpanded": true,
+      "preferredControlType": "textField",
+      "preferredDataType": "string",
+      "propertyName": "p1Email"
+    },
+    {
+      "description": "",
+      "isExpanded": true,
+      "preferredControlType": "textField",
+      "preferredDataType": "object",
+      "propertyName": "mf-configObject"
+    }
+  ],
+  "flowColor": "#ff661c",
+  "savedDate": 1729785245500,
+  "variables": [
+    {
+      "context": "flowInstance",
+      "createdDate": 1729617691823,
+      "fields": {
+        "displayName": "",
+        "max": 2000,
+        "min": 0,
+        "mutable": true,
+        "type": "object"
+      },
+      "id": "7850e826-245c-4766-acad-ee2fc372bd33",
+      "type": "property",
+      "visibility": "private",
+      "name": "mf-configObject##SK##flowInstance",
+      "companyId": "5e4b5c7b-636d-492e-ad93-f736f905c9cf"
+    }
+  ]
+}

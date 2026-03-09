@@ -1,0 +1,721 @@
+# DaVinci Flow Resource Definition
+#
+# Schema-driven definition: the processor handles settings, graph_data,
+# input_schema, and output_schema via generic capabilities (choice wrapper
+# unwrapping, slice-to-map keying, jsonencode_raw transform, value_map
+# transform). No custom handlers are needed for this resource.
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_flow
+  api_type: Flow
+  name: DaVinci Flow
+  short_name: flow
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/davinci
+  sdk_type: Flow
+  list_method: Flows.GetAll
+  get_method: Flows.Get
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Description - optional string
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  # Color - optional string
+  - name: Color
+    terraform_name: color
+    type: string
+    source_path: Color
+
+  # Enabled - computed bool
+  - name: Enabled
+    terraform_name: enabled
+    type: bool
+    source_path: Enabled
+    computed: true
+
+  # Current version - computed number
+  - name: CurrentVersion
+    terraform_name: current_version
+    type: number
+    source_path: CurrentVersion
+    computed: true
+
+  # Published version - computed number
+  - name: PublishedVersion
+    terraform_name: published_version
+    type: number
+    source_path: PublishedVersion
+    computed: true
+
+  # Connectors - computed set of connector references
+  - name: Connectors
+    terraform_name: connectors
+    type: set
+    source_path: Connectors
+    computed: true
+    nested_attributes:
+      - name: Id
+        terraform_name: id
+        type: string
+        source_path: Id
+
+  # ── Settings ──────────────────────────────────────────────────
+  # SDK type: *DaVinciFlowSettingsResponse (25 fields)
+  # Choice wrapper structs are unwrapped automatically by the processor.
+  - name: Settings
+    terraform_name: settings
+    type: object
+    source_path: Settings
+    nested_attributes:
+      # Simple string fields
+      - name: Csp
+        terraform_name: csp
+        type: string
+        source_path: Csp
+
+      - name: Css
+        terraform_name: css
+        type: string
+        source_path: Css
+
+      - name: CustomErrorScreenBrandLogoUrl
+        terraform_name: custom_error_screen_brand_logo_url
+        type: string
+        source_path: CustomErrorScreenBrandLogoUrl
+
+      - name: CustomFaviconLink
+        terraform_name: custom_favicon_link
+        type: string
+        source_path: CustomFaviconLink
+
+      - name: CustomTitle
+        terraform_name: custom_title
+        type: string
+        source_path: CustomTitle
+
+      - name: JsCustomFlowPlayer
+        terraform_name: js_custom_flow_player
+        type: string
+        source_path: JsCustomFlowPlayer
+
+      # Number fields
+      - name: CustomLogoURLSelection
+        terraform_name: custom_logo_urlselection
+        type: number
+        source_path: CustomLogoURLSelection
+
+      - name: FlowHttpTimeoutInSeconds
+        terraform_name: flow_http_timeout_in_seconds
+        type: number
+        source_path: FlowHttpTimeoutInSeconds
+
+      - name: FlowTimeoutInSeconds
+        terraform_name: flow_timeout_in_seconds
+        type: number
+        source_path: FlowTimeoutInSeconds
+
+      - name: LogLevel
+        terraform_name: log_level
+        type: number
+        source_path: LogLevel
+
+      # Bool choice wrapper fields (SDK: *...{Bool *bool, Choice2 *...})
+      - name: CustomErrorShowFooter
+        terraform_name: custom_error_show_footer
+        type: bool
+        source_path: CustomErrorShowFooter
+
+      - name: DefaultErrorScreenBrandLogo
+        terraform_name: default_error_screen_brand_logo
+        type: bool
+        source_path: DefaultErrorScreenBrandLogo
+
+      - name: RequireAuthenticationToInitiate
+        terraform_name: require_authentication_to_initiate
+        type: bool
+        source_path: RequireAuthenticationToInitiate
+
+      - name: ScrubSensitiveInfo
+        terraform_name: scrub_sensitive_info
+        type: bool
+        source_path: ScrubSensitiveInfo
+
+      - name: UseCSP
+        terraform_name: use_csp
+        type: bool
+        source_path: UseCSP
+
+      - name: UseCustomCSS
+        terraform_name: use_custom_css
+        type: bool
+        source_path: UseCustomCSS
+
+      - name: UseCustomFlowPlayer
+        terraform_name: use_custom_flow_player
+        type: bool
+        source_path: UseCustomFlowPlayer
+
+      - name: UseCustomScript
+        terraform_name: use_custom_script
+        type: bool
+        source_path: UseCustomScript
+
+      - name: UseIntermediateLoadingScreen
+        terraform_name: use_intermediate_loading_screen
+        type: bool
+        source_path: UseIntermediateLoadingScreen
+
+      - name: ValidateOnSave
+        terraform_name: validate_on_save
+        type: bool
+        source_path: ValidateOnSave
+
+      # String/Object choice wrapper fields
+      - name: IntermediateLoadingScreenCSS
+        terraform_name: intermediate_loading_screen_css
+        type: string
+        source_path: IntermediateLoadingScreenCSS
+
+      - name: IntermediateLoadingScreenHTML
+        terraform_name: intermediate_loading_screen_html
+        type: string
+        source_path: IntermediateLoadingScreenHTML
+
+      # Set of strings
+      - name: CssLinks
+        terraform_name: css_links
+        type: set
+        source_path: CssLinks
+
+      - name: SensitiveInfoFields
+        terraform_name: sensitive_info_fields
+        type: set
+        source_path: SensitiveInfoFields
+
+      # Set of objects with nested attributes
+      - name: JsLinks
+        terraform_name: js_links
+        type: set
+        source_path: JsLinks
+        nested_attributes:
+          - name: Value
+            terraform_name: value
+            type: string
+            source_path: Value
+
+          - name: Label
+            terraform_name: label
+            type: string
+            source_path: Label
+
+          - name: Type
+            terraform_name: type
+            type: string
+            source_path: Type
+
+          - name: Crossorigin
+            terraform_name: crossorigin
+            type: string
+            source_path: Crossorigin
+
+          - name: Integrity
+            terraform_name: integrity
+            type: string
+            source_path: Integrity
+
+          - name: Referrerpolicy
+            terraform_name: referrerpolicy
+            type: string
+            source_path: Referrerpolicy
+
+          - name: Defer
+            terraform_name: defer
+            type: bool
+            source_path: Defer
+
+  # ── Graph Data ────────────────────────────────────────────────
+  # SDK type: *DaVinciFlowGraphDataResponse
+  # Processor handles slice-to-map keying for nodes/edges, and
+  # jsonencode_raw transforms for data, renderer, and node properties.
+  - name: GraphData
+    terraform_name: graph_data
+    type: object
+    source_path: GraphData
+    required: true
+    nested_attributes:
+      # Top-level graph data (arbitrary JSON map)
+      - name: Data
+        terraform_name: data
+        type: object
+        source_path: Data
+        transform: jsonencode_raw
+
+      # Renderer configuration (arbitrary JSON object)
+      - name: Renderer
+        terraform_name: renderer
+        type: object
+        source_path: Renderer
+        transform: jsonencode_raw
+
+      # Elements container
+      - name: Elements
+        terraform_name: elements
+        type: object
+        source_path: Elements
+        nested_attributes:
+          # Nodes: API returns []Node, provider expects map[string]Node
+          - name: Nodes
+            terraform_name: nodes
+            type: map
+            source_path: Nodes
+            map_key_path: Data.Id
+            nested_attributes:
+              - name: Data
+                terraform_name: data
+                type: object
+                source_path: Data
+                nested_attributes:
+                  - name: Id
+                    terraform_name: id
+                    type: string
+                    source_path: Id
+
+                  - name: NodeType
+                    terraform_name: node_type
+                    type: string
+                    source_path: NodeType
+
+                  - name: ConnectionId
+                    terraform_name: connection_id
+                    type: string
+                    source_path: ConnectionId
+                    references_type: pingone_davinci_connector_instance
+                    reference_field: id
+
+                  - name: ConnectorId
+                    terraform_name: connector_id
+                    type: string
+                    source_path: ConnectorId
+
+                  - name: Name
+                    terraform_name: name
+                    type: string
+                    source_path: Name
+
+                  - name: Label
+                    terraform_name: label
+                    type: string
+                    source_path: Label
+
+                  - name: CapabilityName
+                    terraform_name: capability_name
+                    type: string
+                    source_path: CapabilityName
+
+                  - name: Type
+                    terraform_name: type
+                    type: string
+                    source_path: Type
+
+                  - name: Status
+                    terraform_name: status
+                    type: string
+                    source_path: Status
+
+                  - name: IdUnique
+                    terraform_name: id_unique
+                    type: string
+                    source_path: IdUnique
+
+                  # Properties: arbitrary JSON, must be jsonencode'd
+                  - name: Properties
+                    terraform_name: properties
+                    type: object
+                    source_path: Properties
+                    transform: jsonencode_raw
+
+              - name: Position
+                terraform_name: position
+                type: object
+                source_path: Position
+                nested_attributes:
+                  - name: X
+                    terraform_name: x
+                    type: number
+                    source_path: X
+
+                  - name: Y
+                    terraform_name: y
+                    type: number
+                    source_path: Y
+
+              - name: Group
+                terraform_name: group
+                type: string
+                source_path: Group
+
+              - name: Removed
+                terraform_name: removed
+                type: bool
+                source_path: Removed
+
+              - name: Selected
+                terraform_name: selected
+                type: bool
+                source_path: Selected
+
+              - name: Selectable
+                terraform_name: selectable
+                type: bool
+                source_path: Selectable
+
+              - name: Locked
+                terraform_name: locked
+                type: bool
+                source_path: Locked
+
+              - name: Grabbable
+                terraform_name: grabbable
+                type: bool
+                source_path: Grabbable
+
+              - name: Pannable
+                terraform_name: pannable
+                type: bool
+                source_path: Pannable
+
+              - name: Classes
+                terraform_name: classes
+                type: string
+                source_path: Classes
+
+          # Edges: API returns []Edge, provider expects map[string]Edge
+          - name: Edges
+            terraform_name: edges
+            type: map
+            source_path: Edges
+            map_key_path: Data.Id
+            nested_attributes:
+              - name: Data
+                terraform_name: data
+                type: object
+                source_path: Data
+                nested_attributes:
+                  - name: Id
+                    terraform_name: id
+                    type: string
+                    source_path: Id
+
+                  - name: Source
+                    terraform_name: source
+                    type: string
+                    source_path: Source
+
+                  - name: Target
+                    terraform_name: target
+                    type: string
+                    source_path: Target
+
+              - name: Position
+                terraform_name: position
+                type: object
+                source_path: Position
+                nested_attributes:
+                  - name: X
+                    terraform_name: x
+                    type: number
+                    source_path: X
+
+                  - name: Y
+                    terraform_name: y
+                    type: number
+                    source_path: Y
+
+              - name: Group
+                terraform_name: group
+                type: string
+                source_path: Group
+
+              - name: Removed
+                terraform_name: removed
+                type: bool
+                source_path: Removed
+
+              - name: Selected
+                terraform_name: selected
+                type: bool
+                source_path: Selected
+
+              - name: Selectable
+                terraform_name: selectable
+                type: bool
+                source_path: Selectable
+
+              - name: Locked
+                terraform_name: locked
+                type: bool
+                source_path: Locked
+
+              - name: Grabbable
+                terraform_name: grabbable
+                type: bool
+                source_path: Grabbable
+
+              - name: Pannable
+                terraform_name: pannable
+                type: bool
+                source_path: Pannable
+
+              - name: Classes
+                terraform_name: classes
+                type: string
+                source_path: Classes
+
+      # ── Graph-level viewport settings ─────────────────────────
+      - name: BoxSelectionEnabled
+        terraform_name: box_selection_enabled
+        type: bool
+        source_path: BoxSelectionEnabled
+
+      - name: PanningEnabled
+        terraform_name: panning_enabled
+        type: bool
+        source_path: PanningEnabled
+
+      - name: UserPanningEnabled
+        terraform_name: user_panning_enabled
+        type: bool
+        source_path: UserPanningEnabled
+
+      - name: UserZoomingEnabled
+        terraform_name: user_zooming_enabled
+        type: bool
+        source_path: UserZoomingEnabled
+
+      - name: ZoomingEnabled
+        terraform_name: zooming_enabled
+        type: bool
+        source_path: ZoomingEnabled
+
+      - name: Zoom
+        terraform_name: zoom
+        type: number
+        source_path: Zoom
+
+      - name: MinZoom
+        terraform_name: min_zoom
+        type: number
+        source_path: MinZoom
+
+      - name: MaxZoom
+        terraform_name: max_zoom
+        type: number
+        source_path: MaxZoom
+
+      - name: Pan
+        terraform_name: pan
+        type: object
+        source_path: Pan
+        nested_attributes:
+          - name: X
+            terraform_name: x
+            type: number
+            source_path: X
+
+          - name: Y
+            terraform_name: y
+            type: number
+            source_path: Y
+
+  # ── Input Schema ──────────────────────────────────────────────
+  # SDK type: []InputSchema
+  # value_map transform normalizes preferred_data_type values.
+  - name: InputSchema
+    terraform_name: input_schema
+    type: list
+    source_path: InputSchema
+    nested_attributes:
+      - name: PropertyName
+        terraform_name: property_name
+        type: string
+        source_path: PropertyName
+
+      - name: PreferredDataType
+        terraform_name: preferred_data_type
+        type: string
+        source_path: PreferredDataType
+        transform: value_map
+        value_map:
+          bool: boolean
+          boolean: boolean
+          integer: number
+          int: number
+          float: number
+          double: number
+          number: number
+          secret: string
+          string: string
+          object: object
+          array: array
+        value_map_default: string
+
+      - name: PreferredControlType
+        terraform_name: preferred_control_type
+        type: string
+        source_path: PreferredControlType
+
+      - name: Required
+        terraform_name: required
+        type: bool
+        source_path: Required
+
+      - name: IsExpanded
+        terraform_name: is_expanded
+        type: bool
+        source_path: IsExpanded
+
+      - name: Description
+        terraform_name: description
+        type: string
+        source_path: Description
+
+  # ── Output Schema ────────────────────────────────────────────
+  # SDK type: *OutputSchema with nested Output object
+  - name: OutputSchema
+    terraform_name: output_schema
+    type: object
+    source_path: OutputSchema
+    nested_attributes:
+      - name: Output
+        terraform_name: output
+        type: object
+        source_path: Output
+        nested_attributes:
+          - name: Type
+            terraform_name: type
+            type: string
+            source_path: Type
+
+          - name: Properties
+            terraform_name: properties
+            type: object
+            source_path: Properties
+            transform: jsonencode_raw
+
+          - name: AdditionalPropertiesField
+            terraform_name: additional_properties
+            type: bool
+            source_path: AdditionalPropertiesField
+
+  # ── Trigger ───────────────────────────────────────────────────
+  - name: Trigger
+    terraform_name: trigger
+    type: object
+    source_path: Trigger
+    nested_attributes:
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+
+      - name: Configuration
+        terraform_name: configuration
+        type: object
+        source_path: Configuration
+        nested_attributes:
+          - name: Mfa
+            terraform_name: mfa
+            type: object
+            source_path: Mfa
+            nested_attributes:
+              - name: Enabled
+                terraform_name: enabled
+                type: bool
+                source_path: Enabled
+
+              - name: Time
+                terraform_name: time
+                type: number
+                source_path: Time
+
+              - name: TimeFormat
+                terraform_name: time_format
+                type: string
+                source_path: TimeFormat
+
+          - name: Pwd
+            terraform_name: pwd
+            type: object
+            source_path: Pwd
+            nested_attributes:
+              - name: Enabled
+                terraform_name: enabled
+                type: bool
+                source_path: Enabled
+
+              - name: Time
+                terraform_name: time
+                type: number
+                source_path: Time
+
+              - name: TimeFormat
+                terraform_name: time_format
+                type: string
+                source_path: TimeFormat
+
+# Settings log_level default: emit API response value; default to 4 if absent.
+conditional_defaults:
+  - target_attribute: log_level
+    set_value: 4
+    when_all:
+      - attribute_empty: log_level
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+    - resource_type: pingone_davinci_connector_instance
+      field_path: GraphData.Elements.Nodes.Data.ConnectionId
+      lookup_field: id
+      reference_format: "pingone_davinci_connector_instance.{resource_name}.id"
+      optional: true
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

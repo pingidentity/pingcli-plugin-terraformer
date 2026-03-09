@@ -1,0 +1,163 @@
+# DaVinci Application Flow Policy Resource Definition
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_application_flow_policy
+  api_type: FlowPolicy
+  name: DaVinci Application Flow Policy
+  short_name: flow_policy
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/pingone
+  sdk_type: DaVinciFlowPolicyResponse
+  list_method: FlowPolicies.GetAll
+  get_method: FlowPolicies.Get
+  id_field: id
+  name_field: name
+  pagination_type: none
+  allow_duplicate_labels: true
+  additional_id_fields:
+    - davinci_application_id
+
+attributes:
+  # ID - resource identifier (not written to HCL, used for import blocks and graph)
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Application ID - required, references application
+  - name: ApplicationID
+    terraform_name: davinci_application_id
+    type: string
+    source_path: Application.Id
+    required: true
+    references_type: pingone_davinci_application
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Status - optional string (e.g., "enabled", "disabled")
+  - name: Status
+    terraform_name: status
+    type: string
+    source_path: Status
+
+  # Trigger - optional nested object
+  - name: Trigger
+    terraform_name: trigger
+    type: object
+    source_path: Trigger
+    nested_attributes:
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+
+      - name: Configuration
+        terraform_name: configuration
+        type: object
+        source_path: Configuration
+        nested_attributes:
+          - name: Mfa
+            terraform_name: mfa
+            type: object
+            source_path: Mfa
+            nested_attributes:
+              - name: Enabled
+                terraform_name: enabled
+                type: bool
+                source_path: Enabled
+
+              - name: Time
+                terraform_name: time
+                type: number
+                source_path: Time
+
+              - name: TimeFormat
+                terraform_name: time_format
+                type: string
+                source_path: TimeFormat
+
+          - name: Pwd
+            terraform_name: pwd
+            type: object
+            source_path: Pwd
+            nested_attributes:
+              - name: Enabled
+                terraform_name: enabled
+                type: bool
+                source_path: Enabled
+
+              - name: Time
+                terraform_name: time
+                type: number
+                source_path: Time
+
+              - name: TimeFormat
+                terraform_name: time_format
+                type: string
+                source_path: TimeFormat
+
+  # Flow distributions - optional list of objects
+  - name: FlowDistributions
+    terraform_name: flow_distributions
+    type: list
+    source_path: FlowDistributions
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        references_type: pingone_davinci_flow
+        reference_field: id
+
+      - name: Version
+        terraform_name: version
+        type: number
+        source_path: Version
+        override_value: -1
+
+      - name: Weight
+        terraform_name: weight
+        type: number
+        source_path: Weight
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+    - resource_type: pingone_davinci_application
+      field_path: ApplicationID
+      lookup_field: id
+      reference_format: "pingone_davinci_application.{resource_name}.id"
+
+    - resource_type: pingone_davinci_flow
+      field_path: FlowDistributions.Id
+      lookup_field: id
+      reference_format: "pingone_davinci_flow.{resource_name}.id"
+      optional: true
+
+  import_id_format: "{env_id}/{davinci_application_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []
