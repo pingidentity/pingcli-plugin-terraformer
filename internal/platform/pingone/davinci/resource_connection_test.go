@@ -50,7 +50,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			contains: []string{
 				`"clientId"`,
 				`"type": "string"`,
-				`"value": "my-client-id"`,
+				`${var.davinci_connection_Test_0020_Connector_clientId}`,
 				"jsonencode(",
 			},
 		},
@@ -65,7 +65,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			apiData: &mockAPIData{Name: "PingOne Protect"},
 			contains: []string{
 				`"clientSecret"`,
-				`${var.davinci_connection_PingOne-0020-Protect_clientSecret}`,
+				`${var.davinci_connection_PingOne_0020_Protect_clientSecret}`,
 			},
 		},
 		{
@@ -78,7 +78,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			},
 			apiData: &mockAPIData{Name: "test"},
 			contains: []string{
-				`"value": true`,
+				`${var.davinci_connection_test_enabled}`,
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			},
 			apiData: &mockAPIData{Name: "test"},
 			contains: []string{
-				`"value": 30`,
+				`${var.davinci_connection_test_timeout}`,
 			},
 		},
 		{
@@ -104,7 +104,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			},
 			apiData: &mockAPIData{Name: "test"},
 			contains: []string{
-				`"value": "val"`,
+				`${var.davinci_connection_test_noType}`,
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func TestConnectorVariableName(t *testing.T) {
 		{
 			resource: "pingcli__PingOne-0020-Protect",
 			property: "clientSecret",
-			want:     "davinci_connection_PingOne-0020-Protect_clientSecret",
+			want:     "davinci_connection_PingOne_0020_Protect_clientSecret",
 		},
 		{
 			resource: "pingcli__simple",
@@ -503,8 +503,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				"jsonencode(",
 				`"properties"`,
 				`"providerName"`,
-				`"Login with Apple"`,
-				`${var.davinci_connection_Apple-0020-Login_customAuth_clientSecret}`,
+				`${var.davinci_connection_Apple_0020_Login_customAuth_providerName}`,
+				`${var.davinci_connection_Apple_0020_Login_customAuth_clientSecret}`,
 				`"secure": true`,
 			},
 			notContains: []string{
@@ -533,10 +533,10 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 			contains: []string{
 				`"clientId"`,
 				`"type": "string"`,
-				`"value": "my-client-id"`,
+				`${var.davinci_connection_Mixed_clientId}`,
 				`"customAuth"`,
 				`"type": "json"`,
-				`"My Provider"`,
+				`${var.davinci_connection_Mixed_customAuth_providerName}`,
 			},
 		},
 		{
@@ -623,11 +623,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 			apiData: &mockAPIData{Name: "Google"},
 			contains: []string{
 				`"type": "json"`,
-				`"Google"`,
-				`"https://accounts.google.com"`,
-			},
-			notContains: []string{
-				`${var.`,
+				`${var.davinci_connection_Google_oauth2_providerName}`,
+				`${var.davinci_connection_Google_oauth2_issuerUrl}`,
 				`"secure"`,
 			},
 		},
@@ -658,8 +655,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				"jsonencode(",
 				`"properties"`,
 				`"providerName"`,
-				`"Login with Apple"`,
-				`${var.davinci_connection_Apple-0020-Login_customAuth_clientSecret}`,
+				`${var.davinci_connection_Apple_0020_Login_customAuth_providerName}`,
+				`${var.davinci_connection_Apple_0020_Login_customAuth_clientSecret}`,
 				`"secure": true`,
 			},
 			notContains: []string{
@@ -681,7 +678,7 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				"jsonencode(",
 				`"properties"`,
 				`"providerName"`,
-				`"Login with Apple"`,
+				`${var.davinci_connection_Apple_0020_Login_customAuth_providerName}`,
 			},
 			notContains: []string{
 				`"displayName"`,
@@ -776,7 +773,7 @@ func TestHandleConnectorPropertiesComplexVariables(t *testing.T) {
 	}
 
 	// clientSecret — secret (secure: true + masked + name heuristic).
-	cs, ok := varMap["davinci_connection_Apple-0020-Login_customAuth_clientSecret"]
+	cs, ok := varMap["davinci_connection_Apple_0020_Login_customAuth_clientSecret"]
 	require.True(t, ok, "expected clientSecret variable")
 	assert.True(t, cs.IsSecret)
 	assert.True(t, cs.Sensitive)
@@ -785,7 +782,7 @@ func TestHandleConnectorPropertiesComplexVariables(t *testing.T) {
 	assert.Equal(t, "pingone_davinci_connector_instance", cs.ResourceType)
 
 	// providerName — not a secret, should carry current value.
-	pn, ok := varMap["davinci_connection_Apple-0020-Login_customAuth_providerName"]
+	pn, ok := varMap["davinci_connection_Apple_0020_Login_customAuth_providerName"]
 	require.True(t, ok, "expected providerName variable")
 	assert.False(t, pn.IsSecret)
 	assert.False(t, pn.Sensitive)

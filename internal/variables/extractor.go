@@ -6,6 +6,7 @@ import (
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
 )
 
 // VariableExtractor evaluates schema-driven rules to determine which resource
@@ -83,9 +84,9 @@ func (e *VariableExtractor) Extract(
 
 		// Derive variable name.
 		if hasRule && rule.VariablePrefix != "" {
-			ev.VariableName = sanitizeVariableName(rule.VariablePrefix + resourceName + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + resourceName + "_" + tfName)
 		} else {
-			ev.VariableName = sanitizeVariableName(resourceType + "_" + resourceName + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + resourceName + "_" + tfName)
 		}
 
 		// Apply rule overrides.
@@ -120,23 +121,6 @@ func inferTerraformType(schemaType string) string {
 	default:
 		return "string"
 	}
-}
-
-// sanitizeVariableName produces a valid Terraform variable name.
-func sanitizeVariableName(name string) string {
-	var b strings.Builder
-	for _, r := range name {
-		switch {
-		case r >= 'a' && r <= 'z',
-			r >= 'A' && r <= 'Z',
-			r >= '0' && r <= '9',
-			r == '_':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('_')
-		}
-	}
-	return strings.ToLower(b.String())
 }
 
 // unwrapTypeDiscriminatedBlock extracts the inner value from a

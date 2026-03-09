@@ -120,6 +120,11 @@ func (f *Formatter) Format(data *core.ResourceData, def *schema.ResourceDefiniti
 		if !ok || val == nil {
 			continue
 		}
+		// ResolvedReference: write as unquoted traversal (e.g. var.my_variable).
+		if ref, ok := val.(core.ResolvedReference); ok {
+			writeTraversalExpression(body, tName, ref.Expression())
+			continue
+		}
 		writeScalarValue(body, tName, val)
 	}
 
@@ -496,6 +501,8 @@ func scalarTokens(indent, name string, val interface{}) hclwrite.Tokens {
 	tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenEqual, Bytes: []byte(" = ")})
 
 	switch v := val.(type) {
+	case core.ResolvedReference:
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte(v.Expression())})
 	case string:
 		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenQuotedLit, Bytes: []byte(fmt.Sprintf("%q", v))})
 	case bool:

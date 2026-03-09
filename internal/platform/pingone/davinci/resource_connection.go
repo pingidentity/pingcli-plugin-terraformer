@@ -159,37 +159,13 @@ func inferPropertyVariableType(value interface{}) string {
 }
 
 // formatPropertyValue renders a single property value for use inside
-// a jsonencode expression. Masked secrets are replaced with variable refs.
+// a jsonencode expression. All non-nil values are replaced with variable refs.
 func formatPropertyValue(value interface{}, prefix, resourceName, propertyName string) string {
-	// Masked secret detection (API returns "******").
-	if strVal, ok := value.(string); ok && strings.TrimSpace(strVal) == "******" {
-		varName := connectorVariableName(prefix, resourceName, propertyName)
-		return fmt.Sprintf("\"${var.%s}\"", varName)
-	}
-
 	if value == nil {
 		return "null"
 	}
-
-	switch v := value.(type) {
-	case string:
-		return fmt.Sprintf("\"%s\"", v)
-	case bool:
-		return fmt.Sprintf("%t", v)
-	case float64:
-		if v == float64(int64(v)) {
-			return fmt.Sprintf("%d", int64(v))
-		}
-		return fmt.Sprintf("%f", v)
-	case map[string]interface{}:
-		jsonBytes, err := json.Marshal(v)
-		if err != nil {
-			return fmt.Sprintf("\"%v\"", v)
-		}
-		return string(jsonBytes)
-	default:
-		return fmt.Sprintf("\"%v\"", v)
-	}
+	varName := connectorVariableName(prefix, resourceName, propertyName)
+	return fmt.Sprintf("\"${var.%s}\"", varName)
 }
 
 // extractResourceName retrieves the Name field from an API data struct via
@@ -208,14 +184,28 @@ func extractResourceName(apiData interface{}) string {
 	return ""
 }
 
+// isScalarValue returns true if the value is a scalar (string, number, bool),
+// false for arrays, objects, and other complex types.
+func isScalarValue(value interface{}) bool {
+	switch value.(type) {
+	case string, bool, float64, int:
+		return true
+	default:
+		return false
+	}
+}
+
 // connectorVariableName builds a Terraform variable name for a connector
 // property. Format: {prefix}{cleanedName}_{propertyName}
+// The output is sanitized to match schema-driven variable naming:
+// non-alphanumeric/underscore characters are replaced with underscores,
+// and preserves the casing from the original components.
 func connectorVariableName(prefix, resourceName, propertyName string) string {
 	cleanName := resourceName
 	for _, pfx := range []string{"pingcli__", "davinci__"} {
 		cleanName = strings.TrimPrefix(cleanName, pfx)
 	}
-	return prefix + cleanName + "_" + propertyName
+	return utils.SanitizeVariableName(prefix + cleanName + "_" + propertyName)
 }
 
 // isComplexProperty returns true when a property map contains a nested
@@ -368,9 +358,16 @@ func formatComplexPropertyValue(propMap map[string]interface{}, prefix, resource
 				continue
 			}
 
-			entry["value"] = rawValue
-
 			varName := connectorVariableName(prefix, resourceName, parentKey+"_"+nk)
+
+			// For scalar values, use variable reference; for arrays/objects, preserve structure
+			if isScalarValue(rawValue) {
+				entry["value"] = fmt.Sprintf("${var.%s}", varName)
+			} else {
+				entry["value"] = rawValue
+			}
+			entry["secure"] = false
+
 			extractedVars = append(extractedVars, core.ExtractedVariable{
 				AttributePath: "properties." + parentKey + "." + nk,
 				VariableName:  varName,

@@ -158,23 +158,6 @@ func TestInferTerraformType(t *testing.T) {
 	}
 }
 
-func TestSanitizeVariableName(t *testing.T) {
-	tests := []struct {
-		in  string
-		out string
-	}{
-		{"simple", "simple"},
-		{"with-dashes", "with_dashes"},
-		{"CamelCase", "camelcase"},
-		{"dots.and.slashes/here", "dots_and_slashes_here"},
-		{"a b c", "a_b_c"},
-		{"already_underscored", "already_underscored"},
-	}
-	for _, tt := range tests {
-		assert.Equal(t, tt.out, sanitizeVariableName(tt.in), "input: %s", tt.in)
-	}
-}
-
 func TestExpandDescription(t *testing.T) {
 	assert.Equal(t, "Value for my_flow", expandDescription("Value for {name}", "my_flow"))
 	assert.Equal(t, "no placeholders", expandDescription("no placeholders", "x"))

@@ -82,7 +82,10 @@ internal/
         loader.go          # YAML file loading
         validator.go       # Definition validation
         keys.go            # CanonicalAttributeKey
-    utils/                 # Name sanitization, HCL sorting
+    utils/                 # Sanitization utilities (use these, don't duplicate):
+                           #   - SanitizeResourceName() — valid Terraform resource labels
+                           #   - SanitizeMultiKeyResourceName() — composite key resources
+                           #   - SanitizeVariableName() — valid Terraform variable names
     variables/extractor.go # Schema-driven variable extraction
 
 tools/
@@ -123,6 +126,8 @@ Document:
 ### Step 2: Create the YAML Definition
 
 Create `definitions/pingone/davinci/{short_name}.yaml`:
+
+**Naming Strategy**: The YAML `label_fields` list combines attributes to form a unique resource label. This label is automatically sanitized via `utils.SanitizeResourceName()` (or `utils.SanitizeMultiKeyResourceName()` for composites) to produce a valid Terraform resource name. You do not specify sanitization in the YAML; the processing engine handles it.
 
 ```yaml
 metadata:
@@ -269,6 +274,13 @@ go test ./internal/... -v -count=1
 ## Adding Custom Transforms
 
 Most resources need only declarative YAML with standard transforms (`passthrough`, `base64_encode`, `json_encode`, `value_map`, etc.). Custom transforms are for cases requiring complex Go logic — deep JSON traversal, multi-field correlation, or property masking.
+
+**Important**: Do not write inline sanitization logic in custom transforms or handlers. **Always use the canonicalized utilities**:
+- `utils.SanitizeResourceName(name)` for Terraform resource labels
+- `utils.SanitizeMultiKeyResourceName(keys...)` for composite keys
+- `utils.SanitizeVariableName(name)` for Terraform variable identifiers
+
+These are shared utilities maintained in `internal/utils/sanitize.go`. Duplicating sanitization logic across packages creates inconsistency and maintenance debt.
 
 ### When a Custom Transform Is Needed
 
@@ -700,7 +712,7 @@ api:
   get_method: <method>                # Optional
   id_field: <field>
   name_field: <field>
-  label_fields: [<terraform_attr>, ...]  # Combined for HCL label; falls back to name_field
+  labels: [<terraform_attr>, ...]  # Combined for HCL label (sanitized automatically via utils.SanitizeResourceName or utils.SanitizeMultiKeyResourceName)
   pagination_type: <cursor|...>
   additional_id_fields: [<field>, ...]   # Optional
   allow_duplicate_labels: true|false     # Optional; default false
@@ -780,10 +792,10 @@ custom_handlers:
 | `set` | `[]interface{}` | `["a", "b"]` (deduplicated) |
 | `type_discriminated_block` | varies | `{ string = "value" }` |
 
-### Standard Transforms
+### Standard Transforms and Sanitization
 
 | Transform | Description |
-|-----------|-------------|
+|-----------|----------|
 | `passthrough` | Returns value unchanged |
 | `base64_encode` | Base64 encodes a string |
 | `base64_decode` | Base64 decodes a string |
@@ -793,6 +805,8 @@ custom_handlers:
 | `to_string` | Converts any value to string representation |
 | `value_map` | Looks up value in `value_map`, with `value_map_default` fallback |
 | `custom` | Dispatches to named function in `CustomHandlerRegistry` via `custom_transform` |
+
+**Sanitization is built-in**: Resource labels from `label_fields` are automatically sanitized via `utils.SanitizeResourceName()` or `utils.SanitizeMultiKeyResourceName()`. Variable names are sanitized via `utils.SanitizeVariableName()`. You do not need to apply sanitization transforms manually — it happens automatically during processing.
 
 ---
 
@@ -854,6 +868,29 @@ Use `sensitive: true` and optionally `masked_secret` for API-masked values:
   masked_secret:
     sentinel: "************"
     variable_prefix: secret_
+```
+
+### When should I use the sanitization utilities?
+
+**Always**. Never write inline sanitization logic.
+
+The `internal/utils/sanitize.go` module provides three canonicalized functions:
+
+- **`utils.SanitizeResourceName(name)`** — Produces valid Terraform resource labels. Hex-encodes non-alphanumeric and non-hyphen characters, prepends `pingcli__`. Use this when generating Terraform resource names.
+- **`utils.SanitizeMultiKeyResourceName(keys...)`** — Combines multiple key components (e.g., variable name + context). Same hex-encoding and `pingcli__` prefix, but joins keys with underscores. Use this for resources with composite/multi-field labels.
+- **`utils.SanitizeVariableName(name)`** — Produces valid Terraform variable identifiers. Replaces any character not in `[a-zA-Z0-9_]` with underscore. Use this for Terraform variable names.
+
+**In YAML definitions**: You do not need to invoke sanitization. The processor automatically applies `SanitizeResourceName()` or `SanitizeMultiKeyResourceName()` to labels based on the `label_fields` list. Similarly, `SanitizeVariableName()` is applied automatically when extracting variable names.
+
+**In custom Go code** (handlers, transforms): Always import and call `utils.SanitizeResourceName()`, `utils.SanitizeMultiKeyResourceName()`, or `utils.SanitizeVariableName()` rather than writing your own logic. This ensures consistency across the codebase and reduces maintenance debt.
+
+Example:
+```go
+import "github.com/samir-gandhi/pingcli-plugin-terraformer/internal/utils"
+
+resourceLabel := utils.SanitizeResourceName(data.Name)
+variableName := utils.SanitizeVariableName(attr.TerraformName)
+compositeLabel := utils.SanitizeMultiKeyResourceName(data.Name, data.Context)
 ```
 
 ### How do I test against a live environment?

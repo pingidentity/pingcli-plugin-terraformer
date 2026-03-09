@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/pingidentity/pingcli/shared/grpc"
 	"github.com/pingidentity/pingcli-plugin-terraformer/definitions"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/api"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
@@ -20,6 +19,7 @@ import (
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/variables"
+	"github.com/pingidentity/pingcli/shared/grpc"
 	"github.com/spf13/pflag"
 )
 
@@ -298,7 +298,68 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 	var allVariables []module.Variable
 
 	for _, erd := range result.ResourcesByType {
-		// Format resource output.
+		// Extract variables FIRST and inject references into resource attributes
+		// so the formatter renders var.X expressions instead of raw values.
+		for _, rd := range erd.Resources {
+			// Schema-driven variable extraction (variable_eligible attributes).
+			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Name)
+			if extErr != nil {
+				return fmt.Errorf("extract variables %s: %w", erd.ResourceType, extErr)
+			}
+
+			for _, ev := range extracted {
+				allVariables = append(allVariables, module.Variable{
+					Name:         ev.VariableName,
+					Type:         ev.VariableType,
+					Description:  ev.Description,
+					Default:      ev.CurrentValue,
+					Sensitive:    ev.Sensitive,
+					IsSecret:     ev.IsSecret,
+					ResourceType: ev.ResourceType,
+					ResourceName: ev.ResourceName,
+				})
+
+				// Inject variable reference into resource attributes.
+				// For type_discriminated_block (single-key map), inject inside the map.
+				ref := core.ResolvedReference{
+					IsVariable:   true,
+					VariableName: ev.VariableName,
+				}
+				if ev.CurrentValue != nil {
+					if s, ok := ev.CurrentValue.(string); ok {
+						ref.OriginalValue = s
+					} else {
+						ref.OriginalValue = fmt.Sprintf("%v", ev.CurrentValue)
+					}
+				}
+
+				if m, ok := rd.Attributes[ev.AttributePath].(map[string]interface{}); ok && len(m) == 1 {
+					for k := range m {
+						m[k] = ref
+					}
+				} else {
+					rd.Attributes[ev.AttributePath] = ref
+				}
+			}
+
+			// Custom-transform-provided variables (e.g., connector properties).
+			// These already have var. references baked into their RawHCLValue — do NOT inject.
+			for i := range rd.ExtractedVariables {
+				ev := &rd.ExtractedVariables[i]
+				allVariables = append(allVariables, module.Variable{
+					Name:         ev.VariableName,
+					Type:         ev.VariableType,
+					Description:  ev.Description,
+					Default:      ev.CurrentValue,
+					Sensitive:    ev.Sensitive,
+					IsSecret:     ev.IsSecret,
+					ResourceType: ev.ResourceType,
+					ResourceName: ev.ResourceName,
+				})
+			}
+		}
+
+		// Format resource output (now with variable references injected).
 		formattedOutput, fmtErr := outFmt.FormatList(erd.Resources, erd.Definition, formatters.FormatOptions{
 			SkipDependencies: skipDeps,
 			EnvironmentID:    environmentID,
@@ -315,39 +376,6 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 				allImportBlocks = append(allImportBlocks, module.ImportBlock{
 					To: fmt.Sprintf("module.%s.%s.%s", moduleName, erd.ResourceType, label),
 					ID: buildImportID(erd.Definition, rd, environmentID),
-				})
-			}
-		}
-
-		// Extract variables.
-		for _, rd := range erd.Resources {
-			// Collect all extracted variables: both schema-driven and custom-transform-provided.
-			// Both paths now produce core.ExtractedVariable.
-			var allExtracted []*core.ExtractedVariable
-
-			// Schema-driven variable extraction (variable_eligible attributes).
-			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Name)
-			if extErr != nil {
-				return fmt.Errorf("extract variables %s: %w", erd.ResourceType, extErr)
-			}
-			allExtracted = append(allExtracted, extracted...)
-
-			// Custom-transform-provided variables (e.g., connector properties).
-			for i := range rd.ExtractedVariables {
-				allExtracted = append(allExtracted, &rd.ExtractedVariables[i])
-			}
-
-			// Single mapping point: core.ExtractedVariable → module.Variable
-			for _, ev := range allExtracted {
-				allVariables = append(allVariables, module.Variable{
-					Name:         ev.VariableName,
-					Type:         ev.VariableType,
-					Description:  ev.Description,
-					Default:      ev.CurrentValue,
-					Sensitive:    ev.Sensitive,
-					IsSecret:     ev.IsSecret,
-					ResourceType: ev.ResourceType,
-					ResourceName: ev.ResourceName,
 				})
 			}
 		}

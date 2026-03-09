@@ -611,3 +611,86 @@ func TestFormatter_Format_NestedResolvedReference(t *testing.T) {
 	// Nested flow reference should render as resource traversal.
 	assert.Contains(t, output, "pingone_davinci_flow.pingcli__my_flow.id")
 }
+
+// ── Regression tests: variable-eligible attributes rendering ────
+
+// Regression test: variable-eligible attributes must render as var.X references
+func TestFormatter_Format_ScalarVariableEligibleAttribute(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			ResourceType: "test_resource",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "Name", TerraformName: "name", Type: "string"},
+		},
+	}
+	data := &core.ResourceData{
+		Name: "test",
+		Attributes: map[string]interface{}{
+			"name": core.ResolvedReference{
+				IsVariable:   true,
+				VariableName: "davinci_variable_test_name",
+			},
+		},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	// BUG: This should render as unquoted traversal expression (var.davinci_variable_test_name)
+	// but currently renders as quoted string or is missing.
+	assert.Contains(t, output, "name = var.davinci_variable_test_name",
+		"variable-eligible scalar attributes must render as var.X references without quotes")
+}
+
+// Regression test: variable-eligible attributes inside type_discriminated_block must render as var.X references
+func TestFormatter_Format_TypeDiscriminatedBlockVariableReference(t *testing.T) {
+	f := hclformatter.NewFormatter()
+
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			ResourceType: "pingone_davinci_variable",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string", Computed: true},
+			{Name: "Name", TerraformName: "name", Type: "string"},
+			{
+				Name:          "Value",
+				TerraformName: "value",
+				Type:          "type_discriminated_block",
+				TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
+					TypeKeyMap: map[string]string{
+						"string": "string",
+						"bool":   "bool",
+						"float32": "float32",
+					},
+				},
+			},
+		},
+	}
+
+	data := &core.ResourceData{
+		Name: "my_var",
+		ID:   "var-123",
+		Attributes: map[string]interface{}{
+			"id":   "var-123",
+			"name": "my_var",
+			"value": map[string]interface{}{
+				"string": core.ResolvedReference{
+					IsVariable:   true,
+					VariableName: "davinci_variable_test_value",
+				},
+			},
+		},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	// BUG: The var.X reference inside the block should render without quotes
+	assert.Contains(t, output, "value = {",
+		"type_discriminated_block should contain a block")
+	assert.Contains(t, output, "var.davinci_variable_test_value",
+		"variable references inside type_discriminated_block must render as var.X")
+}

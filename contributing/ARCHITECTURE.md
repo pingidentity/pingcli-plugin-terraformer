@@ -147,7 +147,10 @@ internal/
         validator.go       # Definition validation
     utils/
         hclsort.go         # HCL block sorting
-        sanitize.go        # Resource name sanitization
+        sanitize.go        # Canonicalized name sanitization functions:
+                           #   - SanitizeResourceName() — hex-encode specials, add pingcli__ prefix
+                           #   - SanitizeMultiKeyResourceName() — same for composite keys
+                           #   - SanitizeVariableName() — replace non-[a-zA-Z0-9_] with _
     variables/
         extractor.go       # Schema-driven variable extraction
 ```
@@ -205,7 +208,7 @@ type APIDefinition struct {
 }
 ```
 
-- `LabelFields`: Ordered list of terraform attribute names combined to produce the HCL resource label. Falls back to `SanitizeName(data.Name)` when empty.
+- `LabelFields`: Ordered list of terraform attribute names combined to produce the HCL resource label. The combined label is passed through `utils.SanitizeResourceName()` to generate a valid Terraform resource name. Falls back to the `name_field` value when empty.
 - `AllowDuplicateLabels`: Skips unique label validation for resource types where the upstream system permits duplicate names (e.g., flow policies).
 
 ### AttributeDefinition
@@ -470,6 +473,14 @@ func ReadInterfaceField(data interface{}, fieldName string) interface{}
 
 Used by the processor's `type_discriminated_block` implementation (to evaluate `skip_conditions`) and by custom handlers.
 
+### Name Sanitization (Canonical Utilities)
+
+**Always use the shared utilities in `internal/utils/sanitize.go`**. Do not inline sanitization logic.
+
+- `utils.SanitizeResourceName(name)` — Produces valid Terraform resource names: hex-encodes special characters and prepends `pingcli__`. Used for HCL resource labels.
+- `utils.SanitizeMultiKeyResourceName(keys...)` — Combines multiple key components (e.g., variable name + context) with hex-encoding and `pingcli__` prefix. For resources with multi-field labels.
+- `utils.SanitizeVariableName(name)` — Produces valid Terraform variable identifiers: replaces any non-alphanumeric and non-underscore character with `_`. Used for Terraform variable names in modules and tfvars files.
+
 ---
 
 ## Layer 3: Output Formatters
@@ -641,6 +652,7 @@ The `VariableExtractor` (`internal/variables/extractor.go`) evaluates schema-dri
 - Applies `variables.eligible_attributes` rules for naming and descriptions
 - Handles `type_discriminated_block` value unwrapping for tfvars output
 - Custom transforms can also produce variables via `TransformResultWithVariables`
+- **Variable names are sanitized via `utils.SanitizeVariableName()` to ensure valid Terraform identifiers**
 
 ---
 

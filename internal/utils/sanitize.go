@@ -72,13 +72,28 @@ func SanitizeVariableResourceName(name, context string) string {
 	return SanitizeMultiKeyResourceName(name, context)
 }
 
-// CamelCaseToWords converts a camelCase or PascalCase string to space-separated words
+// SanitizeVariableName produces a valid Terraform variable name by replacing
+// any character that is not alphanumeric or underscore with an underscore.
+// Unlike SanitizeResourceName, this does not add a prefix or hex-encode specials,
+// since Terraform variables only require [a-zA-Z0-9_].
+//
 // Examples:
-//   - "clientSecret" -> "client secret"
-//   - "apiKey" -> "api key"
-//   - "envId" -> "env id"
-func CamelCaseToWords(s string) string {
-	// Insert space before uppercase letters (except at start)
-	result := regexp.MustCompile(`([a-z])([A-Z])`).ReplaceAllString(s, "$1 $2")
-	return result
+//   - "simple" -> "simple"
+//   - "with-dashes" -> "with_dashes"
+//   - "dots.and.slashes/here" -> "dots_and_slashes_here"
+//   - "a b c" -> "a_b_c"
+func SanitizeVariableName(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
 }

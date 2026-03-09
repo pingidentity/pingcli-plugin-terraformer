@@ -214,3 +214,23 @@ func TestSanitizeVariableResourceName(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeVariableName(t *testing.T) {
+	tests := []struct {
+		in  string
+		out string
+	}{
+		{"simple", "simple"},
+		{"with-dashes", "with_dashes"},
+		{"CamelCase", "CamelCase"},
+		{"dots.and.slashes/here", "dots_and_slashes_here"},
+		{"a b c", "a_b_c"},
+		{"already_underscored", "already_underscored"},
+	}
+	for _, tt := range tests {
+		result := utils.SanitizeVariableName(tt.in)
+		if result != tt.out {
+			t.Errorf("SanitizeVariableName(%q) = %q, expected %q", tt.in, result, tt.out)
+		}
+	}
+}

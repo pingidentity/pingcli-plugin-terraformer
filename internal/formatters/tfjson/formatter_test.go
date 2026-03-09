@@ -625,3 +625,39 @@ func TestFormat_ProducesValidJSON(t *testing.T) {
 	assert.True(t, json.Valid([]byte(out)))
 }
 
+// Regression test: variable-eligible attributes inside type_discriminated_block must render as var.X references
+func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name:          "Value",
+		TerraformName: "value",
+		Type:          "type_discriminated_block",
+		TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
+			TypeKeyMap: map[string]string{
+				"string": "string",
+				"bool":   "bool",
+				"float32": "float32",
+			},
+		},
+	})
+	ref := core.ResolvedReference{
+		IsVariable:   true,
+		VariableName: "davinci_variable_test_value",
+	}
+	data := baseData("res1", "id1", map[string]interface{}{
+		"value": map[string]interface{}{
+			"string": ref,
+		},
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	// BUG: ResolvedReference inside type_discriminated_block should render as ${var.X}
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	value, ok := attrs["value"].(map[string]interface{})
+	require.True(t, ok, "value should be a map object")
+	// The "string" key inside the block should contain the variable reference
+	assert.Equal(t, "${var.davinci_variable_test_value}", value["string"],
+		"variable references inside type_discriminated_block must render as ${var.X}")
+}
+
