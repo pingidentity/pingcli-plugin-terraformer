@@ -1,0 +1,80 @@
+# DaVinci Connector Instance Resource Definition
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_connector_instance
+  api_type: ConnectorInstance
+  name: DaVinci Connector Instance
+  short_name: connection
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/davinci
+  sdk_type: ConnectorInstance
+  list_method: ConnectorInstances.GetAll
+  get_method: ConnectorInstances.Get
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Connector ID - required, nested inside connector block
+  - name: ConnectorID
+    terraform_name: connector
+    type: object
+    source_path: Connector
+    required: true
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        required: true
+
+  # Properties - optional, complex jsonencode map
+  # Each property is { "type": "...", "value": ... }
+  # Requires custom transform for jsonencode output
+  - name: Properties
+    terraform_name: properties
+    type: map
+    source_path: Properties
+    transform: custom
+    custom_transform: handleConnectorProperties
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  variable_prefix: "davinci_connection_"
+  eligible_attributes: []
+

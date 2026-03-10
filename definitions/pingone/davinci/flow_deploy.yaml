@@ -1,0 +1,77 @@
+# DaVinci Flow Deploy Resource Definition
+#
+# Manages the deployment state of a DaVinci flow.
+# Data is derived from the Flow API — each flow produces one flow_deploy resource.
+# This is a manage-only resource — no Terraform import is supported.
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_flow_deploy
+  api_type: Flow
+  name: DaVinci Flow Deploy
+  short_name: flow_deploy
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/davinci
+  sdk_type: Flow
+  list_method: Flows.GetAll
+  get_method: Flows.Get
+  id_field: flow_id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # Name - computed only, used for resource label generation
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Flow ID - required, references parent flow
+  - name: FlowID
+    terraform_name: flow_id
+    type: string
+    source_path: FlowID
+    required: true
+    references_type: pingone_davinci_flow
+    reference_field: id
+
+  # Deploy trigger values - required object
+  - name: DeployTriggerValues
+    terraform_name: deploy_trigger_values
+    type: object
+    source_path: DeployTriggerValues
+    required: true
+    nested_attributes:
+      - name: DeployedVersion
+        terraform_name: deployed_version
+        type: number
+        source_path: DeployedVersion
+        required: true
+        references_type: pingone_davinci_flow
+        reference_field: current_version
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_davinci_flow
+      field_path: FlowID
+      lookup_field: id
+      reference_format: "pingone_davinci_flow.{name}.id"
+    - resource_type: pingone_davinci_flow
+      field_path: DeployTriggerValues.DeployedVersion
+      lookup_field: current_version
+      reference_format: "pingone_davinci_flow.{name}.current_version"
+
+variables:
+  eligible_attributes: []

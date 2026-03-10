@@ -1,0 +1,1697 @@
+{
+  "companyId": "5e4b5c7b-636d-492e-ad93-f736f905c9cf",
+  "authTokenExpireIds": [],
+  "connectorIds": [
+    "httpConnector",
+    "variablesConnector",
+    "functionsConnector",
+    "pingOneSSOConnector",
+    "errorConnector",
+    "annotationConnector",
+    "analyticsConnector"
+  ],
+  "createdDate": 1729786592267,
+  "currentVersion": 5,
+  "customerId": "7103642ff587ecb4de6b6c332453ca73",
+  "description": "Imported on Tue Apr 30 2024 20:47:03 GMT+0000 (Coordinated Universal Time)",
+  "flowStatus": "enabled",
+  "inputSchemaCompiled": {
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "p1UserId": {
+          "description": "PingOne User Id",
+          "isExpanded": true,
+          "preferredDataType": "string",
+          "type": "string",
+          "name": "p1UserId"
+        },
+        "mf-configObject": {
+          "description": "",
+          "isExpanded": true,
+          "preferredDataType": "object",
+          "type": "object",
+          "name": "mf-configObject"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "p1UserId"
+      ]
+    }
+  },
+  "isInputSchemaSaved": true,
+  "isOutputSchemaSaved": false,
+  "name": "PingOne Custom Security Question and Answer Registration subflow",
+  "publishedVersion": 5,
+  "settings": {
+    "csp": "worker-src 'self' blob:; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://devsdk.singularkey.com http://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval';",
+    "cssLinks": [
+      "https://assets.pingone.com/ux/astro-nano/0.1.0-alpha.11/icons.css",
+      "https://assets.pingone.com/ux/end-user-nano/0.1.0-alpha.1/end-user-nano.css"
+    ],
+    "customFaviconLink": "https://console.pingone.com/favicon.ico",
+    "flowTimeoutInSeconds": 3600,
+    "intermediateLoadingScreenCSS": "",
+    "intermediateLoadingScreenHTML": "",
+    "logLevel": 3,
+    "useCustomCSS": true
+  },
+  "timeouts": "null",
+  "updatedDate": 1729786594232,
+  "flowId": "3b287d1398c9fb41dd0153dc56f5cdd7",
+  "versionId": 5,
+  "graphData": {
+    "elements": {
+      "nodes": [
+        {
+          "data": {
+            "capabilityName": "customHTMLTemplate",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "jet072d7hr",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#afd5ffff"
+              },
+              "buttonLabel": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Submit\"\n      }\n    ]\n  }\n]"
+              },
+              "buttonLabel2": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Cancel\"\n      }\n    ]\n  }\n]"
+              },
+              "customCSS": {
+                "value": ":root {\n  --animation-dimension: 120px;\n  --animation-start-color: #71e171;\n  --animation-midway-color: #67d067;\n  --animation-finish-color: #59b259;\n}\n\n.checkmark {\n  width: var(--animation-dimension);\n  height: var(--animation-dimension);\n  border-radius: 50%;\n  display: block;\n  stroke-width: 5;\n  stroke: #ffffff;\n  stroke-miterlimit: 10;\n  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);\n  animation: fill 0.4s ease-in-out 0.4s forwards,\n    scale 0.3s ease-in-out 0.9s both;\n}\n\n.checkmarkCircle {\n  stroke-dasharray: 166;\n  stroke-dashoffset: 166;\n  stroke-width: 5;\n  stroke-miterlimit: 10;\n  stroke: var(--animation-finish-color);\n  fill: none;\n  animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards,\n    colorChange 1.2s ease-in-out forwards;\n}\n\n.checkmarkCheck {\n  transform-origin: 50% 50%;\n  stroke-dasharray: 48;\n  stroke-dashoffset: 48;\n  animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards,\n    colorChange 0.6s ease-in-out 0.8s forwards;\n}\n\n@keyframes colorChange {\n  0% {\n    stroke: var(--animation-start-color);\n  }\n  50% {\n    stroke: var(--animation-midway-color);\n  } \n  100% {\n    stroke: var(--animation-finish-color);\n  }\n}\n\n@keyframes stroke {\n  100% {\n    stroke-dashoffset: 0;\n  }\n}\n@keyframes scale {\n  0%,\n  100% {\n    transform: none;\n  }\n  50% {\n    transform: scale3d(1.1, 1.1, 1);\n  }\n  70% {\n    transform: scale3d(0.98, 0.98, 1);\n  }\n  85% {\n    transform: scale3d(1.02, 1.02, 1);\n  }\n}\n@keyframes fill {\n  100% {\n    box-shadow: inset 0px 0px 0px 0px var(--animation-finish-color);\n  }\n}\n#addAnotherBtn {\n        font-size: smaller;\n        color: #007BFF;\n        background-color: transparent !important;\n        margin-right: 10px;\n    }\n\n#addAnotherBtn:hover {\n        color:black;\n    }\n\n.removeBtn {\n  color: red;\n  background-color: transparent !important;\n  border:none;\n  font-size: smaller;\n}\n\n.removeBtn:hover{\n  \n  color:black;\n}\n\n.add-question-btn {\n    font-size: 1.5em; /* Increase the font size */\n    font-weight: bold; /* Make the font bold */\n    padding: 10px 20px; /* Increase padding for a larger button */\n}\n"
+              },
+              "customHTML": {
+                "value": "<!-- Main Container for the End User Interface -->\n<div class=\"end-user-nano\">\n    <!-- Centered Content Wrapper -->\n    <div class=\"bg-light d-flex flex-column justify-content-center align-items-center position-absolute top-0 start-0 bottom-0 end-0\">\n        \n        <!-- Container with fixed width for the card -->\n        <div style=\"max-width: 400px; width: 100%\">\n            \n            <!-- Card for holding the content -->\n            <div class=\"card shadow mb-5\">\n                <main aria-labelledby=\"title\">\n                    <!-- Card body with padding and column layout -->\n                    <div class=\"card-body p-5 d-flex flex-column\">\n                        \n                        <!-- Company Logo, dynamically sourced -->\n                       <img class=\"companyLogo align-self-center mb-4\" src=\"{{global.variables.companyLogo}}\"  alt=\"{{global.variables.companyName}}\" />\n\n                        <!-- Conditional title -->\n                        {{#if title}}\n                        <h1 id=\"title\" class=\"text-center mb-4\">{{title}}</h1>\n                        {{/if}}\n\n                        <!-- Conditional textOne -->\n                        {{#if textOne}}\n                        <h2 class=\"text-muted text-center\">{{textOne}}</h2>\n                        {{/if}}\n\n                        <!-- Conditional textTwo -->\n                        {{#if textTwo}}\n                        <p class=\"text-muted text-center\">{{textTwo}}</p>\n                        {{/if}}\n\n                        <!-- Generic Error Message -->\n                        <p class=\"text-danger mdi mdi-alert-circle text-center\" id=\"feedbackError\" data-id=\"feedback\" data-skcomponent=\"skerror\" aria-live=\"assertive\"></p>\n\n                        <!-- Security Questions Form -->\n                        <form id=\"securityQA\">\n\n                            <!-- Existing Question Section -->\n                            <div id=\"selectSection\" class=\"mb-3 row selectBox\">\n                                <label for=\"selectQuestion0\" class=\"col-sm-5 col-form-label\">\n                                    <span>Select Question</span>\n                                    <span class=\"starRed\" style=\"color:red\">*</span>\n                                </label>\n                                <div class=\"col-sm-7\">\n                                    <select class=\"form-select\" id=\"selectQuestion0\" aria-label=\"Default select\">\n                                        <option selected style=\"margin-bottom:15px\">select</option>\n                                        {{#each questionSet}}\n                                        <option value=\"{{question}}\">{{question}}</option>\n                                        {{/each}}\n                                    </select>\n                                </div>\n                            </div>\n\n                            <!-- Existing Answer Input -->\n                            <div class=\"mb-4 form-floating\" id=\"answerSection\">\n                                <input class=\"form-control\" type=\"text\" id=\"answer0\" name=\"answer\" placeholder=\"answer\" autocomplete=\"off\" value=\"\" data-id=\"answer-input\" style=\"margin-bottom:15px\" />\n                                <label class=\"form-label\" for=\"answer0\">Answer</label>\n                            </div>\n\n                            <!-- Dynamic Cloned Sections will be inserted above the + Add Question button -->\n                            <div id=\"dynamicSectionsContainer\"></div>\n\n                            <!-- + Add Question button -->\n                            <button id=\"addAnotherBtn\" class=\"btn btn-link\" style=\"margin-bottom:15px; border:none; margin-top:-15px\">+ Add Question</button>\n\n                            <!-- Conditional Submit Button -->\n                            {{#if buttonLabel}}\n                            <div class=\"d-flex flex-column\">\n                                <button id=\"submitBtn\" data-id=\"submitBtn\" class=\"btn btn-primary mb-3\" type=\"submit\" data-skcomponent=\"skbutton\" data-skform=\"securityQA\" data-skbuttontype=\"form-submit\" data-skbuttonvalue=\"SUBMIT\">\n                                    {{buttonLabel}}\n                                </button>\n                            </div>\n                            {{/if}}\n\n                            <!-- Conditional Cancel Button -->\n                            {{#if buttonLabel2}}\n                            <div class=\"d-flex flex-column\">\n                                <button id=\"cancelBtn\" data-id=\"cancelBtn\" class=\"btn btn-link mb-3\" type=\"submit\" data-skcomponent=\"skbutton\" data-skform=\"securityQA\" data-skbuttontype=\"next-event\" data-skbuttonvalue=\"CANCEL\">\n                                    {{buttonLabel2}}\n                                </button>\n                            </div>\n                            {{/if}}\n                        </form> <!-- End of Security Questions Form -->\n                    </div> <!-- End of Card Body -->\n                </main>\n            </div> <!-- End of Card -->\n        </div> <!-- End of Width-Limited Container -->\n    </div> <!-- End of Centered Content Wrapper -->\n</div> <!-- End of Main Container -->"
+              },
+              "customScript": {
+                "value": "var counter = 1; // Initialize a counter for unique IDs\n console.log(\"In Progressive subflow:\");\n\ndocument.getElementById('addAnotherBtn').addEventListener('click', function () {\n    try {\n        console.log(\"Add Another button clicked. Current counter:\", counter);\n\n        // Check if the counter is less than or equal to 2 before cloning\n        if (counter <= 2) {\n            console.log(\"Counter is within limit. Proceeding with cloning.\");\n\n            // Clone the select and answer input fields\n            var cloneSelectSection = document.querySelector('#selectSection').cloneNode(true);\n            var cloneAnswer = document.querySelector('#answerSection').cloneNode(true);\n\n            // Generate unique IDs for the cloned elements\n            var newSelectSectionId = 'selectSection' + counter;\n            var newSelectQuestionId = 'selectQuestion' + counter;\n            var newAnswerId = 'answer' + counter;\n            var newRemoveBtnId = 'removeBtn' + counter;\n\n            console.log(\"Generated new IDs:\", newSelectSectionId, newSelectQuestionId, newAnswerId, newRemoveBtnId);\n\n            // Assign new IDs to the cloned elements\n            cloneSelectSection.id = newSelectSectionId;\n\n            // Find the \"selectQuestion\" element inside the cloned \"selectSection\"\n            var clonedSelectQuestion = cloneSelectSection.querySelector('.form-select');\n\n            // Find the \"answer\" element inside the cloned \"selectSection\"\n            var clonedAnswerInput = cloneAnswer.querySelector('.form-control');\n\n            // Check if the \"selectQuestion\" element exists inside the cloned \"selectSection\"\n            if (clonedSelectQuestion) {\n                // Assign a new ID to the \"selectQuestion\" element\n                clonedSelectQuestion.id = newSelectQuestionId;\n\n                // Add an event listener to update the options on change\n                clonedSelectQuestion.addEventListener('change', updateOptions);\n                console.log(\"Cloned select question element found and updated:\", clonedSelectQuestion);\n            }\n            if (clonedAnswerInput) {\n                clonedAnswerInput.id = newAnswerId; // Assign new IDs to the cloned answer element\n                clonedAnswerInput.value = ''; // Clear the value of the cloned answer input\n                console.log(\"Cloned answer input element found and updated:\", clonedAnswerInput);\n            }\n\n            // Create a \"Remove\" button\n            var removeBtn = document.createElement('button');\n            removeBtn.id = newRemoveBtnId;\n            removeBtn.className = 'btn btn-danger removeBtn';\n            removeBtn.innerHTML = '- Remove Question';\n\n            // Attach an event listener to the \"Remove\" button\n            removeBtn.addEventListener('click', function () {\n                try {\n                    console.log(\"Remove button clicked for:\", newRemoveBtnId);\n\n                    // Remove the corresponding cloned container\n                    cloneSelectSection.parentNode.removeChild(cloneSelectSection);\n                    cloneAnswer.parentNode.removeChild(cloneAnswer);\n\n                    // Decrement the counter by 1\n                    counter--;\n\n                    // Enable the \"addAnotherBtn\" button after removing a section\n                    document.getElementById('addAnotherBtn').style.display = 'block';\n                    document.getElementById('addAnotherBtn').disabled = false;\n\n                    // Remove the \"Remove\" button row\n                    removeBtnRow.parentNode.removeChild(removeBtnRow);\n\n                    // Disable the \"remove\" button if there are no cloned sections\n                    if (counter <= 1) {\n                        document.getElementById('removeSectionBtn').disabled = true;\n                    }\n\n                    // Update options after removing a section\n                    updateOptions();\n                    console.log(\"Section removed. Updated counter:\", counter);\n                } catch (error) {\n                    console.error(\"Error removing cloned section:\", error);\n                }\n            });\n\n            // Increment the counter for the next set of cloned elements\n            counter++;\n            console.log(\"Counter incremented. New counter:\", counter);\n\n            // Clear the values in the cloned fields\n            clearClonedFields(clonedSelectQuestion, clonedAnswerInput);\n\n            // Append the cloned fields above the submit and cancel buttons\n            var form = document.getElementById('securityQA');\n            form.insertBefore(cloneSelectSection, document.getElementById('addAnotherBtn'));\n            form.insertBefore(cloneAnswer, document.getElementById('addAnotherBtn'));\n\n            // Create a new row for the \"Remove\" button\n            var removeBtnRow = document.createElement('div');\n            removeBtnRow.className = 'mb-3 row selectBox';\n            removeBtnRow.appendChild(removeBtn);\n            form.insertBefore(removeBtnRow, document.getElementById('addAnotherBtn'));\n\n            // Update options after adding a new section\n            updateOptions();\n            console.log(\"New section added and options updated.\");\n        }\n\n        // If counter exceeds 2, you can disable the button or hide it as needed\n        if (counter > 2) {\n            document.getElementById('addAnotherBtn').style.display = 'none';\n            console.log(\"Counter exceeded limit. Add Another button hidden.\");\n        }\n    } catch (error) {\n        console.error(\"Error adding another section:\", error);\n    }\n});\n\nfunction clearClonedFields(clonedSelectQuestion, clonedAnswerInput) {\n    if (clonedSelectQuestion) {\n        clonedSelectQuestion.selectedIndex = 0;\n        console.log(\"Cloned select question field cleared.\");\n    }\n    if (clonedAnswerInput) {\n        clonedAnswerInput.value = ''; // Ensure the cloned answer input is cleared\n        console.log(\"Cloned answer input field cleared.\");\n    }\n}\n\nfunction updateOptions() {\n    try {\n        console.log(\"Updating options for select elements.\");\n\n        // Get all the select elements\n        var selectElements = document.querySelectorAll('.form-select');\n        var selectedOptions = [];\n\n        // Collect the selected options\n        selectElements.forEach(function(selectElement) {\n            if (selectElement.value) {\n                selectedOptions.push(selectElement.value);\n            }\n        });\n\n        // Disable selected options in other select elements\n        selectElements.forEach(function(selectElement) {\n            var options = selectElement.querySelectorAll('option');\n            options.forEach(function(option) {\n                if (selectedOptions.includes(option.value) && option.value !== selectElement.value) {\n                    option.disabled = true;\n                } else {\n                    option.disabled = false;\n                }\n            });\n        });\n\n        console.log(\"Options updated for select elements.\");\n    } catch (error) {\n        console.error(\"Error updating options:\", error);\n    }\n}"
+              },
+              "formFieldsList": {
+                "value": [
+                  {
+                    "preferredControlType": "textField",
+                    "preferredDataType": "string",
+                    "propertyName": "buttonValue",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"submit\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "hashedVisibility": false,
+                    "preferredControlType": "dropDown",
+                    "preferredDataType": "number",
+                    "propertyName": "selectQuestion0",
+                    "value": ""
+                  },
+                  {
+                    "hashedVisibility": false,
+                    "preferredControlType": "textField",
+                    "preferredDataType": "string",
+                    "propertyName": "answer0",
+                    "value": ""
+                  },
+                  {
+                    "hashedVisibility": false,
+                    "preferredControlType": "textField",
+                    "preferredDataType": "string",
+                    "propertyName": "selectQuestion1",
+                    "value": ""
+                  },
+                  {
+                    "hashedVisibility": false,
+                    "preferredControlType": "textField",
+                    "preferredDataType": "string",
+                    "propertyName": "answer1",
+                    "value": ""
+                  },
+                  {
+                    "hashedVisibility": false,
+                    "preferredControlType": "textField",
+                    "preferredDataType": "string",
+                    "propertyName": "selectQuestion2",
+                    "value": ""
+                  },
+                  {
+                    "hashedVisibility": false,
+                    "preferredControlType": "textField",
+                    "preferredDataType": "string",
+                    "propertyName": "answer2",
+                    "value": ""
+                  }
+                ]
+              },
+              "inputSchema": {
+                "value": "{\n    \"type\": \"object\",\n    \"properties\": {\n        \"title\": {\n            \"type\": \"string\",\n            \"displayName\": \"Title\",\n            \"preferredControlType\": \"textField\",\n            \"enableParameters\": true,\n            \"propertyName\": \"title\"\n        },\n\t\"textOne\": {\n            \"type\": \"string\",\n            \"displayName\": \"Text One\",\n            \"preferredControlType\": \"textField\",\n            \"enableParameters\": true,\n            \"propertyName\": \"textOne\"\n        },\n\t\"textTwo\": {\n            \"type\": \"string\",\n            \"displayName\": \"Text Two\",\n            \"preferredControlType\": \"textField\",\n            \"enableParameters\": true,\n            \"propertyName\": \"textTwo\"\n        },\n        \"buttonLabel\": {\n            \"type\": \"string\",\n            \"displayName\": \"Button Label\",\n            \"preferredControlType\": \"textField\",\n            \"enableParameters\": true,\n            \"propertyName\": \"buttonLabel\"\n        },\n        \"buttonLabel2\": {\n            \"type\": \"string\",\n            \"displayName\": \"Button Label2\",\n            \"preferredControlType\": \"textField\",\n            \"enableParameters\": true,\n            \"propertyName\": \"buttonLabel2\"\n        },\n         \"questionSet\": {\n            \"type\": \"object\",\n            \"properties\": {\n                \"question\": {\n                    \"displayName\": \"question\",\n                    \"preferedControlType\": \"textField\",\n                    \"enableParameters\": true\n                },\n                \"questionIndex\": {\n                    \"displayName\": \"questionIndex\",\n                    \"preferedControlType\": \"textField\",\n                    \"enableParameters\": true\n                }\n            }\n        }\n    }\n}"
+              },
+              "nodeDescription": {
+                "value": "A form for the user to submit the username of the account they forgot the password to"
+              },
+              "nodeTitle": {
+                "value": "Security Q&A Form"
+              },
+              "questionSet": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"{{global.variables.mf-configObject.config.mf-str-availableQuestions}}\"\n      }\n    ]\n  }\n]"
+              },
+              "textOne": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"Security Questions Registration\"\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "textTwo": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"Register up to three security questions and provide the answers\"\n      }\n    ]\n  }\n]"
+              },
+              "title": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"     {{global.variables.mf-configObject.config.mf-str-companyName}}  \"\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "validationRules": {
+                "value": []
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 1440,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "saveValue",
+            "connectionId": "06922a684039827499bdbdd97f49827b",
+            "connectorId": "variablesConnector",
+            "id": "zch0qnuu08",
+            "label": "Variables",
+            "name": "Variables",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "nodeTitle": {
+                "value": "Start - Available Questions"
+              },
+              "saveVariables": {
+                "value": [
+                  {
+                    "key": 0.3741352687998927,
+                    "label": "mf-configObject (object - flowInstance)",
+                    "name": "mf-configObject",
+                    "nameDefault": "mf-configObject",
+                    "type": "object",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"mf-configObject\",\n        \"data\": \"{{global.parameters.mf-configObject}}\",\n        \"tooltip\": \"{{global.parameters.mf-configObject}}\",\n        \"children\": [\n          {\n            \"text\": \"mf-configObject\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 454,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "pyd1kocw2k",
+            "label": "Evaluator",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 1590,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "customFunction",
+            "connectionId": "de650ca45593b82c49064ead10b9fe17",
+            "connectorId": "functionsConnector",
+            "id": "ga5jnwij1v",
+            "label": "Functions",
+            "name": "Functions",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "code": {
+                "value": "// Write your code here\n// Supported language: Javascript \nmodule.exports = a = async ({params}) => {\nfunction generateJson(question1, answer1, question2, answer2, question3, answer3) {\n    const data = {};\n\n    if (question1 !== \"\" && answer1 !== \"\") {\n        data[\"question1\"] = question1;\n        data[\"answer1\"] = answer1;\n    }\n\n    if (question2 !== \"\" && answer2 !== \"\") {\n        data[\"question2\"] = question2;\n        data[\"answer2\"] = answer2;\n    }\n\n    if (question3 !== \"\" && answer3 !== \"\") {\n        data[\"question3\"] = question3;\n        data[\"answer3\"] = answer3;\n    }\n\n    const jsonObject = JSON.stringify(data, null, 2);\n\treturn jsonObject;\n}\nconst resultJson = generateJson(\n    params.question1, params.answer1,\n    params.question2, params.answer2, // Empty strings won't be added to the output JSON\n    params.question3, params.answer3\n);\n\nreturn {'resultJson': resultJson};\n\n}"
+              },
+              "nodeTitle": {
+                "value": "Format Q&A"
+              },
+              "outputSchema": {
+                "value": "{\n\t\"output\": {\n\t\t\"type\": \"object\",\n\t\t\"properties\": {\n\t\t\t\"resultJson\": {\n\t\t\t\t\"type\": \"object\"\n\t\t\t}\n\t\t}\n\t}\n}"
+              },
+              "variableInputList": {
+                "value": [
+                  {
+                    "name": "question1",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"selectQuestion0\",\n        \"data\": \"{{local.jet072d7hr.payload.output.selectQuestion0}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.selectQuestion0}}\",\n        \"children\": [\n          {\n            \"text\": \"selectQuestion0\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "name": "answer1",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"answer0\",\n        \"data\": \"{{local.jet072d7hr.payload.output.answer0}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.answer0}}\",\n        \"children\": [\n          {\n            \"text\": \"answer0\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "name": "question2",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"selectQuestion1\",\n        \"data\": \"{{local.jet072d7hr.payload.output.selectQuestion1}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.selectQuestion1}}\",\n        \"children\": [\n          {\n            \"text\": \"selectQuestion1\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "name": "answer2",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"answer1\",\n        \"data\": \"{{local.jet072d7hr.payload.output.answer1}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.answer1}}\",\n        \"children\": [\n          {\n            \"text\": \"answer1\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "name": "question3",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"selectQuestion2\",\n        \"data\": \"{{local.jet072d7hr.payload.output.selectQuestion2}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.selectQuestion2}}\",\n        \"children\": [\n          {\n            \"text\": \"selectQuestion2\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "name": "answer3",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"answer2\",\n        \"data\": \"{{local.jet072d7hr.payload.output.answer2}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.answer2}}\",\n        \"children\": [\n          {\n            \"text\": \"answer2\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 2040,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "76bryumnkk",
+            "label": "Evaluator",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 2160,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateUser",
+            "connectionId": "94141bf2f1b9b59a5f5365ff135e02bb",
+            "connectorId": "pingOneSSOConnector",
+            "id": "o672icru4s",
+            "label": "PingOne",
+            "name": "PingOne",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "additionalUserProperties": {
+                "value": [
+                  {
+                    "name": "securityQA",
+                    "preferredDataType": "object",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"functions.svg\",\n        \"url\": \"resultJson\",\n        \"data\": \"{{local.ga5jnwij1v.payload.output.resultJson}}\",\n        \"tooltip\": \"{{local.ga5jnwij1v.payload.output.resultJson}}\",\n        \"children\": [\n          {\n            \"text\": \"resultJson\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "name": "SecurityQARegistered",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"true\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "identifier": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"p1UserId\",\n        \"data\": \"{{global.parameters.p1UserId}}\",\n        \"tooltip\": \"{{global.parameters.p1UserId}}\",\n        \"children\": [\n          {\n            \"text\": \"p1UserId\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2310,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "3kjyoxlkmd",
+            "label": "Evaluator",
+            "nodeType": "EVAL",
+            "properties": {
+              "51yr02bu5j": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 2460,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createSuccessResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "tqlfgvxe0k",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#9dc967ff"
+              },
+              "claimsNameValuePairs": {
+                "value": [
+                  {
+                    "key": 0.2716903336958312,
+                    "label": "p1UserId (string - flowInstance)",
+                    "name": "p1UserId",
+                    "nameDefault": "p1UserId",
+                    "type": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"p1UserId\",\n        \"data\": \"{{global.parameters.p1UserId}}\",\n        \"tooltip\": \"{{global.parameters.p1UserId}}\",\n        \"children\": [\n          {\n            \"text\": \"p1UserId\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "nodeTitle": {
+                "value": "Success"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2940,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "customErrorMessage",
+            "connectionId": "53ab83a4a4ab919d9f2cb02d9e111ac8",
+            "connectorId": "errorConnector",
+            "id": "51yr02bu5j",
+            "label": "Error Customize",
+            "name": "Error Message",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "errorMessage": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Error updating user object, please try again\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "Error updating user object, please try again"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2640,
+            "y": 690
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "AEqualsMultipleB",
+            "connectionId": "de650ca45593b82c49064ead10b9fe17",
+            "connectorId": "functionsConnector",
+            "id": "kb1wr4lym9",
+            "label": "Functions",
+            "name": "Functions",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "leftValueA": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"buttonValue\",\n        \"data\": \"{{local.jet072d7hr.payload.output.buttonValue}}\",\n        \"tooltip\": \"{{local.jet072d7hr.payload.output.buttonValue}}\",\n        \"children\": [\n          {\n            \"text\": \"buttonValue\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "check which button"
+              },
+              "rightValueMultiple": {
+                "value": [
+                  {
+                    "id": "8v50bvs4t1",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"SUBMIT\"\n      }\n    ]\n  }\n]"
+                  },
+                  {
+                    "id": "a3zl2ssnaa",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"CANCEL\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 1740,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "9n1nifnjdi",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 1890,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "dxqv0fu2d6",
+            "label": "Evaluator",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 1890,
+            "y": 660
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "createErrorResponse",
+            "connectionId": "867ed4363b2bc21c860085ad2baa817d",
+            "connectorId": "httpConnector",
+            "id": "si3w2hv48f",
+            "label": "Http",
+            "name": "Http",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "backgroundColor": {
+                "value": "#ffc8c1ff"
+              },
+              "claimsNameValuePairs": {
+                "value": [
+                  {
+                    "key": 0.16374294742051632,
+                    "label": "cancelReturn (boolean - flowInstance)",
+                    "name": "cancelReturn",
+                    "type": "boolean",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"true\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "nodeTitle": {
+                "value": "CANCEL"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2040,
+            "y": 660
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "customErrorMessage",
+            "connectionId": "53ab83a4a4ab919d9f2cb02d9e111ac8",
+            "connectorId": "errorConnector",
+            "id": "vj1t33d3in",
+            "label": "Error Customize",
+            "name": "Error Message",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "errorCode": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Unexpected password state\"\n      }\n    ]\n  }\n]"
+              },
+              "errorDescription": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"An unexpected password state was received\"\n      }\n    ]\n  }\n]"
+              },
+              "errorMessage": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"An unexpected error has occurred\"\n      }\n    ]\n  }\n]"
+              },
+              "errorReason": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Received an unexpected password state value from PingOne\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeDescription": {
+                "value": "Received an unexpected value for the password status"
+              },
+              "nodeTitle": {
+                "value": "Received an unexpected value"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2040,
+            "y": 780
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "vj12wjoddq",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 1890,
+            "y": 780
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "dame9dwe09",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Question and Answer for MFA"
+              },
+              "annotationTextColor": {
+                "value": "#ffffffff"
+              },
+              "backgroundColor": {
+                "value": "#4462edff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 16
+              },
+              "fontStyle": {
+                "value": "bold"
+              },
+              "width": {
+                "value": 1800
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 844,
+            "y": 214
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "vmq8mv16di",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "This is JSON in attribute availableQuestions"
+              },
+              "annotationTextColor": {
+                "value": "#000000"
+              },
+              "backgroundColor": {
+                "value": "#f2f3f4ff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 14
+              },
+              "strokeColor": {
+                "value": "#181818ff"
+              },
+              "strokeEnabled": {
+                "value": true
+              },
+              "strokeWidth": {
+                "value": 1
+              },
+              "width": {
+                "value": 340
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 214,
+            "y": 450
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "ottr9j0xv9",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Which button was pushed"
+              },
+              "annotationTextColor": {
+                "value": "#000000"
+              },
+              "backgroundColor": {
+                "value": "#f2f3f4ff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 14
+              },
+              "strokeColor": {
+                "value": "#181818ff"
+              },
+              "strokeEnabled": {
+                "value": true
+              },
+              "strokeWidth": {
+                "value": 1
+              },
+              "width": {
+                "value": 240
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 1650,
+            "y": 450
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "oj9xi7ecos",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Update the user at PingOne with new JSON of questions and answers"
+              },
+              "annotationTextColor": {
+                "value": "#000000"
+              },
+              "backgroundColor": {
+                "value": "#f2f3f4ff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 14
+              },
+              "strokeColor": {
+                "value": "#181818ff"
+              },
+              "strokeEnabled": {
+                "value": true
+              },
+              "strokeWidth": {
+                "value": 1
+              },
+              "width": {
+                "value": 340
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2160,
+            "y": 450
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "ctzjy1qgsg",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Register KBA questions & Answers"
+              },
+              "annotationTextColor": {
+                "value": "#ffffffff"
+              },
+              "backgroundColor": {
+                "value": "#5D00D6ff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 14
+              },
+              "fontStyle": {
+                "value": "bold"
+              },
+              "width": {
+                "value": 2500
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 364,
+            "y": 364
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "updateAnnotationProperties",
+            "connectionId": "921bfae85c38ed45045e07be703d86b8",
+            "connectorId": "annotationConnector",
+            "id": "d591ng371y",
+            "idUnique": "o2v5xhdcbc",
+            "name": "Annotation",
+            "nodeType": "ANNOTATION",
+            "properties": {
+              "annotation": {
+                "value": "Last Updated: 7/10, 2024"
+              },
+              "annotationTextColor": {
+                "value": "#000000"
+              },
+              "backgroundColor": {
+                "value": "#ffffffff"
+              },
+              "cornerRadius": {
+                "value": 8
+              },
+              "fontFamily": {
+                "value": "sans-serif"
+              },
+              "fontSize": {
+                "value": 14
+              },
+              "strokeColor": {
+                "value": "#181818ff"
+              },
+              "strokeEnabled": {
+                "value": false
+              },
+              "strokeWidth": {
+                "value": 1
+              },
+              "width": {
+                "value": 240
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 523,
+            "y": 216
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "m91req3vl9",
+            "label": "Evaluator",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 574,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "saveValue",
+            "connectionId": "06922a684039827499bdbdd97f49827b",
+            "connectorId": "variablesConnector",
+            "id": "vutqa51q7c",
+            "label": "Variables",
+            "name": "Variables",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "nodeTitle": {
+                "value": "Company Variables"
+              },
+              "saveVariables": {
+                "value": [
+                  {
+                    "key": 0.24525851653144048,
+                    "label": "companyLogo (string - flowInstance)",
+                    "name": "companyLogo",
+                    "nameDefault": "mf-configObject",
+                    "type": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"{{global.variables.mf-configObject.config.mf-str-companyLogo}}\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            },
+            "status": "configured",
+            "type": "trigger"
+          },
+          "position": {
+            "x": 754,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "logOutcome",
+            "connectionId": "c4b2032a1b63d370c5fbdd205522f1c5",
+            "connectorId": "analyticsConnector",
+            "id": "em0wazy4ft",
+            "idUnique": "vp8mvklpzw",
+            "label": "Flow Analytics",
+            "name": "Flow Analytics",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "outcomeStatus": {
+                "value": "approved"
+              },
+              "outcomeStatusDetail": {
+                "value": "Running KBA registration"
+              },
+              "outcomeType": {
+                "value": "enrollment"
+              },
+              "shouldContinueOnError": {
+                "value": true
+              },
+              "nodeTitle": {
+                "value": "Q&A"
+              },
+              "outcomeDescription": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"KBA\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 1050,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "ndcj65r4ne",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 902,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "4td64po6a7",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 1200,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "capabilityName": "logOutcome",
+            "connectionId": "c4b2032a1b63d370c5fbdd205522f1c5",
+            "connectorId": "analyticsConnector",
+            "id": "9ek1ikg24w",
+            "idUnique": "z6elc47fzv",
+            "label": "Flow Analytics",
+            "name": "Flow Analytics",
+            "nodeType": "CONNECTION",
+            "properties": {
+              "outcomeStatus": {
+                "value": "approved"
+              },
+              "outcomeStatusDetail": {
+                "value": "Running KBA registration"
+              },
+              "outcomeType": {
+                "value": "enrollment"
+              },
+              "shouldContinueOnError": {
+                "value": true
+              },
+              "nodeTitle": {
+                "value": "Finish Q&A"
+              },
+              "outcomeDescription": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Finish KBA\"\n      }\n    ]\n  }\n]"
+              }
+            },
+            "status": "configured",
+            "type": "action"
+          },
+          "position": {
+            "x": 2670,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "x9159j5mbf",
+            "nodeType": "EVAL"
+          },
+          "position": {
+            "x": 2805,
+            "y": 540
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        }
+      ],
+      "edges": [
+        {
+          "data": {
+            "id": "61qvbvdqmx",
+            "multiValueSourceId": "8v50bvs4t1",
+            "source": "kb1wr4lym9",
+            "target": "9n1nifnjdi"
+          },
+          "position": {
+            "x": 64,
+            "y": 52
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "o145puqmug",
+            "source": "9n1nifnjdi",
+            "target": "ga5jnwij1v"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "x8b34qzb5z",
+            "multiValueSourceId": "a3zl2ssnaa",
+            "source": "kb1wr4lym9",
+            "target": "dxqv0fu2d6"
+          },
+          "position": {
+            "x": 64,
+            "y": 92
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "7lxh5m18rl",
+            "source": "dxqv0fu2d6",
+            "target": "si3w2hv48f"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "nmxl66zb3d",
+            "source": "jet072d7hr",
+            "target": "pyd1kocw2k"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "bs4q902iwl",
+            "multiValueSourceId": "-1",
+            "source": "kb1wr4lym9",
+            "target": "vj12wjoddq"
+          },
+          "position": {
+            "x": 64,
+            "y": 132
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "ggak4l6fi2",
+            "source": "vj12wjoddq",
+            "target": "vj1t33d3in"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "851hi1z27c",
+            "source": "3kjyoxlkmd",
+            "target": "51yr02bu5j"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "f2jbtycp32",
+            "source": "ga5jnwij1v",
+            "target": "76bryumnkk"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "cqgny7mqc1",
+            "source": "76bryumnkk",
+            "target": "o672icru4s"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "v03517x97r",
+            "source": "o672icru4s",
+            "target": "3kjyoxlkmd"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "29za60kckn",
+            "source": "pyd1kocw2k",
+            "target": "kb1wr4lym9"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "dkbwfg6idc",
+            "source": "zch0qnuu08",
+            "target": "m91req3vl9"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "aqaazg47n9",
+            "source": "m91req3vl9",
+            "target": "vutqa51q7c"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "pc5x98tug9",
+            "source": "vutqa51q7c",
+            "target": "ndcj65r4ne"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "2zj4dxgj57",
+            "source": "ndcj65r4ne",
+            "target": "em0wazy4ft"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "29sowyd2tv",
+            "source": "em0wazy4ft",
+            "target": "4td64po6a7"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "3j4qgr5gtl",
+            "source": "4td64po6a7",
+            "target": "jet072d7hr"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "ydsr8vbkku",
+            "source": "3kjyoxlkmd",
+            "target": "9ek1ikg24w"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "k63ne3ling",
+            "source": "9ek1ikg24w",
+            "target": "x9159j5mbf"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "5i4j9cj5u0",
+            "source": "x9159j5mbf",
+            "target": "tqlfgvxe0k"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        }
+      ]
+    },
+    "data": {},
+    "zoomingEnabled": true,
+    "userZoomingEnabled": true,
+    "zoom": 1,
+    "minZoom": 1E-50,
+    "maxZoom": 1E+50,
+    "panningEnabled": true,
+    "userPanningEnabled": true,
+    "pan": {
+      "x": 0,
+      "y": 0
+    },
+    "boxSelectionEnabled": true,
+    "renderer": {
+      "name": "null"
+    }
+  },
+  "inputSchema": [
+    {
+      "description": "PingOne User Id",
+      "isExpanded": true,
+      "preferredControlType": "textField",
+      "preferredDataType": "string",
+      "propertyName": "p1UserId",
+      "required": true
+    },
+    {
+      "description": "",
+      "isExpanded": true,
+      "preferredControlType": "textField",
+      "preferredDataType": "object",
+      "propertyName": "mf-configObject"
+    }
+  ],
+  "flowColor": "#E3F0FF",
+  "savedDate": 1729786592157,
+  "variables": [
+    {
+      "context": "flowInstance",
+      "createdDate": 1729617691821,
+      "fields": {
+        "displayName": "",
+        "max": 2000,
+        "min": 0,
+        "mutable": true,
+        "type": "string"
+      },
+      "id": "15869bd2-a03d-4d23-9e6d-b41caf012029",
+      "type": "property",
+      "visibility": "private",
+      "name": "companyLogo##SK##flowInstance",
+      "companyId": "5e4b5c7b-636d-492e-ad93-f736f905c9cf"
+    },
+    {
+      "context": "flowInstance",
+      "createdDate": 1729617691822,
+      "fields": {
+        "displayName": "Internal variable",
+        "max": 2000,
+        "min": 0,
+        "mutable": true,
+        "type": "string"
+      },
+      "id": "288db8a8-fde1-4499-bfe9-34f389edc926",
+      "type": "property",
+      "visibility": "private",
+      "name": "companyName##SK##flowInstance",
+      "companyId": "5e4b5c7b-636d-492e-ad93-f736f905c9cf"
+    },
+    {
+      "context": "flowInstance",
+      "createdDate": 1729617691823,
+      "fields": {
+        "displayName": "",
+        "max": 2000,
+        "min": 0,
+        "mutable": true,
+        "type": "object"
+      },
+      "id": "7850e826-245c-4766-acad-ee2fc372bd33",
+      "type": "property",
+      "visibility": "private",
+      "name": "mf-configObject##SK##flowInstance",
+      "companyId": "5e4b5c7b-636d-492e-ad93-f736f905c9cf"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+davinci-convert
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.github/agents/**
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Output files
+*.hcl
+*.tf
+output/
+dist/
+
+# Test fixtures (except sample files)
+*.json
+!.github/**/*.json
+!**/testdata/**/*.json
+!**/testdata/**/*.tf
+localsecrets
+
+pingcli-terraformer

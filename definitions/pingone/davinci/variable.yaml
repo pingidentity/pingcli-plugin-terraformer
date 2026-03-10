@@ -1,0 +1,150 @@
+# DaVinci Variable Resource Definition
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_variable
+  api_type: Variable
+  name: DaVinci Variable
+  short_name: variable
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/davinci
+  sdk_type: Variable
+  list_method: EnvironmentVariables.GetAll
+  get_method: EnvironmentVariables.Get
+  id_field: id
+  name_field: name
+  label_fields: [name, context]
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Context - required string (company, flow, flowInstance)
+  - name: Context
+    terraform_name: context
+    type: string
+    source_path: Context
+    required: true
+
+  # DataType - required string (string, number, boolean, object, secret)
+  - name: DataType
+    terraform_name: data_type
+    type: string
+    source_path: DataType
+    required: true
+
+  # Mutable - required boolean
+  - name: Mutable
+    terraform_name: mutable
+    type: bool
+    source_path: Mutable
+    required: true
+
+  # DisplayName - optional string
+  - name: DisplayName
+    terraform_name: display_name
+    type: string
+    source_path: DisplayName
+
+  # Min - optional number (for number type)
+  - name: Min
+    terraform_name: min
+    type: number
+    source_path: Min
+
+  # Max - optional number (for number type)
+  - name: Max
+    terraform_name: max
+    type: number
+    source_path: Max
+
+  # Flow - optional object (for flow context variables)
+  - name: Flow
+    terraform_name: flow
+    type: object
+    source_path: Flow
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        references_type: pingone_davinci_flow
+        reference_field: id
+
+  # Value - optional, variable-eligible
+  # Uses type_discriminated_block to map Go runtime type to Terraform block key.
+  # Skip conditions suppress the block for secret data types.
+  - name: Value
+    terraform_name: value
+    type: type_discriminated_block
+    source_path: Value
+    variable_eligible: true
+    sensitive: false
+    type_discriminated_block:
+      type_key_map:
+        string: string
+        bool: bool
+        float32: float32
+        float64: float32
+        int: float32
+        map: json_object
+        slice: json_object
+      json_encode_keys: [json_object]
+      skip_conditions:
+        - source_field: DataType
+          equals: secret
+
+dependencies:
+  # Optional dependency on flow (when context is 'flow')
+  depends_on:
+    - resource_type: pingone_davinci_flow
+      field_path: Flow.ID
+      lookup_field: id
+      reference_format: "pingone_davinci_flow.{resource_name}.id"
+      optional: true
+
+  # Import ID format: {environment_id}/{variable_id}
+  import_id_format: "{env_id}/{resource_id}"
+
+# Post-processing attribute overrides
+# When no value will be written and mutable is false, the Terraform provider
+# requires mutable = true. This replaces the Go handleVariableMutableOverride handler.
+conditional_defaults:
+  - target_attribute: mutable
+    set_value: true
+    when_all:
+      - attribute_empty: value
+      - attribute_equals:
+          name: mutable
+          value: false
+
+variables:
+  eligible_attributes:
+    - attribute_path: value
+      variable_prefix: davinci_variable_
+      is_secret: false
+      description: "Value for DaVinci variable {name}"

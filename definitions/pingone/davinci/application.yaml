@@ -1,0 +1,107 @@
+# DaVinci Application Resource Definition
+
+metadata:
+  platform: pingone
+  service: davinci
+  resource_type: pingone_davinci_application
+  api_type: Application
+  name: DaVinci Application
+  short_name: application
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/davinci
+  sdk_type: Application
+  list_method: Applications.GetAll
+  get_method: Applications.Get
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # API Key - optional object block
+  - name: APIKey
+    terraform_name: api_key
+    type: object
+    source_path: ApiKey
+    nested_attributes:
+      - name: Enabled
+        terraform_name: enabled
+        type: bool
+        source_path: Enabled
+
+  # OAuth - optional object block
+  - name: OAuth
+    terraform_name: oauth
+    type: object
+    source_path: Oauth
+    nested_attributes:
+      - name: GrantTypes
+        terraform_name: grant_types
+        type: list
+        source_path: GrantTypes
+
+      - name: RedirectUris
+        terraform_name: redirect_uris
+        type: list
+        source_path: RedirectUris
+
+      - name: LogoutUris
+        terraform_name: logout_uris
+        type: list
+        source_path: LogoutUris
+
+      - name: Scopes
+        terraform_name: scopes
+        type: list
+        source_path: Scopes
+
+      - name: EnforceSignedRequestOpenid
+        terraform_name: enforce_signed_request_openid
+        type: bool
+        source_path: EnforceSignedRequestOpenid
+
+      - name: SpJwksOpenid
+        terraform_name: sp_jwks_openid
+        type: string
+        source_path: SpJwksOpenid
+
+      - name: SpJwksUrl
+        terraform_name: sp_jwks_url
+        type: string
+        source_path: SpjwksUrl
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.ID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

@@ -1,0 +1,11 @@
+# Ignore any credential files
+*.env
+.env
+credentials.txt
+
+# Ignore generated terraform files from tests
+*.tf
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
