@@ -38,7 +38,7 @@ brews:
     skip_upload: "auto"
     repository:
       owner: "pingidentity"
-      name: "homebrew-pingcli"
+      name: "homebrew-tap"
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
 nfpms:
