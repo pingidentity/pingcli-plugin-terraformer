@@ -18,14 +18,14 @@ type TransformFunc func(value interface{}, attr *schema.AttributeDefinition) (in
 // their Go implementations. The "custom" transform is intentionally absent —
 // it is handled separately via the custom handler registry.
 var StandardTransforms = map[string]TransformFunc{
-	"passthrough":     transformPassthrough,
-	"base64_encode":   transformBase64Encode,
-	"base64_decode":   transformBase64Decode,
-	"json_encode":     transformJSONEncode,
-	"json_decode":     transformJSONDecode,
-	"jsonencode_raw":  transformJSONEncodeRaw,
-	"value_map":       transformValueMap,
-	"to_string":       transformToString,
+	"passthrough":    transformPassthrough,
+	"base64_encode":  transformBase64Encode,
+	"base64_decode":  transformBase64Decode,
+	"json_encode":    transformJSONEncode,
+	"json_decode":    transformJSONDecode,
+	"jsonencode_raw": transformJSONEncodeRaw,
+	"value_map":      transformValueMap,
+	"to_string":      transformToString,
 }
 
 // ApplyTransform applies the named transform to value.
@@ -120,7 +120,7 @@ func transformToString(value interface{}, _ *schema.AttributeDefinition) (interf
 // HCL template markers (${ and %{) in string values are escaped to
 // prevent Terraform from interpreting them as interpolation.
 func transformJSONEncodeRaw(value interface{}, attr *schema.AttributeDefinition) (interface{}, error) {
-	b, err := json.Marshal(value)
+	b, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("jsonencode_raw: attribute %s: %w", attr.Name, err)
 	}

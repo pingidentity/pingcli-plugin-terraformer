@@ -257,17 +257,17 @@ func TestTransformJSONEncodeRaw(t *testing.T) {
 		{
 			name:     "simple map",
 			input:    map[string]interface{}{"key": "val"},
-			expected: RawHCLValue(`jsonencode({"key":"val"})`),
+			expected: RawHCLValue("jsonencode({\n  \"key\": \"val\"\n})"),
 		},
 		{
 			name:     "nested map",
 			input:    map[string]interface{}{"a": map[string]interface{}{"b": "c"}},
-			expected: RawHCLValue(`jsonencode({"a":{"b":"c"}})`),
+			expected: RawHCLValue("jsonencode({\n  \"a\": {\n    \"b\": \"c\"\n  }\n})"),
 		},
 		{
 			name:     "slice",
 			input:    []interface{}{1, 2, 3},
-			expected: RawHCLValue(`jsonencode([1,2,3])`),
+			expected: RawHCLValue("jsonencode([\n  1,\n  2,\n  3\n])"),
 		},
 		{
 			name:     "string value",

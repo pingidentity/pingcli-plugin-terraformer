@@ -1117,7 +1117,7 @@ func TestProcessorNestedAttributeTransform(t *testing.T) {
 	// Data should be wrapped in jsonencode() via the transform
 	dataVal, ok := outer["data"].(core.RawHCLValue)
 	require.True(t, ok, "data should be RawHCLValue, got %T", outer["data"])
-	assert.Equal(t, core.RawHCLValue(`jsonencode({"key":"val"})`), dataVal)
+	assert.Equal(t, core.RawHCLValue("jsonencode({\n  \"key\": \"val\"\n})"), dataVal)
 
 	// Label should be a plain string (no transform)
 	assert.Equal(t, "myLabel", outer["label"])
