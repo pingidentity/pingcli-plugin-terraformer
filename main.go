@@ -1,8 +1,8 @@
 // Copyright © 2025 Ping Identity Corporation
 
-// Package main provides a CLI plugin for converting PingOne DaVinci flows
-// (in JSON format) to HCL (HashiCorp Configuration Language) that is compatible
-// with the PingOne Terraform Provider's DaVinci resources.
+// Package main provides a CLI plugin for exporting PingOne resources
+// to Terraform configuration (HCL or JSON) compatible
+// with the PingOne Terraform Provider.
 //
 // This binary can operate in two modes:
 // 1. Plugin mode: Launched by pingcli as a gRPC plugin
@@ -157,8 +157,8 @@ Available subcommands:
 
 Examples:
 
-  # Export PingOne DaVinci resources to Terraform HCL
-  pingcli-terraformer export --services pingone-davinci --environment-id "<uuid>"
+  # Export PingOne resources to Terraform
+  pingcli-terraformer export --out ./environment.tf
 
 Global Flags:
   -h, --help      Show help message

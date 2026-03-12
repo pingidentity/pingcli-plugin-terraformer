@@ -11,7 +11,6 @@ func TestResourceDefinitionMarshal(t *testing.T) {
 	def := &ResourceDefinition{
 		Metadata: ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 			APIType:      "Variable",
 			Name:         "DaVinci Variable",
@@ -66,7 +65,6 @@ func TestResourceDefinitionMarshal(t *testing.T) {
 	err = yaml.Unmarshal(data, &decoded)
 	assert.NoError(t, err)
 	assert.Equal(t, "pingone", decoded.Metadata.Platform)
-	assert.Equal(t, "davinci", decoded.Metadata.Service)
 	assert.Equal(t, "pingone_davinci_variable", decoded.Metadata.ResourceType)
 	assert.Len(t, decoded.Attributes, 2)
 }

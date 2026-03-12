@@ -16,7 +16,6 @@ func sdkTestDef(resourceType string, attrs []schema.AttributeDefinition) *schema
 	return &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: resourceType,
 			APIType:      "Test",
 			Name:         "Test",
@@ -170,7 +169,6 @@ func TestSDK_UnionStructUnwrapping(t *testing.T) {
 
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
-			Platform: "pingone", Service: "davinci",
 			ResourceType: "test_union", APIType: "Test",
 			Name: "Test", ShortName: "test", Version: "1.0",
 		},
@@ -269,7 +267,6 @@ func TestSDK_Float32InTypeDiscriminatedBlock(t *testing.T) {
 
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
-			Platform: "pingone", Service: "davinci",
 			ResourceType: "test_f32", APIType: "Test",
 			Name: "Test", ShortName: "test", Version: "1.0",
 		},
@@ -324,7 +321,6 @@ func TestSDK_Float32UnionUnwrapInTDB(t *testing.T) {
 
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
-			Platform: "pingone", Service: "davinci",
 			ResourceType: "test_f32_union", APIType: "Test",
 			Name: "Test", ShortName: "test", Version: "1.0",
 		},

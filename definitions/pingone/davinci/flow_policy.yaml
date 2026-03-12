@@ -2,7 +2,6 @@
 
 metadata:
   platform: pingone
-  service: davinci
   resource_type: pingone_davinci_application_flow_policy
   api_type: FlowPolicy
   name: DaVinci Application Flow Policy

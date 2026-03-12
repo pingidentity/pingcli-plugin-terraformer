@@ -1,11 +1,11 @@
-// Package davinci provides the unified service package for PingOne DaVinci.
+// Package pingone provides the unified platform package for PingOne.
 // It implements the clients.APIClient interface and registers custom handlers
-// and transforms for all DaVinci resource types.
+// and transforms for all PingOne resource types.
 //
 // Adding a new resource requires only a single new resource_*.go file whose
 // init() calls registerResource() and optionally registerHandler() /
 // registerTransform(). No other files need editing.
-package davinci
+package pingone
 
 import (
 	"context"
@@ -37,9 +37,6 @@ func New(apiClient *pingone.APIClient, environmentID uuid.UUID) *Client {
 
 // Platform returns the platform identifier.
 func (c *Client) Platform() string { return "pingone" }
-
-// Service returns the service identifier.
-func (c *Client) Service() string { return "davinci" }
 
 // ListResources retrieves all resources of the given type from the environment.
 func (c *Client) ListResources(ctx context.Context, resourceType string, envID string) ([]interface{}, error) {

@@ -16,7 +16,6 @@ func minimalVariableDef() *schema.ResourceDefinition {
 	return &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 			APIType:      "Variable",
 			Name:         "DaVinci Variable",
@@ -588,7 +587,6 @@ func defWithConnRef() *schema.ResourceDefinition {
 	return &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_flow",
 			APIType:      "Flow",
 			Name:         "DaVinci Flow",

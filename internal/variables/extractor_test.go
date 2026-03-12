@@ -18,7 +18,6 @@ func TestExtractBasic(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -63,7 +62,6 @@ func TestExtractSkipsNonEligible(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -85,7 +83,6 @@ func TestExtractSkipsNilValue(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -106,7 +103,6 @@ func TestExtractSensitiveAttribute(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_connection",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -167,7 +163,6 @@ func TestExtractNoRuleFallback(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -190,7 +185,6 @@ func TestExtractMultipleEligible(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_connection",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -220,7 +214,6 @@ func TestExtractWithTerraformName(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_variable",
 		},
 		Attributes: []schema.AttributeDefinition{

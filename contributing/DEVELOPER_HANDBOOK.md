@@ -132,7 +132,6 @@ Create `definitions/pingone/davinci/{short_name}.yaml`:
 ```yaml
 metadata:
   platform: pingone
-  service: davinci
   resource_type: pingone_davinci_variable
   api_type: Variable
   name: DaVinci Variable
@@ -483,7 +482,6 @@ func SupportedResourceTypes() []string {
 After creating the service package:
 1. Create YAML definitions in `definitions/{platform}/{service}/`
 2. Update `cmd/export.go` to instantiate the new client and load definitions for the new service
-3. Add the service to the `--services` flag's valid values
 
 ---
 
@@ -657,7 +655,6 @@ go tool pprof mem.prof
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--services` | `[]string` | `["pingone-davinci"]` | Services to export |
 | `--pingone-worker-environment-id` | `string` | | Environment ID containing worker app |
 | `--pingone-export-environment-id` | `string` | | Target environment to export |
 | `--pingone-region-code` | `string` | | Region: `NA`, `EU`, `AP`, `CA`, `AU` |
@@ -698,7 +695,6 @@ Flags can also be sourced from environment variables. See `internal/config/flags
 ```yaml
 metadata:
   platform: <platform>                # e.g., pingone
-  service: <service>                  # e.g., davinci
   resource_type: <terraform_type>     # e.g., pingone_davinci_variable
   api_type: <sdk_struct_name>         # e.g., Variable
   name: <human_readable_name>

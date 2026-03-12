@@ -1,6 +1,6 @@
 // Copyright © 2025 Ping Identity Corporation
 
-// Package cmd provides the command implementation for the DaVinci Terraform converter.
+// Package cmd provides the command implementation for the Terraform converter.
 package cmd
 
 import (
@@ -15,7 +15,7 @@ import (
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/formatters"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/module"
-	davinci "github.com/pingidentity/pingcli-plugin-terraformer/internal/platform/pingone/davinci"
+	pingoneplatform "github.com/pingidentity/pingcli-plugin-terraformer/internal/platform/pingone"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/variables"
@@ -26,21 +26,13 @@ import (
 // Command metadata for the export subcommand
 var (
 	// ExportExample provides usage examples for the command
-	ExportExample = `  # Export all supported services (defaults to all if --services not specified)
+	ExportExample = `  # Export PingOne resources to Terraform
   pingcli tf export \
     --pingone-worker-environment-id <auth-uuid> \
     --pingone-worker-client-id <client-id> \
     --pingone-worker-client-secret <secret> \
     --pingone-region-code NA \
     --out ./environment.tf
-
-  # Export specific service (PingOne DaVinci)
-  pingcli tf export --services pingone-davinci \
-    --pingone-worker-environment-id <auth-uuid> \
-    --pingone-worker-client-id <client-id> \
-    --pingone-worker-client-secret <secret> \
-    --pingone-region-code NA \
-    --out ./davinci.tf
 
   # Export from different environment than worker app
   pingcli tf export \
@@ -61,20 +53,12 @@ var (
   export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID="..."
   export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="..."
   export PINGCLI_PINGONE_REGION_CODE="NA"
-  pingcli tf export --services pingone-davinci --out ./environment.tf`
+  pingcli tf export --out ./environment.tf`
 
 	// ExportLong provides a detailed description of the command
-	ExportLong = `Export Ping Identity resources to Terraform configuration.
+	ExportLong = `Export PingOne resources to Terraform configuration.
 
-Connects to Ping Identity APIs and exports resources based on the specified services.
-If --services is not specified, all supported services will be exported.
-
-Currently supported services:
-  • pingone-davinci - PingOne DaVinci flows, variables, connections, applications, and policies
-
-Future services (not yet implemented):
-  • pingone-sso - PingOne SSO resources (users, groups, applications, etc.)
-  • pingfederate - PingFederate configuration
+Connects to PingOne APIs and exports all registered resource types for the target environment.
 
 The generated output includes proper Terraform resource references and dependency ordering.
 
@@ -82,7 +66,7 @@ Output formats:
   • hcl    - Terraform HCL syntax (.tf files, default)
   • tfjson - Terraform JSON configuration syntax (.tf.json files)
 
-Authentication for PingOne services can be provided via flags or environment variables:
+Authentication can be provided via flags or environment variables:
   PINGCLI_PINGONE_ENVIRONMENT_ID                    - Environment containing the worker app
   PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID      - Worker app client ID
   PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET   - Worker app client secret
@@ -93,11 +77,11 @@ Authentication for PingOne services can be provided via flags or environment var
 	ExportShort = "Export Ping Identity resources to Terraform configuration"
 
 	// ExportUse defines the command's name and its arguments/flags syntax
-	ExportUse = "export --services <service> [flags]"
+	ExportUse = "export [flags]"
 )
 
 // ExportCommand is the implementation of the export subcommand.
-// It encapsulates the logic for exporting DaVinci environments to HCL.
+// It encapsulates the logic for exporting PingOne environments to Terraform.
 type ExportCommand struct{}
 
 // A compile-time check to ensure ExportCommand correctly implements the
@@ -122,9 +106,6 @@ func (c *ExportCommand) Configuration() (*grpc.PingCliCommandConfiguration, erro
 func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	// Create a new FlagSet for parsing command-line flags
 	flags := pflag.NewFlagSet("export", pflag.ContinueOnError)
-
-	// Define service selection flag (defaults to all available services)
-	services := flags.StringSlice("services", []string{"pingone-davinci"}, "Services to export (comma-separated). Supported: pingone-davinci. Defaults to all services if not specified.")
 
 	// Define API export flags matching Ping CLI standards
 	workerEnvironmentID := flags.String("pingone-worker-environment-id", "", "PingOne environment ID containing the worker app")
@@ -157,28 +138,13 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 		return fmt.Errorf("unsupported output format: %s. Supported: hcl, tfjson", *outputFormat)
 	}
 
-	// Validate requested services
-	for _, svc := range *services {
-		if svc != "pingone-davinci" {
-			return fmt.Errorf("unsupported service: %s. Currently supported: pingone-davinci", svc)
-		}
-	}
-
 	// Execute export (invert skipImports to get generateImports)
-	return c.runExport(logger, *services, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, !*skipImports, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat)
+	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, !*skipImports, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat)
 }
 
 // runExport handles API export of all resources from an environment
 // All exports now generate Terraform module structure
-func (c *ExportCommand) runExport(logger grpc.Logger, services []string, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, generateImports bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string) error {
-	// Log which services are being exported
-	if err := logger.Message(fmt.Sprintf("Exporting services: %v", services), nil); err != nil {
-		return err
-	}
-
-	// Currently only pingone-davinci is supported, so we can proceed directly
-	// In the future, this would route to different exporters based on services list
-
+func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, generateImports bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string) error {
 	// Get credentials from environment variables if not provided via flags
 	if workerEnvironmentID == "" {
 		workerEnvironmentID = os.Getenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
@@ -217,7 +183,7 @@ func (c *ExportCommand) runExport(logger grpc.Logger, services []string, workerE
 	}
 
 	// Log export start
-	if err := logger.Message(fmt.Sprintf("Exporting DaVinci from environment: %s (Region: %s)", exportEnvironmentID, regionCode), nil); err != nil {
+	if err := logger.Message(fmt.Sprintf("Exporting PingOne resources from environment: %s (Region: %s)", exportEnvironmentID, regionCode), nil); err != nil {
 		return err
 	}
 
@@ -254,13 +220,13 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 
 	// 1. Load schema definitions from embedded FS.
 	registry := schema.NewRegistry()
-	if err := registry.LoadFromFS(definitions.FS, "pingone/davinci"); err != nil {
+	if err := registry.LoadFromFS(definitions.FS, "pingone"); err != nil {
 		return fmt.Errorf("failed to load definitions: %w", err)
 	}
 
 	// 2. Create custom handler registry and load platform-specific handlers.
 	customReg := core.NewCustomHandlerRegistry()
-	davinci.RegisterCustomHandlers(customReg)
+	pingoneplatform.RegisterCustomHandlers(customReg)
 
 	// 3. Create processor.
 	proc := core.NewProcessor(registry, core.WithCustomHandlers(customReg))
@@ -270,7 +236,7 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 	if err != nil {
 		return fmt.Errorf("invalid environment ID format: %w", err)
 	}
-	apiClient := davinci.New(client.APIClient(), envUUID)
+	apiClient := pingoneplatform.New(client.APIClient(), envUUID)
 
 	// 5. Create and run orchestrator.
 	orch := core.NewExportOrchestrator(registry, proc, apiClient, core.WithProgressFunc(func(msg string) {

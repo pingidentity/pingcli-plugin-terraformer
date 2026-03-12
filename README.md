@@ -51,7 +51,7 @@ docker run --rm \
   -e PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="..." \
   -v $(pwd)/output:/output \
   ghcr.io/pingidentity/pingcli-plugin-terraformer:latest \
-  export --services pingone-davinci --out /output
+  export --out /output
 ```
 
 ### From Source
@@ -100,7 +100,6 @@ pingcli-terraformer export \
 
 ```bash
 pingcli-terraformer export \
-  --services pingone-davinci \
   --pingone-worker-environment-id <uuid> \
   --pingone-worker-client-id <client-id> \
   --pingone-worker-client-secret <secret> \
@@ -112,7 +111,6 @@ pingcli-terraformer export \
 
 ```bash
 pingcli-terraformer export \
-  --services pingone-davinci \
   --output-format tfjson \
   --out ./output
 ```
@@ -125,7 +123,7 @@ export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID="..."
 export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="..."
 export PINGCLI_PINGONE_REGION_CODE="NA"
 
-pingcli-terraformer export --services pingone-davinci --out ./output
+pingcli-terraformer export --out ./output
 ```
 
 ## Command Reference
@@ -134,7 +132,6 @@ pingcli-terraformer export --services pingone-davinci --out ./output
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--services` | `pingone-davinci` | Services to export (comma-separated) |
 | `--pingone-worker-environment-id` | - | Worker environment ID |
 | `--pingone-export-environment-id` | Worker env | Target environment ID |
 | `--pingone-worker-client-id` | - | OAuth2 client ID |

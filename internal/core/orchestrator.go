@@ -115,12 +115,11 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 		return nil, fmt.Errorf("environment ID is required")
 	}
 
-	// 1. Discover resource types for this client's platform/service.
+	// 1. Discover resource types for this client's platform.
 	platform := o.client.Platform()
-	service := o.client.Service()
-	defs := o.registry.ListByService(platform, service)
+	defs := o.registry.ListByPlatform(platform)
 	if len(defs) == 0 {
-		return nil, fmt.Errorf("no resource definitions found for %s/%s", platform, service)
+		return nil, fmt.Errorf("no resource definitions found for platform %s", platform)
 	}
 
 	// 2. Determine processing order from declared dependencies.
@@ -129,7 +128,7 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 		return nil, fmt.Errorf("dependency ordering: %w", err)
 	}
 
-	o.progress(fmt.Sprintf("Exporting %d resource types from %s/%s", len(ordered), platform, service))
+	o.progress(fmt.Sprintf("Exporting %d resource types from %s", len(ordered), platform))
 
 	// 3. Process each resource type in dependency order.
 	depGraph := graph.New()

@@ -72,7 +72,7 @@ func TestRegistryLoadPlatform(t *testing.T) {
 	err := registry.LoadPlatform("../../definitions", "pingone")
 	require.NoError(t, err)
 
-	// Should have loaded all davinci definitions
+	// Should have loaded all definitions
 	assert.Equal(t, 8, registry.Count())
 
 	// Get the variable definition
@@ -84,11 +84,11 @@ func TestRegistryLoadPlatform(t *testing.T) {
 func TestRegistryLoadFromFS(t *testing.T) {
 	registry := schema.NewRegistry()
 
-	// Load all PingOne DaVinci definitions from embedded FS.
-	err := registry.LoadFromFS(definitions.FS, "pingone/davinci")
+	// Load all PingOne definitions from embedded FS.
+	err := registry.LoadFromFS(definitions.FS, "pingone")
 	require.NoError(t, err)
 
-	// Should have loaded all davinci definitions.
+	// Should have loaded all definitions.
 	assert.Equal(t, 8, registry.Count())
 
 	// Verify a specific definition loaded correctly.
@@ -96,21 +96,19 @@ func TestRegistryLoadFromFS(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "variable", def.Metadata.ShortName)
 	assert.Equal(t, "pingone", def.Metadata.Platform)
-	assert.Equal(t, "davinci", def.Metadata.Service)
 }
 
 func TestLoaderLoadFromFS(t *testing.T) {
 	loader := schema.NewLoader()
 
 	// Load from embedded FS.
-	defs, err := loader.LoadFromFS(definitions.FS, "pingone/davinci")
+	defs, err := loader.LoadFromFS(definitions.FS, "pingone")
 	require.NoError(t, err)
 	assert.Len(t, defs, 8)
 
 	// Verify each definition has valid metadata.
 	for _, def := range defs {
 		assert.Equal(t, "pingone", def.Metadata.Platform)
-		assert.Equal(t, "davinci", def.Metadata.Service)
 		assert.NotEmpty(t, def.Metadata.ResourceType)
 	}
 }

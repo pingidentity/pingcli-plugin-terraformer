@@ -75,21 +75,6 @@ func (r *Registry) ListByPlatform(platform string) []*ResourceDefinition {
 	return defs
 }
 
-// ListByService returns all resource definitions for a specific platform and service
-func (r *Registry) ListByService(platform, service string) []*ResourceDefinition {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	defs := make([]*ResourceDefinition, 0)
-	for _, def := range r.definitions {
-		if def.Metadata.Platform == platform && def.Metadata.Service == service {
-			defs = append(defs, def)
-		}
-	}
-
-	return defs
-}
-
 // LoadFromDirectory loads all definitions from a directory and registers them
 func (r *Registry) LoadFromDirectory(dir string) error {
 	definitions, err := r.loader.LoadFromDirectory(dir)
