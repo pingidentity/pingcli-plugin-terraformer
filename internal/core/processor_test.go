@@ -1219,6 +1219,95 @@ func TestProcessorListWithNestedAttributes(t *testing.T) {
 	assert.Equal(t, "number", item2["preferred_data_type"]) // "int" → "number" via value_map
 }
 
+// TestProcessorSetWithNestedAttributes tests set type with nested attributes.
+// This verifies the processor correctly handles set (in addition to list) for nested attribute processing.
+func TestProcessorSetWithNestedAttributes(t *testing.T) {
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "test",
+			ResourceType: "test_set_nested",
+			APIType:      "SetNested",
+			Name:         "Set Nested Test",
+			ShortName:    "setnested",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			IDField:   "id",
+			NameField: "name",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string", SourcePath: "ID"},
+			{Name: "Name", TerraformName: "name", Type: "string", SourcePath: "Name"},
+			{
+				Name:          "Tags",
+				TerraformName: "tags",
+				Type:          "set",
+				SourcePath:    "Tags",
+				NestedAttributes: []schema.AttributeDefinition{
+					{Name: "Key", TerraformName: "key", Type: "string", SourcePath: "Key"},
+					{Name: "Value", TerraformName: "value", Type: "string", SourcePath: "Value"},
+					{Name: "Enabled", TerraformName: "enabled", Type: "bool", SourcePath: "Enabled"},
+				},
+			},
+		},
+	}
+
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	// Mock data with set of nested items
+	type MockTag struct {
+		Key     string
+		Value   string
+		Enabled bool
+	}
+	type MockResourceWithSet struct {
+		ID   string
+		Name string
+		Tags []MockTag
+	}
+
+	mock := &MockResourceWithSet{
+		ID:   "res-1",
+		Name: "resource_with_tags",
+		Tags: []MockTag{
+			{Key: "environment", Value: "production", Enabled: true},
+			{Key: "owner", Value: "team-a", Enabled: true},
+			{Key: "deprecated", Value: "true", Enabled: false},
+		},
+	}
+
+	result, err := p.ProcessResource("test_set_nested", mock)
+	require.NoError(t, err)
+
+	// Set should be converted to []interface{} just like list
+	tagSet, ok := result.Attributes["tags"].([]interface{})
+	require.True(t, ok, "tags should be []interface{}, got %T", result.Attributes["tags"])
+	require.Len(t, tagSet, 3)
+
+	// Verify first tag
+	tag0, ok := tagSet[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "environment", tag0["key"])
+	assert.Equal(t, "production", tag0["value"])
+	assert.Equal(t, true, tag0["enabled"])
+
+	// Verify second tag
+	tag1, ok := tagSet[1].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "owner", tag1["key"])
+	assert.Equal(t, "team-a", tag1["value"])
+	assert.Equal(t, true, tag1["enabled"])
+
+	// Verify third tag
+	tag2, ok := tagSet[2].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "deprecated", tag2["key"])
+	assert.Equal(t, "true", tag2["value"])
+	assert.Equal(t, false, tag2["enabled"])
+}
+
 // ── override_value tests ────────────────────────────────────────
 
 // MockOverrideResource is used by override_value tests.

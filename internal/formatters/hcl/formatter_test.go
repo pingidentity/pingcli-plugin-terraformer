@@ -326,6 +326,111 @@ func TestFormatter_Format_ObjectBlockNotMap(t *testing.T) {
 	assert.NotContains(t, output, "config")
 }
 
+// ── Set with nested attributes tests ───────────────────────────
+
+func defWithSetAttr() *schema.ResourceDefinition {
+	def := minimalVariableDef()
+	def.Attributes = append(def.Attributes, schema.AttributeDefinition{
+		Name:          "Tags",
+		TerraformName: "tags",
+		Type:          "set",
+		NestedAttributes: []schema.AttributeDefinition{
+			{Name: "Key", TerraformName: "key", Type: "string"},
+			{Name: "Value", TerraformName: "value", Type: "string"},
+			{Name: "Enabled", TerraformName: "enabled", Type: "bool"},
+		},
+	})
+	return def
+}
+
+func TestFormatter_Format_SetWithNestedAttributes(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := defWithSetAttr()
+	data := resourceData()
+	data.Attributes["tags"] = []interface{}{
+		map[string]interface{}{
+			"key":     "environment",
+			"value":   "production",
+			"enabled": true,
+		},
+		map[string]interface{}{
+			"key":     "owner",
+			"value":   "team-a",
+			"enabled": false,
+		},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	// Should contain set blocks with nested attributes
+	assert.Contains(t, output, "tags")
+	assert.Contains(t, output, `"environment"`)
+	assert.Contains(t, output, `"production"`)
+	assert.Contains(t, output, `"owner"`)
+	assert.Contains(t, output, `"team-a"`)
+	assert.Contains(t, output, "true")
+	assert.Contains(t, output, "false")
+}
+
+func TestFormatter_Format_SetWithNestedAttributesEmpty(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := defWithSetAttr()
+	data := resourceData()
+	data.Attributes["tags"] = []interface{}{}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	// Empty set should be omitted
+	assert.NotContains(t, output, "tags")
+}
+
+func TestFormatter_Format_SetWithNestedAttributesNil(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := defWithSetAttr()
+	data := resourceData()
+	// tags not set → omitted
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.NotContains(t, output, "tags")
+}
+
+func TestFormatter_Format_SetWithNestedAttributesReferences(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := defWithSetAttr()
+	// Add a reference type attribute to the set definition
+	def.Attributes[len(def.Attributes)-1].NestedAttributes = append(
+		def.Attributes[len(def.Attributes)-1].NestedAttributes,
+		schema.AttributeDefinition{
+			Name:           "ConnRef",
+			TerraformName:  "conn_ref",
+			Type:           "string",
+			ReferencesType: "pingone_davinci_connector_instance",
+			ReferenceField: "id",
+		},
+	)
+
+	data := resourceData()
+	data.Attributes["tags"] = []interface{}{
+		map[string]interface{}{
+			"key": "connector-1",
+			"value": core.ResolvedReference{
+				ResourceType: "pingone_davinci_connector_instance",
+				ResourceName: "pingcli__my_connector",
+				Field:        "id",
+			},
+			"enabled": true,
+		},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	// Nested references should render as resource traversals
+	assert.Contains(t, output, "pingone_davinci_connector_instance.pingcli__my_connector.id")
+}
+
 // ── Scalar value type tests ─────────────────────────────────────
 
 func defWithScalars() *schema.ResourceDefinition {

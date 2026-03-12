@@ -73,7 +73,7 @@ func TestRegistryLoadPlatform(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should have loaded all davinci definitions
-	assert.Equal(t, 7, registry.Count())
+	assert.Equal(t, 8, registry.Count())
 
 	// Get the variable definition
 	def, err := registry.Get("pingone_davinci_variable")
@@ -89,7 +89,7 @@ func TestRegistryLoadFromFS(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should have loaded all davinci definitions.
-	assert.Equal(t, 7, registry.Count())
+	assert.Equal(t, 8, registry.Count())
 
 	// Verify a specific definition loaded correctly.
 	def, err := registry.Get("pingone_davinci_variable")
@@ -105,7 +105,7 @@ func TestLoaderLoadFromFS(t *testing.T) {
 	// Load from embedded FS.
 	defs, err := loader.LoadFromFS(definitions.FS, "pingone/davinci")
 	require.NoError(t, err)
-	assert.Len(t, defs, 7)
+	assert.Len(t, defs, 8)
 
 	// Verify each definition has valid metadata.
 	for _, def := range defs {

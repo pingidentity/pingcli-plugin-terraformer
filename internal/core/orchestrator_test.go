@@ -508,3 +508,111 @@ func TestResolveCorrelatedReferences_AlreadyResolved(t *testing.T) {
 	ref := attrs["ref"].(ResolvedReference)
 	assert.Equal(t, "some_type.my_resource.id", ref.Expression())
 }
+
+// TestResolveEnvironmentReference_InGraph tests that when pingone_environment
+// IS in the dependency graph, environment references resolve to resource traversals.
+func TestResolveEnvironmentReference_InGraph(t *testing.T) {
+	// Create a definition with an environment reference
+	envAttrDef := schema.AttributeDefinition{
+		Name:           "environment_id",
+		TerraformName:  "environment_id",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "id",
+	}
+
+	// Create a mock attribute value (UUID)
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Build graph with pingone_environment resource
+	g := graph.New()
+	g.AddResource("pingone_environment", environmentUUID, "pingcli__production")
+
+	// Resolve the reference
+	result := resolveOneReference(envAttrDef, environmentUUID, g)
+
+	// Should resolve to resource traversal, not variable
+	assert.False(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment", result.ResourceType)
+	assert.Equal(t, "pingcli__production", result.ResourceName)
+	assert.Equal(t, "id", result.Field)
+	assert.Equal(t, "pingone_environment.pingcli__production.id", result.Expression())
+}
+
+// TestResolveEnvironmentReference_NotInGraph tests that when pingone_environment
+// is NOT in the dependency graph, environment references fall back to variable references.
+func TestResolveEnvironmentReference_NotInGraph(t *testing.T) {
+	// Create a definition with an environment reference
+	envAttrDef := schema.AttributeDefinition{
+		Name:           "environment_id",
+		TerraformName:  "environment_id",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "id",
+	}
+
+	// Create a mock attribute value (UUID)
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Build empty graph (no pingone_environment resource)
+	g := graph.New()
+
+	// Resolve the reference
+	result := resolveOneReference(envAttrDef, environmentUUID, g)
+
+	// Should fall back to variable reference
+	assert.True(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment_id", result.VariableName)
+	assert.Equal(t, environmentUUID, result.OriginalValue)
+	assert.Equal(t, "var.pingone_environment_id", result.Expression())
+}
+
+// TestResolveEnvironmentReference_NilGraph tests that when graph is nil,
+// environment references fall back to variable references.
+func TestResolveEnvironmentReference_NilGraph(t *testing.T) {
+	// Create a definition with an environment reference
+	envAttrDef := schema.AttributeDefinition{
+		Name:           "environment_id",
+		TerraformName:  "environment_id",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "id",
+	}
+
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Resolve with nil graph
+	result := resolveOneReference(envAttrDef, environmentUUID, nil)
+
+	// Should fall back to variable reference
+	assert.True(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment_id", result.VariableName)
+	assert.Equal(t, "var.pingone_environment_id", result.Expression())
+}
+
+// TestResolveEnvironmentReference_CustomField tests reference resolution
+// when a custom ReferenceField is specified.
+func TestResolveEnvironmentReference_CustomField(t *testing.T) {
+	// Use a custom reference field (unusual but valid for testing)
+	customAttrDef := schema.AttributeDefinition{
+		Name:           "env_name",
+		TerraformName:  "env_name",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "name",
+	}
+
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Build graph with environment resource
+	g := graph.New()
+	g.AddResource("pingone_environment", environmentUUID, "pingcli__staging")
+
+	result := resolveOneReference(customAttrDef, environmentUUID, g)
+
+	// Should resolve with custom field
+	assert.False(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment", result.ResourceType)
+	assert.Equal(t, "name", result.Field)
+	assert.Equal(t, "pingone_environment.pingcli__staging.name", result.Expression())
+}

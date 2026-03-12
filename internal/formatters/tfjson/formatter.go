@@ -218,7 +218,7 @@ func buildAttributes(data *core.ResourceData, def *schema.ResourceDefinition, op
 		}
 
 		// List of objects with nested schema.
-		if attrDef.Type == "list" && len(attrDef.NestedAttributes) > 0 {
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 			val, ok := data.Attributes[tName]
 			if !ok || val == nil {
 				continue
@@ -328,8 +328,8 @@ func renderNestedObject(nested []schema.AttributeDefinition, valMap map[string]i
 			continue
 		}
 
-		// Nested list of objects.
-		if attr.Type == "list" && len(attr.NestedAttributes) > 0 {
+		// Nested list/set of objects.
+		if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
 			slice, ok := nVal.([]interface{})
 			if !ok || len(slice) == 0 {
 				continue

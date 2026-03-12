@@ -116,7 +116,7 @@ func inferTerraformType(schemaType string) string {
 		return "bool"
 	case "object", "map":
 		return "any"
-	case "list":
+	case "list", "set":
 		return "list(any)"
 	default:
 		return "string"
