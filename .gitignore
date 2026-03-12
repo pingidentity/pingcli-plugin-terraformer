@@ -26,7 +26,7 @@ go.work
 *.swp
 *.swo
 *~
-.github/agents/**
+# .github/agents/**
 
 # OS specific files
 .DS_Store
