@@ -26,7 +26,7 @@ Download from [GitHub Releases](https://github.com/pingidentity/pingcli-plugin-t
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install pingidentity/homebrew-pingcli/pingcli-terraformer
+brew install pingidentity/tap/pingcli-plugin-terraformer
 ```
 
 ### Linux Package Managers
