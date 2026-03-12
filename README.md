@@ -4,7 +4,7 @@ Export PingOne resources to Terraform configuration with automatic dependency re
 
 ## Features
 
-- **Complete DaVinci Export**: Export DaVinci flows, variables, connector instances, applications, and flow policies
+- **Complete DaVinci Export**: Export PingOne environments, DaVinci flows, variables, connector instances, applications, and flow policies
 - **Multiple Output Formats**: Supports Terraform HCL (`.tf`) or Terraform JSON (`.tf.json`) output
 - **Automatic Dependency Resolution**: Generates Terraform references between resources
 - **Import Block Generation**: Terraform import blocks to manage existing resources (Terraform 1.5+)
@@ -160,6 +160,7 @@ pingcli-terraformer export --services pingone-davinci --out ./output
 
 | Resource | Terraform Type |
 |----------|---------------|
+| PingOne Environment | `pingone_environment` |
 | DaVinci Flow | `pingone_davinci_flow` |
 | DaVinci Variable | `pingone_davinci_variable` |
 | DaVinci Connector Instance | `pingone_davinci_connector_instance` |

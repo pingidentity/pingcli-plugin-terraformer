@@ -21,7 +21,8 @@ This project is a **schema-driven, multi-format Terraform configuration export e
 │  └── pingone/                                                       │
 │      └── davinci/                                                   │
 │          ├── application.yaml                                       │
-│          ├── connection.yaml                                        │
+│          ├── connector_instance.yaml                                │
+│          ├── environment.yaml                                       │
 │          ├── flow.yaml                                              │
 │          ├── flow_deploy.yaml                                       │
 │          ├── flow_enable.yaml                                       │
