@@ -19,10 +19,11 @@ This project is a **schema-driven, multi-format Terraform configuration export e
 │                                                                     │
 │  definitions/                                                       │
 │  └── pingone/                                                       │
+│      ├── base/                                                      │
+│      │   └── environment.yaml                                       │
 │      └── davinci/                                                   │
 │          ├── application.yaml                                       │
 │          ├── connector_instance.yaml                                │
-│          ├── environment.yaml                                       │
 │          ├── flow.yaml                                              │
 │          ├── flow_deploy.yaml                                       │
 │          ├── flow_enable.yaml                                       │
@@ -111,7 +112,9 @@ cmd/
 
 definitions/
     embed.go               # go:embed for YAML definitions
-    pingone/davinci/       # YAML resource definitions
+    pingone/
+        base/              # PingOne base resource definitions
+        davinci/           # DaVinci resource definitions
 
 internal/
     api/                   # Legacy API client (being replaced)
@@ -139,7 +142,7 @@ internal/
         generator.go       # Module structure generation
         types.go           # Module types (Variable, Output, etc.)
     platform/
-        pingone/davinci/   # DaVinci API client + resource handlers
+        pingone/           # PingOne API client + resource handlers (all services)
     schema/
         keys.go            # CanonicalAttributeKey
         loader.go          # YAML file loading
@@ -538,12 +541,13 @@ The orchestrator calls **only** `ListResources`. It never calls `GetResource` di
 
 ### Platform Package Structure
 
-Each service package follows a unified pattern under `internal/platform/{platform}/{service}/`:
+All PingOne resource handlers live in a single flat package at `internal/platform/pingone/`. There are no sub-packages per service — base and DaVinci resources share one package:
 
 ```
-internal/platform/pingone/davinci/
+internal/platform/pingone/
 ├── client.go              # Client struct, dispatches through handler table
 ├── dispatch.go            # Handler dispatch table + custom handler queuing
+├── resource_environment.go
 ├── resource_application.go
 ├── resource_connection.go
 ├── resource_flow.go
@@ -569,17 +573,18 @@ func init() {
 
 ### Adding a New Resource
 
-1. Create `resource_{short_name}.go` in the service package
+1. Create `resource_{short_name}.go` in `internal/platform/pingone/`
 2. Implement `list` and `get` functions
 3. Register via `init()` calling `registerResource()`
 4. Optionally register custom handlers/transforms
-5. Create the YAML definition in `definitions/{platform}/{service}/`
+5. Create the YAML definition in `definitions/pingone/{category}/` (e.g., `base/` or `davinci/`)
 6. No edits to `client.go` or `dispatch.go` required
 
 ### Currently Supported Resources
 
 | Resource Type | Custom Handler |
 |--------------|----------------|
+| `pingone_environment` | None (projection struct) |
 | `pingone_davinci_variable` | None (fully declarative) |
 | `pingone_davinci_flow` | None (fully declarative) |
 | `pingone_davinci_flow_deploy` | None (projection struct) |
