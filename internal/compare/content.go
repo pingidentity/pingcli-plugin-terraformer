@@ -52,7 +52,31 @@ const (
 
 	// DiffBlockMismatch means a nested block exists in both but content differs.
 	DiffBlockMismatch DiffKind = "block_mismatch"
+
+	// DiffExtraAttribute means an attribute present in actual is absent from expected.
+	DiffExtraAttribute DiffKind = "extra_attribute"
 )
+
+// DiffSeverity classifies how severe a diff is.
+type DiffSeverity string
+
+const (
+	// SeverityAcceptable means the diff is an addition (extra resource/attribute).
+	SeverityAcceptable DiffSeverity = "acceptable"
+
+	// SeverityBreaking means the diff indicates a regression.
+	SeverityBreaking DiffSeverity = "breaking"
+)
+
+// ClassifyDiff returns the severity of a diff.
+func ClassifyDiff(d Diff) DiffSeverity {
+	switch d.Kind {
+	case DiffExtraResource, DiffExtraAttribute:
+		return SeverityAcceptable
+	default:
+		return SeverityBreaking
+	}
+}
 
 // Result holds the outcome of an HCL content comparison.
 type Result struct {
@@ -62,6 +86,16 @@ type Result struct {
 // HasDiffs returns true when any content differences were found.
 func (r *Result) HasDiffs() bool {
 	return len(r.Diffs) > 0
+}
+
+// HasBreakingDiffs returns true when any breaking diff exists.
+func (r *Result) HasBreakingDiffs() bool {
+	for _, d := range r.Diffs {
+		if ClassifyDiff(d) == SeverityBreaking {
+			return true
+		}
+	}
+	return false
 }
 
 // Summary returns a human-readable summary of all diffs.
@@ -85,6 +119,8 @@ func (r *Result) Summary() string {
 			sb.WriteString(fmt.Sprintf("  - %s: block %q missing\n", d.Resource, d.Attribute))
 		case DiffBlockMismatch:
 			sb.WriteString(fmt.Sprintf("  ~ %s: block %q content differs\n", d.Resource, d.Attribute))
+		case DiffExtraAttribute:
+			sb.WriteString(fmt.Sprintf("  + %s: attribute %q extra\n", d.Resource, d.Attribute))
 		}
 	}
 	return sb.String()
@@ -230,6 +266,23 @@ func compareResource(result *Result, key string, exp, act *parsedResource) {
 		}
 	}
 
+	// Check for extra attributes in actual that are not in expected.
+	actAttrNames := sortedMapKeys(act.attrs)
+	for _, name := range actAttrNames {
+		if _, isBlock := act.blocks[name]; isBlock {
+			continue
+		}
+		if _, exists := exp.attrs[name]; !exists {
+			actVal := normalizeValue(act.attrs[name])
+			result.Diffs = append(result.Diffs, Diff{
+				Resource:  key,
+				Kind:      DiffExtraAttribute,
+				Attribute: name,
+				Actual:    actVal,
+			})
+		}
+	}
+
 	// Compare nested blocks.
 	blockNames := sortedMapKeys(exp.blocks)
 	for _, name := range blockNames {
@@ -355,4 +408,123 @@ func CompareModuleResources(expected, actual map[string]string) (*Result, error)
 	}
 
 	return combined, nil
+}
+
+// CompareHCLGeneric parses two HCL strings and returns content differences
+// for all block types (resource, module, variable, output, provider, data,
+// locals, terraform, import, etc.).
+func CompareHCLGeneric(expected, actual string) (*Result, error) {
+	expBlocks, expTopAttrs, err := parseBlocksGeneric(expected)
+	if err != nil {
+		return nil, fmt.Errorf("parse expected HCL: %w", err)
+	}
+	actBlocks, actTopAttrs, err := parseBlocksGeneric(actual)
+	if err != nil {
+		return nil, fmt.Errorf("parse actual HCL: %w", err)
+	}
+
+	result := &Result{}
+
+	// Compare blocks.
+	for _, key := range sortedMapKeys(expBlocks) {
+		expRes := expBlocks[key]
+		actRes, exists := actBlocks[key]
+		if !exists {
+			result.Diffs = append(result.Diffs, Diff{
+				Resource: key,
+				Kind:     DiffMissingResource,
+			})
+			continue
+		}
+		compareResource(result, key, expRes, actRes)
+	}
+
+	for _, key := range sortedMapKeys(actBlocks) {
+		if _, exists := expBlocks[key]; !exists {
+			result.Diffs = append(result.Diffs, Diff{
+				Resource: key,
+				Kind:     DiffExtraResource,
+			})
+		}
+	}
+
+	// Compare top-level attributes (e.g., .tfvars files).
+	if len(expTopAttrs) > 0 || len(actTopAttrs) > 0 {
+		topResource := &parsedResource{attrs: expTopAttrs, blocks: make(map[string]string)}
+		actTopResource := &parsedResource{attrs: actTopAttrs, blocks: make(map[string]string)}
+		compareResource(result, "top-level", topResource, actTopResource)
+	}
+
+	return result, nil
+}
+
+func parseBlocksGeneric(hclText string) (map[string]*parsedResource, map[string]string, error) {
+	if strings.TrimSpace(hclText) == "" {
+		return make(map[string]*parsedResource), make(map[string]string), nil
+	}
+
+	file, diags := hclwrite.ParseConfig([]byte(hclText), "compare.tf", hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		return nil, nil, fmt.Errorf("hclwrite parse: %s", diags.Error())
+	}
+
+	blocks := make(map[string]*parsedResource)
+	for _, block := range file.Body().Blocks() {
+		key := genericBlockKey(block)
+		if key == "" {
+			continue
+		}
+		labels := block.Labels()
+		resType := block.Type()
+		label := ""
+		if len(labels) > 0 {
+			label = labels[len(labels)-1]
+		}
+		blocks[key] = extractBlock(resType, label, block)
+	}
+
+	// Extract top-level attributes (for .tfvars and similar files).
+	topAttrs := make(map[string]string)
+	for name, attr := range file.Body().Attributes() {
+		tokens := attr.Expr().BuildTokens(nil)
+		topAttrs[name] = strings.TrimSpace(tokensToString(tokens))
+	}
+
+	return blocks, topAttrs, nil
+}
+
+func genericBlockKey(block *hclwrite.Block) string {
+	blockType := block.Type()
+	labels := block.Labels()
+
+	switch blockType {
+	case "resource":
+		if len(labels) >= 2 {
+			return blockType + "." + labels[0] + "." + labels[1]
+		}
+	case "data":
+		if len(labels) >= 2 {
+			return blockType + "." + labels[0] + "." + labels[1]
+		}
+	case "module", "variable", "output", "provider":
+		if len(labels) >= 1 {
+			return blockType + "." + labels[0]
+		}
+	case "locals", "terraform":
+		return blockType
+	case "import":
+		for name, attr := range block.Body().Attributes() {
+			if name == "to" {
+				tokens := attr.Expr().BuildTokens(nil)
+				val := normalizeValue(strings.TrimSpace(tokensToString(tokens)))
+				return "import." + val
+			}
+		}
+		return "import"
+	}
+	// Fallback: blockType + labels
+	if len(labels) > 0 {
+		return blockType + "." + strings.Join(labels, ".")
+	}
+	return blockType
 }
