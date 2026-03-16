@@ -73,6 +73,7 @@ internal/
         formatter.go       # OutputFormatter interface + factory
         hcl/               # HCL formatter (hclwrite-based)
         tfjson/            # Terraform JSON formatter
+    filter/filter.go       # Resource filtering (include/exclude patterns)
     graph/graph.go         # DependencyGraph (cycle detection, topo sort)
     imports/generator.go   # Terraform import block generation
     module/generator.go    # Module structure generation
@@ -656,6 +657,9 @@ go tool pprof mem.prof
 | `--skip-dependencies` | `bool` | `false` | Skip dependency resolution |
 | `--skip-imports` | `bool` | `false` | Skip generating import blocks |
 | `--include-imports` | `bool` | `false` | Generate import blocks in root module |
+| `--include-resources` | `string` | | Include resources matching glob/regex pattern(s). Repeatable. Patterns match `resource_type.terraform_label` (case-insensitive). Use `regex:` prefix for regex patterns. Multiple patterns combine via OR. |
+| `--exclude-resources` | `string` | | Exclude resources matching glob/regex pattern(s). Repeatable. Same matching rules as `include-resources`. Takes precedence over includes. |
+| `--list-resources` | `bool` | `false` | List all resource addresses (`resource_type.terraform_label`) and exit. Useful for discovering exact addresses to use with include/exclude patterns. |
 | `--include-values` | `bool` | `false` | Populate variable values from export |
 | `--module-dir` | `string` | `"ping-export-module"` | Child module directory name |
 | `--module-name` | `string` | `"ping-export"` | Module name / prefix |

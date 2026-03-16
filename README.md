@@ -164,6 +164,68 @@ pingcli-terraformer export --out ./output
 | DaVinci Application | `pingone_davinci_application` |
 | DaVinci Flow Policy | `pingone_davinci_application_flow_policy` |
 
+## Resource Filtering
+
+Export only specific resources using glob or regex patterns:
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--include-resources <pattern>` | Include resources matching pattern(s). Repeatable. Patterns match `resource_type.terraform_label` (case-insensitive). Use `regex:` prefix for regex. |
+| `--exclude-resources <pattern>` | Exclude resources matching pattern(s). Repeatable. Same matching rules as include. |
+| `--list-resources` | List available resource addresses (`resource_type.terraform_label`) and exit. Useful for discovering exact addresses to filter. |
+
+### Pattern Syntax
+
+- **Glob** (default): `*` matches any characters, `?` matches single character
+  - `pingone_davinci_flow.*` — all flows
+  - `pingone_davinci_variable.dev*` — variables starting with "dev"
+  
+- **Regex**: Prefix pattern with `regex:`, uses Go regexp syntax
+  - `regex:pingone_davinci_(flow|variable)\..*` — flows or variables
+  - `regex:^pingone_davinci_flow\.(login|logout)` — specific flow names
+
+- Multiple patterns combine via OR (union)
+- No filters = export all resources (backwards compatible)
+
+### Examples
+
+List all available resource addresses:
+```bash
+pingcli-terraformer export --list-resources
+```
+
+Export only DaVinci flows and variables:
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci_flow.*" \
+  --include-resources "pingone_davinci_variable.*" \
+  --out ./output
+```
+
+Export everything except flow policies:
+```bash
+pingcli-terraformer export \
+  --exclude-resources "pingone_davinci_application_flow_policy.*" \
+  --out ./output
+```
+
+Export flows with specific name patterns using regex:
+```bash
+pingcli-terraformer export \
+  --include-resources "regex:pingone_davinci_flow\.(login|mfa|consent)" \
+  --out ./output
+```
+
+Combine include and exclude (exclude takes precedence for overlaps):
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci*" \
+  --exclude-resources "pingone_davinci_application_flow_policy.*" \
+  --out ./output
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guides, architecture documentation, and how to add new resources.

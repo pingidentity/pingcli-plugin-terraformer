@@ -3,8 +3,10 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/filter"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/graph"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 	"github.com/stretchr/testify/assert"
@@ -611,4 +613,394 @@ func TestResolveEnvironmentReference_CustomField(t *testing.T) {
 	assert.Equal(t, "pingone_environment", result.ResourceType)
 	assert.Equal(t, "name", result.Field)
 	assert.Equal(t, "pingone_environment.pingcli__staging.name", result.Expression())
+}
+
+// --- Filtering Tests ---
+
+// TestExportOrchestrator_Export_FilterInclude tests that include patterns
+// filter resources at the type level and resource level.
+func TestExportOrchestrator_Export_FilterInclude(t *testing.T) {
+	// Setup: 2 types (type_flow, type_var) with 2 resources each.
+	// type_var depends on type_flow.
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	varDef := baseDef("type_var", "p", "Variable", "var")
+	varDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_flow"},
+	}
+
+	reg := newTestRegistry(t, flowDef, varDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_flow": {
+				simpleStruct{ID: strPtr("flow1"), Name: strPtr("flow1")},
+				simpleStruct{ID: strPtr("flow2"), Name: strPtr("flow2")},
+			},
+			"type_var": {
+				simpleStruct{ID: strPtr("var1"), Name: strPtr("var1")},
+				simpleStruct{ID: strPtr("var2"), Name: strPtr("var2")},
+			},
+		},
+	}
+
+	// Create filter: include only type_flow* resources.
+	filterObj, err := filter.NewResourceFilter([]string{"type_flow*"}, nil)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+
+	// Assert: only type_flow in result
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Equal(t, "type_flow", result.ResourcesByType[0].ResourceType)
+	assert.Len(t, result.ResourcesByType[0].Resources, 2)
+
+	// Assert: graph has 2 nodes (flow1, flow2)
+	assert.Equal(t, 2, result.Graph.NodeCount())
+}
+
+// TestExportOrchestrator_Export_FilterExclude tests that exclude patterns
+// filter out matching resources by full address (type.label).
+func TestExportOrchestrator_Export_FilterExclude(t *testing.T) {
+	// Use a type name that doesn't conflict with the exclude pattern.
+	def := baseDef("my_resource", "p", "My Resource", "myres")
+	reg := newTestRegistry(t, def)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"my_resource": {
+				simpleStruct{ID: strPtr("id-1"), Name: strPtr("alpha")},
+				simpleStruct{ID: strPtr("id-2"), Name: strPtr("beta_test")},
+				simpleStruct{ID: strPtr("id-3"), Name: strPtr("gamma")},
+			},
+		},
+	}
+
+	// Exclude pattern targets the label portion.
+	// Address: my_resource.pingcli__beta_test — matches *beta_test*
+	filterObj, err := filter.NewResourceFilter(nil, []string{"*beta_test*"})
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+
+	// Assert: 2 resources (alpha, gamma)
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Len(t, result.ResourcesByType[0].Resources, 2)
+
+	// Verify names: alpha and gamma
+	resourceNames := map[string]bool{}
+	for _, r := range result.ResourcesByType[0].Resources {
+		resourceNames[r.Name] = true
+	}
+	assert.True(t, resourceNames["alpha"])
+	assert.True(t, resourceNames["gamma"])
+	assert.False(t, resourceNames["beta_test"])
+
+	// Assert: graph has 2 nodes
+	assert.Equal(t, 2, result.Graph.NodeCount())
+}
+
+// TestExportOrchestrator_Export_FilterIncludeAndExclude tests combined
+// include and exclude patterns.
+func TestExportOrchestrator_Export_FilterIncludeAndExclude(t *testing.T) {
+	// Setup: 2 types with 2 resources each.
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	varDef := baseDef("type_var", "p", "Variable", "var")
+
+	reg := newTestRegistry(t, flowDef, varDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_flow": {
+				simpleStruct{ID: strPtr("flow1"), Name: strPtr("Login_Flow")},
+				simpleStruct{ID: strPtr("flow2"), Name: strPtr("Test_Flow")},
+			},
+			"type_var": {
+				simpleStruct{ID: strPtr("var1"), Name: strPtr("authToken")},
+				simpleStruct{ID: strPtr("var2"), Name: strPtr("testVar")},
+			},
+		},
+	}
+
+	// Include both types, but exclude resources with "Test" in the label.
+	// Addresses: type_flow.pingcli__Test_Flow, type_var.pingcli__testVar
+	filterObj, err := filter.NewResourceFilter(
+		[]string{"type_flow*", "type_var*"},
+		[]string{"*Test*"},
+	)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+
+	// Assert: 2 types in result
+	require.Len(t, result.ResourcesByType, 2)
+
+	// type_flow should have 1 resource (Login_Flow, Test_Flow excluded)
+	flowData := result.ResourcesByType[0]
+	if flowData.ResourceType == "type_flow" {
+		assert.Len(t, flowData.Resources, 1)
+		assert.Equal(t, "Login_Flow", flowData.Resources[0].Name)
+	}
+
+	// type_var should have 1 resource (authToken, testVar excluded)
+	varData := result.ResourcesByType[1]
+	if varData.ResourceType == "type_var" {
+		assert.Len(t, varData.Resources, 1)
+		assert.Equal(t, "authToken", varData.Resources[0].Name)
+	}
+
+	// Assert: graph has 2 nodes total
+	assert.Equal(t, 2, result.Graph.NodeCount())
+}
+
+// TestExportOrchestrator_Export_FilterNil tests that nil filter
+// includes all resources (backward compatibility).
+func TestExportOrchestrator_Export_FilterNil(t *testing.T) {
+	// Setup: 1 type with 2 resources
+	def := baseDef("test_resource", "p", "Test Resource", "test")
+	reg := newTestRegistry(t, def)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"test_resource": {
+				simpleStruct{ID: strPtr("id-1"), Name: strPtr("alpha")},
+				simpleStruct{ID: strPtr("id-2"), Name: strPtr("beta")},
+			},
+		},
+	}
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: nil, // no filtering
+	})
+	require.NoError(t, err)
+
+	// Assert: all resources returned
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Len(t, result.ResourcesByType[0].Resources, 2)
+	assert.Equal(t, 2, result.Graph.NodeCount())
+}
+
+// TestExportOrchestrator_Export_FilterEmptyMatch tests that include patterns
+// that match nothing result in empty export.
+func TestExportOrchestrator_Export_FilterEmptyMatch(t *testing.T) {
+	// Setup: 1 type with 2 resources
+	def := baseDef("test_resource", "p", "Test Resource", "test")
+	reg := newTestRegistry(t, def)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"test_resource": {
+				simpleStruct{ID: strPtr("id-1"), Name: strPtr("alpha")},
+				simpleStruct{ID: strPtr("id-2"), Name: strPtr("beta")},
+			},
+		},
+	}
+
+	// Include pattern that matches nothing
+	filterObj, err := filter.NewResourceFilter([]string{"nonexistent_type*"}, nil)
+	require.NoError(t, err)
+
+	var messages []string
+	o := NewExportOrchestrator(reg, proc, client, WithProgressFunc(func(msg string) {
+		messages = append(messages, msg)
+	}))
+
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+
+	// Assert: 0 resources in result (type may or may not be present with 0 resources)
+	totalResources := 0
+	for _, erd := range result.ResourcesByType {
+		totalResources += len(erd.Resources)
+	}
+	assert.Equal(t, 0, totalResources)
+
+	// Assert: progress messages indicate empty or no resources
+	assert.Greater(t, len(messages), 0)
+}
+
+// TestExportOrchestrator_Export_FilterDependencyWarning tests that filtering
+// resources referenced by other resources produces a warning.
+func TestExportOrchestrator_Export_FilterDependencyWarning(t *testing.T) {
+	// Setup: connector type (type_conn) and flow type (type_flow) that references it.
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	// Add connection_id reference attribute to flow.
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-uuid"), Name: strPtr("conn1")},
+			},
+			"type_flow": {
+				simpleStruct{ID: strPtr("flow-uuid"), Name: strPtr("flow1")},
+			},
+		},
+	}
+
+	// Filter to include only flows, excluding connectors
+	filterObj, err := filter.NewResourceFilter([]string{"type_flow*"}, nil)
+	require.NoError(t, err)
+
+	var messages []string
+	o := NewExportOrchestrator(reg, proc, client, WithProgressFunc(func(msg string) {
+		messages = append(messages, msg)
+	}))
+
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Equal(t, "type_flow", result.ResourcesByType[0].ResourceType)
+
+	// Assert: dependency warning was emitted about excluded type_conn
+	hasDepWarning := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "Warning") && strings.Contains(msg, "type_conn") {
+			hasDepWarning = true
+			break
+		}
+	}
+	assert.True(t, hasDepWarning, "should emit dependency warning about excluded type_conn")
+}
+
+// TestExportOrchestrator_Export_ListOnly tests that ListOnly flag
+// returns resources without resolving references.
+func TestExportOrchestrator_Export_ListOnly(t *testing.T) {
+	// Setup: connector and flow with reference
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	// Add connection_id reference attribute to flow.
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	// Make sure connection_id gets set in the raw data
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-uuid"), Name: strPtr("conn1")},
+			},
+			"type_flow": {
+				simpleStruct{ID: strPtr("flow-uuid"), Name: strPtr("flow1")},
+			},
+		},
+	}
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID: "env-1",
+		ListOnly:      true, // Skip reference resolution
+	})
+	require.NoError(t, err)
+
+	// Assert: resources returned with labels assigned
+	require.Len(t, result.ResourcesByType, 2)
+
+	// Verify labels exist
+	for _, erd := range result.ResourcesByType {
+		for _, rd := range erd.Resources {
+			assert.NotEmpty(t, rd.Label)
+			// Verify label has sanitized format (pingcli__ is 9 chars)
+			assert.True(t, len(rd.Label) >= 9 && rd.Label[0:9] == "pingcli__")
+		}
+	}
+
+	// Note: We can't directly test that reference resolution didn't happen
+	// without modifying the data structure, but the ListOnly flag should
+	// prevent the resolveReferences call from being made.
+}
+
+// TestExportOrchestrator_Export_FilterRemovesEmptyTypes tests that when filtering
+// results in empty resource lists for a type, that type is not included in results.
+func TestExportOrchestrator_Export_FilterRemovesEmptyTypes(t *testing.T) {
+	// Setup: 2 types (type_a, type_b), each with 1 resource
+	aDef := baseDef("type_a", "p", "Type A", "a")
+	bDef := baseDef("type_b", "p", "Type B", "b")
+
+	reg := newTestRegistry(t, aDef, bDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_a": {
+				simpleStruct{ID: strPtr("a1"), Name: strPtr("alpha")},
+			},
+			"type_b": {
+				simpleStruct{ID: strPtr("b1"), Name: strPtr("beta")},
+			},
+		},
+	}
+
+	// Filter to include only type_a
+	filterObj, err := filter.NewResourceFilter([]string{"type_a*"}, nil)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+
+	// Assert: only type_a in result (type_b completely removed, not present with 0 resources)
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Equal(t, "type_a", result.ResourcesByType[0].ResourceType)
+	assert.Len(t, result.ResourcesByType[0].Resources, 1)
+	assert.Equal(t, 1, result.Graph.NodeCount())
 }

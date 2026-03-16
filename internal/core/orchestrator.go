@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/clients"
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/filter"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/graph"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
@@ -22,6 +23,13 @@ type ExportOptions struct {
 
 	// EnvironmentID is the PingOne environment being exported.
 	EnvironmentID string
+
+	// ResourceFilter filters resources by pattern matching on addresses.
+	// nil = no filtering (all resources included).
+	ResourceFilter *filter.ResourceFilter
+
+	// ListOnly returns resources after processing but skips reference resolution.
+	ListOnly bool
 }
 
 // ExportedResourceData holds processed data for a single resource type.
@@ -155,18 +163,57 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 			return nil, fmt.Errorf("%s: %w", resourceType, err)
 		}
 
-		// Populate graph nodes with the assigned labels.
+		// Apply filtering if active. Address uses the sanitized Label
+		// (e.g. "pingone_davinci_flow.pingcli__Login-0020-Flow") so that
+		// patterns match the same format shown by --list-resources.
+		if opts.ResourceFilter != nil && opts.ResourceFilter.IsActive() {
+			var filtered []*ResourceData
+			for _, rd := range processed {
+				address := resourceType + "." + rd.Label
+				if opts.ResourceFilter.Allow(address) {
+					filtered = append(filtered, rd)
+				}
+			}
+			processed = filtered
+		}
+
+		// Populate graph nodes with the assigned labels (only surviving resources).
 		for _, rd := range processed {
 			depGraph.AddResource(rd.ResourceType, rd.ID, rd.Label)
 		}
 
 		o.progress(fmt.Sprintf("✓ Processed %d %s resources", len(processed), def.Metadata.ShortName))
 
+		// Exclude types with no resources only when filtering is active
+		// When no filter is active, include all types even if empty
+		if len(processed) == 0 && opts.ResourceFilter != nil && opts.ResourceFilter.IsActive() {
+			continue
+		}
+
 		results = append(results, &ExportedResourceData{
 			ResourceType: resourceType,
 			Definition:   def,
 			Resources:    processed,
 		})
+	}
+
+	// Return early if ListOnly flag is set.
+	if opts.ListOnly {
+		o.progress(fmt.Sprintf("✓ Listed %d resources across %d types", o.totalResources(results), len(results)))
+		return &ExportResult{
+			ResourcesByType: results,
+			Graph:           depGraph,
+			EnvironmentID:   opts.EnvironmentID,
+		}, nil
+	}
+
+	// Emit dependency warnings if filter is active.
+	if opts.ResourceFilter != nil && opts.ResourceFilter.IsActive() {
+		// Warn if no resources matched
+		if o.totalResources(results) == 0 {
+			o.progress("Warning: filter matched 0 resources")
+		}
+		o.emitDependencyWarnings(results, ordered)
 	}
 
 	// 4. Resolve cross-resource references in all processed attributes.
@@ -197,6 +244,55 @@ func (o *ExportOrchestrator) totalResources(results []*ExportedResourceData) int
 		n += len(r.Resources)
 	}
 	return n
+}
+
+// emitDependencyWarnings checks if filtered resources reference types that were
+// excluded by the filter. It recursively scans all attributes (including nested)
+// and warns about missing dependencies. Each resource→referenced pair is warned
+// only once.
+func (o *ExportOrchestrator) emitDependencyWarnings(included []*ExportedResourceData, allDefs []*schema.ResourceDefinition) {
+	// Build set of included resource types
+	includedTypes := make(map[string]bool)
+	for _, erd := range included {
+		includedTypes[erd.ResourceType] = true
+	}
+
+	// Build set of all defined types for validation
+	allDefinedTypes := make(map[string]bool)
+	for _, def := range allDefs {
+		allDefinedTypes[def.Metadata.ResourceType] = true
+	}
+
+	// Track emitted warnings to avoid duplicates
+	warned := make(map[string]bool)
+
+	// For each included type, check what it references
+	for _, erd := range included {
+		o.checkAttributeReferences(erd.ResourceType, erd.Definition.Attributes, includedTypes, allDefinedTypes, warned)
+	}
+}
+
+// checkAttributeReferences recursively scans attributes (including nested) for
+// references and warns if a referenced type is excluded.
+func (o *ExportOrchestrator) checkAttributeReferences(resourceType string, attrs []schema.AttributeDefinition, includedTypes, allDefinedTypes map[string]bool, warned map[string]bool) {
+	for _, attr := range attrs {
+		referencedType := attr.ReferencesType
+		if referencedType == "" || referencedType == "pingone_environment" {
+			continue // Skip empty or environment references
+		}
+
+		// Check if referenced type is missing from included set
+		warningKey := resourceType + "->" + referencedType
+		if !includedTypes[referencedType] && allDefinedTypes[referencedType] && !warned[warningKey] {
+			o.progress(fmt.Sprintf("Warning: %s references %s which was excluded by filter", resourceType, referencedType))
+			warned[warningKey] = true
+		}
+
+		// Recurse into nested attributes
+		if len(attr.NestedAttributes) > 0 {
+			o.checkAttributeReferences(resourceType, attr.NestedAttributes, includedTypes, allDefinedTypes, warned)
+		}
+	}
 }
 
 // resolveReferences walks all processed resources and replaces raw UUID strings

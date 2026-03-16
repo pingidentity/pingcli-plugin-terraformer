@@ -134,6 +134,8 @@ internal/
         formatter.go       # OutputFormatter interface + factory
         hcl/               # HCL formatter (hclwrite-based)
         tfjson/            # Terraform JSON formatter
+    filter/
+        filter.go          # Resource filtering (glob and regex patterns)
     graph/
         graph.go           # DependencyGraph (cycle detection, topo sort)
     imports/

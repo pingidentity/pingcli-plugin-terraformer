@@ -25,7 +25,7 @@ func SanitizeResourceName(name string) string {
 	name = regexp.MustCompile(`[^0-9A-Za-z_\-]`).ReplaceAllStringFunc(name, func(s string) string {
 		return fmt.Sprintf("-%04X-", s)
 	})
-	// Prefix resource names with pingcli__
+	// Prefix resource names with pingcli__ (8 chars: "pingcli_")
 	return "pingcli__" + name
 }
 
