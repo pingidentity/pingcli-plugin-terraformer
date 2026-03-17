@@ -625,6 +625,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				`"type": "json"`,
 				`${var.davinci_connection_Google_oauth2_providerName}`,
 				`${var.davinci_connection_Google_oauth2_issuerUrl}`,
+			},
+			notContains: []string{
 				`"secure"`,
 			},
 		},

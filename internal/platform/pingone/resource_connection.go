@@ -366,7 +366,11 @@ func formatComplexPropertyValue(propMap map[string]interface{}, prefix, resource
 			} else {
 				entry["value"] = rawValue
 			}
-			entry["secure"] = false
+			// Only emit "secure" when the API actually included it.
+			// Emitting false when the API omitted it causes a Terraform plan diff.
+			if _, hasSecure := nv["secure"]; hasSecure {
+				entry["secure"] = false
+			}
 
 			extractedVars = append(extractedVars, core.ExtractedVariable{
 				AttributePath: "properties." + parentKey + "." + nk,

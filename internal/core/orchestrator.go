@@ -55,6 +55,28 @@ type ExportResult struct {
 
 	// EnvironmentID is the exported environment.
 	EnvironmentID string
+
+	// FallbackVariables holds variable declarations for references that
+	// resolved to variable fallbacks (e.g., filter-excluded upstream resources).
+	// The caller should include these in the module's variables.tf.
+	FallbackVariables []FallbackVariable
+}
+
+// FallbackVariable represents a Terraform variable that must be declared
+// because a cross-resource reference could not be resolved to an in-scope
+// resource (e.g., the upstream resource was excluded by a filter).
+type FallbackVariable struct {
+	// Name is the Terraform variable name (e.g., "pingone_davinci_application_pingcli__my_app_id").
+	Name string
+
+	// Type is the Terraform variable type (always "string" for ID references).
+	Type string
+
+	// Description provides context for the variable.
+	Description string
+
+	// ResourceType is the referenced resource type for organizational grouping.
+	ResourceType string
 }
 
 // ProgressFunc is called by the orchestrator to report status.
@@ -141,6 +163,7 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	// 3. Process each resource type in dependency order.
 	depGraph := graph.New()
 	var results []*ExportedResourceData
+	excludedIDs := make(map[string]bool) // tracks IDs excluded by filter
 
 	for _, def := range ordered {
 		resourceType := def.Metadata.ResourceType
@@ -163,6 +186,13 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 			return nil, fmt.Errorf("%s: %w", resourceType, err)
 		}
 
+		// Add ALL resources to the graph before filtering so that
+		// excluded resources' labels are available for variable naming
+		// when downstream references fall back to variable references.
+		for _, rd := range processed {
+			depGraph.AddResource(rd.ResourceType, rd.ID, rd.Label)
+		}
+
 		// Apply filtering if active. Address uses the sanitized Label
 		// (e.g. "pingone_davinci_flow.pingcli__Login-0020-Flow") so that
 		// patterns match the same format shown by --list-resources.
@@ -172,14 +202,11 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 				address := resourceType + "." + rd.Label
 				if opts.ResourceFilter.Allow(address) {
 					filtered = append(filtered, rd)
+				} else {
+					excludedIDs[rd.ID] = true
 				}
 			}
 			processed = filtered
-		}
-
-		// Populate graph nodes with the assigned labels (only surviving resources).
-		for _, rd := range processed {
-			depGraph.AddResource(rd.ResourceType, rd.ID, rd.Label)
 		}
 
 		o.progress(fmt.Sprintf("✓ Processed %d %s resources", len(processed), def.Metadata.ShortName))
@@ -219,8 +246,15 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	// 4. Resolve cross-resource references in all processed attributes.
 	// This replaces raw UUID strings with ResolvedReference values so that
 	// formatters can render them without needing graph access.
+	var fallbackVars []FallbackVariable
 	if !opts.SkipDependencies {
-		o.resolveReferences(results, depGraph, opts.EnvironmentID)
+		fallbackVars = o.resolveReferences(results, depGraph, opts.EnvironmentID, excludedIDs)
+	} else {
+		// Even in skip-dependencies mode, inject the raw environment ID for
+		// attributes that reference pingone_environment but have no extracted
+		// value (no source_path). Without this, resources whose definitions
+		// omit source_path on environment_id lose that attribute entirely.
+		o.injectEnvironmentIDs(results, opts.EnvironmentID)
 	}
 
 	// 5. Validate graph.
@@ -231,9 +265,10 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	o.progress(fmt.Sprintf("✓ Export complete — %d resource types, %d total resources", len(results), o.totalResources(results)))
 
 	return &ExportResult{
-		ResourcesByType: results,
-		Graph:           depGraph,
-		EnvironmentID:   opts.EnvironmentID,
+		ResourcesByType:   results,
+		Graph:             depGraph,
+		EnvironmentID:     opts.EnvironmentID,
+		FallbackVariables: fallbackVars,
 	}, nil
 }
 
@@ -303,18 +338,122 @@ func (o *ExportOrchestrator) checkAttributeReferences(resourceType string, attrs
 //
 // Environment references always resolve to variable references.
 // Other references attempt graph lookup; if unknown, fall back to variable references.
-func (o *ExportOrchestrator) resolveReferences(results []*ExportedResourceData, g *graph.DependencyGraph, environmentID string) {
+// excludedIDs contains resource IDs that were removed by filtering — references to
+// these produce variable fallbacks with label-derived names.
+//
+// Returns deduplicated FallbackVariable entries for variable declarations.
+func (o *ExportOrchestrator) resolveReferences(results []*ExportedResourceData, g *graph.DependencyGraph, environmentID string, excludedIDs map[string]bool) []FallbackVariable {
+	varSeen := make(map[string]bool)
+	var fallbackVars []FallbackVariable
+
 	for _, erd := range results {
 		for _, rd := range erd.Resources {
-			resolveAttrs(rd.Attributes, erd.Definition.Attributes, g, environmentID)
+			resolveAttrs(rd.Attributes, erd.Definition.Attributes, g, environmentID, excludedIDs)
 			resolveCorrelatedReferences(rd.Attributes, erd.Definition.Attributes)
+		}
+	}
+
+	// Collect fallback variables from all resolved references.
+	for _, erd := range results {
+		for _, rd := range erd.Resources {
+			collectFallbackVars(rd.Attributes, erd.Definition.Attributes, varSeen, &fallbackVars)
+		}
+	}
+
+	return fallbackVars
+}
+
+// collectFallbackVars walks attributes and collects FallbackVariable entries
+// from ResolvedReference values that are variable fallbacks (IsVariable == true)
+// and are NOT the standard pingone_environment_id variable.
+func collectFallbackVars(attrs map[string]interface{}, defs []schema.AttributeDefinition, seen map[string]bool, out *[]FallbackVariable) {
+	for _, attrDef := range defs {
+		tName := attrDef.TerraformName
+		if tName == "" {
+			tName = strings.ToLower(attrDef.Name)
+		}
+
+		val, ok := attrs[tName]
+		if !ok || val == nil {
+			continue
+		}
+
+		if ref, ok := val.(ResolvedReference); ok && ref.IsVariable {
+			// Skip the standard environment variable — it's always declared.
+			if ref.VariableName == "pingone_environment_id" {
+				continue
+			}
+			if !seen[ref.VariableName] {
+				seen[ref.VariableName] = true
+				*out = append(*out, FallbackVariable{
+					Name:         ref.VariableName,
+					Type:         "string",
+					Description:  fmt.Sprintf("ID of %s resource (excluded from export)", ref.ResourceType),
+					ResourceType: ref.ResourceType,
+				})
+			}
+			continue
+		}
+
+		// Recurse into nested structures.
+		if attrDef.Type == "object" && len(attrDef.NestedAttributes) > 0 {
+			if m, ok := val.(map[string]interface{}); ok {
+				collectFallbackVars(m, attrDef.NestedAttributes, seen, out)
+			}
+		}
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
+			if slice, ok := val.([]interface{}); ok {
+				for _, item := range slice {
+					if itemMap, ok := item.(map[string]interface{}); ok {
+						collectFallbackVars(itemMap, attrDef.NestedAttributes, seen, out)
+					}
+				}
+			}
+		}
+		if attrDef.Type == "map" && len(attrDef.NestedAttributes) > 0 {
+			if m, ok := val.(map[string]interface{}); ok {
+				for _, entryVal := range m {
+					if entryMap, ok := entryVal.(map[string]interface{}); ok {
+						collectFallbackVars(entryMap, attrDef.NestedAttributes, seen, out)
+					}
+				}
+			}
+		}
+	}
+}
+
+// injectEnvironmentIDs ensures every attribute that references pingone_environment
+// has the raw environment UUID, even when full reference resolution is skipped.
+// This handles definitions where environment_id has no source_path and relies on
+// the orchestrator to provide the value.
+func (o *ExportOrchestrator) injectEnvironmentIDs(results []*ExportedResourceData, environmentID string) {
+	for _, erd := range results {
+		for _, rd := range erd.Resources {
+			injectEnvIDAttrs(rd.Attributes, erd.Definition.Attributes, environmentID)
+		}
+	}
+}
+
+// injectEnvIDAttrs walks attribute definitions and injects the raw environment
+// UUID for any pingone_environment reference attribute that is missing.
+func injectEnvIDAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinition, environmentID string) {
+	for _, attrDef := range defs {
+		tName := attrDef.TerraformName
+		if tName == "" {
+			tName = strings.ToLower(attrDef.Name)
+		}
+
+		if attrDef.ReferencesType == "pingone_environment" {
+			if _, ok := attrs[tName]; !ok {
+				attrs[tName] = environmentID
+			}
 		}
 	}
 }
 
 // resolveAttrs recursively resolves reference attributes in an attribute map
 // against the corresponding schema attribute definitions.
-func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinition, g *graph.DependencyGraph, environmentID string) {
+func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinition, g *graph.DependencyGraph, environmentID string, excludedIDs map[string]bool) {
 	for _, attrDef := range defs {
 		tName := attrDef.TerraformName
 		if tName == "" {
@@ -329,7 +468,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 				// For environment references, inject a ResolvedReference using the
 				// export context's environment ID.
 				if attrDef.ReferencesType == "pingone_environment" && environmentID != "" {
-					attrs[tName] = resolveOneReference(attrDef, environmentID, g)
+					attrs[tName] = resolveOneReference(attrDef, environmentID, g, excludedIDs)
 				}
 				continue
 			}
@@ -337,7 +476,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 			if !ok || uuid == "" {
 				continue
 			}
-			attrs[tName] = resolveOneReference(attrDef, uuid, g)
+			attrs[tName] = resolveOneReference(attrDef, uuid, g, excludedIDs)
 			continue
 		}
 
@@ -348,7 +487,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 				continue
 			}
 			if m, ok := val.(map[string]interface{}); ok {
-				resolveAttrs(m, attrDef.NestedAttributes, g, environmentID)
+				resolveAttrs(m, attrDef.NestedAttributes, g, environmentID, excludedIDs)
 			}
 			continue
 		}
@@ -362,7 +501,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 			if m, ok := val.(map[string]interface{}); ok {
 				for _, entryVal := range m {
 					if entryMap, ok := entryVal.(map[string]interface{}); ok {
-						resolveAttrs(entryMap, attrDef.NestedAttributes, g, environmentID)
+						resolveAttrs(entryMap, attrDef.NestedAttributes, g, environmentID, excludedIDs)
 					}
 				}
 			}
@@ -378,7 +517,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 			if slice, ok := val.([]interface{}); ok {
 				for _, item := range slice {
 					if itemMap, ok := item.(map[string]interface{}); ok {
-						resolveAttrs(itemMap, attrDef.NestedAttributes, g, environmentID)
+						resolveAttrs(itemMap, attrDef.NestedAttributes, g, environmentID, excludedIDs)
 					}
 				}
 			}
@@ -390,21 +529,37 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 // resolveOneReference resolves a single UUID string to a ResolvedReference.
 // Environment references always become variable references. Other references
 // attempt graph lookup and fall back to variable references if not found.
-func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *graph.DependencyGraph) ResolvedReference {
+// When a resource is found in the graph but its ID is in excludedIDs (removed
+// by filtering), a variable reference is produced using the resource label for
+// a unique, human-readable variable name.
+func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *graph.DependencyGraph, excludedIDs map[string]bool) ResolvedReference {
 	field := "id"
 	if attrDef.ReferenceField != "" {
 		field = attrDef.ReferenceField
-	}
-
-	varName := attrDef.ReferencesType
-	if attrDef.ReferenceField != "" {
-		varName = attrDef.ReferencesType + "_" + attrDef.ReferenceField
 	}
 
 	// Try graph lookup for resource-to-resource references.
 	if g != nil {
 		name, err := g.GetReferenceName(attrDef.ReferencesType, uuid)
 		if err == nil {
+			// If the resource was excluded by filter, produce a variable
+			// reference with a label-derived name instead of a resource ref.
+			// Exception: pingone_environment always uses the canonical
+			// "pingone_environment_id" variable for backward compatibility.
+			if excludedIDs[uuid] {
+				var varName string
+				if attrDef.ReferencesType == "pingone_environment" {
+					varName = "pingone_environment_id"
+				} else {
+					varName = utils.SanitizeVariableName(attrDef.ReferencesType + "_" + name + "_" + field)
+				}
+				return ResolvedReference{
+					IsVariable:    true,
+					VariableName:  varName,
+					ResourceType:  attrDef.ReferencesType,
+					OriginalValue: uuid,
+				}
+			}
 			return ResolvedReference{
 				ResourceType:  attrDef.ReferencesType,
 				ResourceName:  name,
@@ -415,6 +570,10 @@ func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *gra
 	}
 
 	// Fallback to variable reference when resource not found in graph.
+	varName := attrDef.ReferencesType
+	if attrDef.ReferenceField != "" {
+		varName = attrDef.ReferencesType + "_" + attrDef.ReferenceField
+	}
 	return ResolvedReference{
 		IsVariable:    true,
 		VariableName:  varName,

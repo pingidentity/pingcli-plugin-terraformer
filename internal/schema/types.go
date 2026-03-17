@@ -87,6 +87,11 @@ type AttributeDefinition struct {
 	// other processing. Useful when the Terraform provider expects a fixed
 	// sentinel (e.g. version = -1) that differs from what the API returns.
 	OverrideValue interface{} `yaml:"override_value,omitempty"`
+
+	// NilValue controls how the processor handles nil values for this attribute.
+	// Options: "keep_empty" (emit empty string for nil) or "omit" (skip, current behavior).
+	// When not specified, defaults to "omit" for backward compatibility.
+	NilValue string `yaml:"nil_value,omitempty"`
 }
 
 // DependencyDefinition defines resource relationship configuration

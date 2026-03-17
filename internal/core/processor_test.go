@@ -1527,3 +1527,158 @@ func TestOverrideValue_NoOverrideStillWorks(t *testing.T) {
 	// Without override_value, the API value is used directly.
 	assert.Equal(t, int64(42), result.Attributes["version"])
 }
+
+// ── nil_value tests ────────────────────────────────────────────
+
+// MockEnvironment represents a mock PingOne Environment resource
+type MockEnvironment struct {
+	ID      string
+	Name    string
+	Console *MockConsole
+}
+
+type MockConsole struct {
+	Href *string
+}
+
+func TestProcessorNilValueKeepEmpty(t *testing.T) {
+	// Create a schema definition for environment with nil_value: "keep_empty"
+	// This test verifies that when an attribute has nil_value: "keep_empty",
+	// the processor emits an empty string value instead of omitting the attribute.
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "pingone",
+			ResourceType: "pingone_environment",
+			APIType:      "Environment",
+			Name:         "PingOne Environment",
+			ShortName:    "environment",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			SDKPackage: "github.com/pingidentity/pingone-go-client",
+			SDKType:    "Environment",
+			IDField:    "ID",
+			NameField:  "Name",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{
+				Name:          "ID",
+				TerraformName: "id",
+				Type:          "string",
+				Computed:      true,
+			},
+			{
+				Name:          "Name",
+				TerraformName: "name",
+				Type:          "string",
+				Required:      true,
+			},
+			{
+				Name:           "Console.Href",
+				TerraformName:  "console_url",
+				Type:           "string",
+				SourcePath:     "Console.Href",
+				NilValue:       "keep_empty",  // NEW FIELD: emit empty string for nil
+			},
+		},
+	}
+
+	// Create registry and register the definition
+	registry := schema.NewRegistry()
+	err := registry.Register(def)
+	require.NoError(t, err)
+
+	// Create processor
+	processor := core.NewProcessor(registry)
+
+	// Create mock data where Console.Href is nil
+	mockData := MockEnvironment{
+		ID:      "env123",
+		Name:    "test_env",
+		Console: &MockConsole{Href: nil},  // nil value that should emit empty string
+	}
+
+	// Process the resource
+	result, err := processor.ProcessResource("pingone_environment", &mockData)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+
+	// Verify basic fields
+	assert.Equal(t, "pingone_environment", result.ResourceType)
+	assert.Equal(t, "env123", result.ID)
+	assert.Equal(t, "test_env", result.Name)
+
+	// CRITICAL ASSERTION: console_url should be present with empty string value.
+	// Currently this fails (before fix) because nil values are skipped, so console_url is omitted.
+	// After implementing nil_value: "keep_empty", this should pass.
+	// This fixes the Terraform plan diff issue after import.
+	consoleURL, exists := result.Attributes["console_url"]
+	assert.True(t, exists, "console_url should exist when attribute has nil_value: keep_empty")
+	assert.Equal(t, "", consoleURL, "console_url should be empty string when API value is nil")
+}
+
+func TestProcessorNilValueOmit(t *testing.T) {
+	// Create a schema definition for comparison: default behavior omits nil values.
+	// This test verifies that when an attribute has nil_value: "omit",
+	// the processor skips the attribute when the value is nil (current default behavior).
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "pingone",
+			ResourceType: "pingone_environment_omit",
+			APIType:      "Environment",
+			Name:         "PingOne Environment Omit",
+			ShortName:    "environment_omit",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			SDKPackage: "github.com/pingidentity/pingone-go-client",
+			SDKType:    "Environment",
+			IDField:    "ID",
+			NameField:  "Name",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{
+				Name:          "ID",
+				TerraformName: "id",
+				Type:          "string",
+				Computed:      true,
+			},
+			{
+				Name:          "Name",
+				TerraformName: "name",
+				Type:          "string",
+				Required:      true,
+			},
+			{
+				Name:           "Console.Href",
+				TerraformName:  "console_url",
+				Type:           "string",
+				SourcePath:     "Console.Href",
+				NilValue:       "omit",  // Explicitly omit nil values (current behavior)
+			},
+		},
+	}
+
+	// Create registry and register the definition
+	registry := schema.NewRegistry()
+	err := registry.Register(def)
+	require.NoError(t, err)
+
+	// Create processor
+	processor := core.NewProcessor(registry)
+
+	// Create mock data where Console.Href is nil
+	mockData := MockEnvironment{
+		ID:      "env456",
+		Name:    "test_env2",
+		Console: &MockConsole{Href: nil},  // nil value - should be omitted
+	}
+
+	// Process the resource
+	result, err := processor.ProcessResource("pingone_environment_omit", &mockData)
+	require.NoError(t, err)
+
+	// Verify that console_url is NOT present (omitted)
+	_, exists := result.Attributes["console_url"]
+	assert.False(t, exists, "console_url should not exist when nil_value: omit")
+}

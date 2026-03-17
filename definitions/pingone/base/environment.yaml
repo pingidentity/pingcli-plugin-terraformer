@@ -117,6 +117,7 @@ attributes:
         terraform_name: console_url
         type: string
         source_path: Console.Href
+        nil_value: keep_empty
 
       # Deployment - computed object
       - name: Deployment
