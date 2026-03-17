@@ -110,7 +110,6 @@ jobs:
   regression-test:
     needs: [build-binaries, load-matrix]
     runs-on: ubuntu-latest
-    environment: regression
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
@@ -135,13 +134,11 @@ jobs:
           PINGCLI_PINGONE_REGION_CODE: ${{ secrets.PINGCLI_PINGONE_REGION_CODE }}
           MATRIX_OUTPUT_FORMAT: ${{ matrix.output-format }}
           MATRIX_SKIP_DEPS: ${{ matrix.skip-dependencies }}
-          MATRIX_SKIP_IMPORTS: ${{ matrix.skip-imports }}
           MATRIX_INCLUDE_IMPORTS: ${{ matrix.include-imports }}
           MATRIX_INCLUDE_VALUES: ${{ matrix.include-values }}
         run: |
           ARGS="--output-format $MATRIX_OUTPUT_FORMAT"
           [ "$MATRIX_SKIP_DEPS" = "true" ] && ARGS="$ARGS --skip-dependencies"
-          [ "$MATRIX_SKIP_IMPORTS" = "true" ] && ARGS="$ARGS --skip-imports"
           [ "$MATRIX_INCLUDE_IMPORTS" = "true" ] && ARGS="$ARGS --include-imports"
           [ "$MATRIX_INCLUDE_VALUES" = "true" ] && ARGS="$ARGS --include-values"
           ARGS="$ARGS --out ./output-base --module-name regression-test --module-dir regression-module"
@@ -158,13 +155,11 @@ jobs:
           PINGCLI_PINGONE_REGION_CODE: ${{ secrets.PINGCLI_PINGONE_REGION_CODE }}
           MATRIX_OUTPUT_FORMAT: ${{ matrix.output-format }}
           MATRIX_SKIP_DEPS: ${{ matrix.skip-dependencies }}
-          MATRIX_SKIP_IMPORTS: ${{ matrix.skip-imports }}
           MATRIX_INCLUDE_IMPORTS: ${{ matrix.include-imports }}
           MATRIX_INCLUDE_VALUES: ${{ matrix.include-values }}
         run: |
           ARGS="--output-format $MATRIX_OUTPUT_FORMAT"
           [ "$MATRIX_SKIP_DEPS" = "true" ] && ARGS="$ARGS --skip-dependencies"
-          [ "$MATRIX_SKIP_IMPORTS" = "true" ] && ARGS="$ARGS --skip-imports"
           [ "$MATRIX_INCLUDE_IMPORTS" = "true" ] && ARGS="$ARGS --include-imports"
           [ "$MATRIX_INCLUDE_VALUES" = "true" ] && ARGS="$ARGS --include-values"
           ARGS="$ARGS --out ./output-pr --module-name regression-test --module-dir regression-module"

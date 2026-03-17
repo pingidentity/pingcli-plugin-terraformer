@@ -43,6 +43,7 @@ dist/
 *.json
 !.github/**/*.json
 !**/testdata/**/*.json
+!tests/regression/matrix.json
 !**/testdata/**/*.tf
 localsecrets
 

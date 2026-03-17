@@ -1,0 +1,37 @@
+[
+  {
+    "name": "default-hcl",
+    "output-format": "hcl",
+    "skip-dependencies": false,
+    "include-imports": false,
+    "include-values": false
+  },
+  {
+    "name": "hcl-skip-deps",
+    "output-format": "hcl",
+    "skip-dependencies": true,
+    "include-imports": false,
+    "include-values": false
+  },
+  {
+    "name": "hcl-include-all",
+    "output-format": "hcl",
+    "skip-dependencies": false,
+    "include-imports": true,
+    "include-values": true
+  },
+  {
+    "name": "default-tfjson",
+    "output-format": "tfjson",
+    "skip-dependencies": false,
+    "include-imports": false,
+    "include-values": false
+  },
+  {
+    "name": "tfjson-skip-deps",
+    "output-format": "tfjson",
+    "skip-dependencies": true,
+    "include-imports": false,
+    "include-values": false
+  }
+]
