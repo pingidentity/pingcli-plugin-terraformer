@@ -30,6 +30,10 @@ type ExportOptions struct {
 
 	// ListOnly returns resources after processing but skips reference resolution.
 	ListOnly bool
+
+	// IncludeUpstream automatically includes upstream dependencies of
+	// matched resources when filtering is active.
+	IncludeUpstream bool
 }
 
 // ExportedResourceData holds processed data for a single resource type.
@@ -193,10 +197,10 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 			depGraph.AddResource(rd.ResourceType, rd.ID, rd.Label)
 		}
 
-		// Apply filtering if active. Address uses the sanitized Label
-		// (e.g. "pingone_davinci_flow.pingcli__Login-0020-Flow") so that
-		// patterns match the same format shown by --list-resources.
-		if opts.ResourceFilter != nil && opts.ResourceFilter.IsActive() {
+		// Apply filtering if active (skip when IncludeUpstream is true)
+		// Address uses the sanitized Label (e.g. "pingone_davinci_flow.pingcli__Login-0020-Flow")
+		// so that patterns match the same format shown by --list-resources.
+		if opts.ResourceFilter != nil && opts.ResourceFilter.IsActive() && !opts.IncludeUpstream {
 			var filtered []*ResourceData
 			for _, rd := range processed {
 				address := resourceType + "." + rd.Label
@@ -222,6 +226,11 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 			Definition:   def,
 			Resources:    processed,
 		})
+	}
+
+	// When IncludeUpstream is active, build edges and apply filter + expansion
+	if opts.IncludeUpstream && opts.ResourceFilter != nil && opts.ResourceFilter.IsActive() {
+		results = o.applyUpstreamExpansion(results, depGraph, opts.ResourceFilter, excludedIDs)
 	}
 
 	// Return early if ListOnly flag is set.
@@ -903,4 +912,161 @@ func terraformLabel(rd *ResourceData, def *schema.ResourceDefinition) string {
 		return utils.SanitizeResourceName(rd.Name)
 	}
 	return rd.ID
+}
+
+// applyUpstreamExpansion applies filter + expansion when IncludeUpstream is active.
+// It builds pre-filter edges, applies the filter to get a seed set, expands via
+// graph walk, and returns the expanded results.
+func (o *ExportOrchestrator) applyUpstreamExpansion(
+	results []*ExportedResourceData,
+	depGraph *graph.DependencyGraph,
+	resourceFilter *filter.ResourceFilter,
+	excludedIDs map[string]bool,
+) []*ExportedResourceData {
+	// Build edges from all processed (unfiltered) resources so the graph is complete
+	// before we apply filtering.
+	o.buildPreFilterEdges(results, depGraph)
+
+	// Collect all nodes as seeds by checking which match the filter.
+	var seeds []graph.ResourceNode
+	for _, erd := range results {
+		for _, rd := range erd.Resources {
+			address := erd.ResourceType + "." + rd.Label
+			if resourceFilter.Allow(address) {
+				seeds = append(seeds, graph.ResourceNode{
+					ResourceType: erd.ResourceType,
+					ID:           rd.ID,
+				})
+			}
+		}
+	}
+
+	// If no seeds match, return empty.
+	if len(seeds) == 0 {
+		return []*ExportedResourceData{}
+	}
+
+	// Expand seeds via graph to get all reachable upstream resources.
+	expanded := depGraph.WalkDependencies(seeds)
+
+	// Build set of expanded nodes for quick lookup.
+	expandedSet := make(map[string]bool) // key: "type:id"
+	for _, node := range expanded {
+		expandedSet[node.ResourceType+":"+node.ID] = true
+	}
+
+	// Check which expanded resources are explicitly excluded.
+	// Resources that match explicit exclude patterns stay excluded.
+	explicitExcludes := make(map[string]bool)
+	for _, erd := range results {
+		for _, rd := range erd.Resources {
+			address := erd.ResourceType + "." + rd.Label
+			if resourceFilter.IsExplicitlyExcluded(address) {
+				explicitExcludes[erd.ResourceType+":"+rd.ID] = true
+			}
+		}
+	}
+
+	// Rebuild results keeping resources in expandedSet that aren't explicitly excluded.
+	var finalResults []*ExportedResourceData
+	for _, erd := range results {
+		var kept []*ResourceData
+		for _, rd := range erd.Resources {
+			key := erd.ResourceType + ":" + rd.ID
+			if expandedSet[key] && !explicitExcludes[key] {
+				// Keep this resource: it's in the expanded set and not explicitly excluded
+				kept = append(kept, rd)
+			} else if !expandedSet[key] {
+				// Mark as excluded if not in expanded set
+				excludedIDs[rd.ID] = true
+			} else if explicitExcludes[key] {
+				// Explicitly excluded (but might be referenced): mark for fallback variables
+				excludedIDs[rd.ID] = true
+			}
+		}
+
+		// Only include types with resources.
+		if len(kept) > 0 {
+			finalResults = append(finalResults, &ExportedResourceData{
+				ResourceType: erd.ResourceType,
+				Definition:   erd.Definition,
+				Resources:    kept,
+			})
+		}
+	}
+
+	return finalResults
+}
+
+// buildPreFilterEdges scans all processed resources and adds edges to the
+// dependency graph based on reference_type declarations in the schema.
+// This enables graph-based upstream expansion before applying filters.
+func (o *ExportOrchestrator) buildPreFilterEdges(results []*ExportedResourceData, g *graph.DependencyGraph) {
+	for _, erd := range results {
+		for _, rd := range erd.Resources {
+			o.scanEdgesFromAttrs(rd.Attributes, erd.Definition.Attributes, erd.ResourceType, rd.ID, g)
+		}
+	}
+}
+
+// scanEdgesFromAttrs recursively walks an attribute map and registers graph edges
+// for any reference_type UUID values found. It mirrors the resolveAttrs pattern.
+func (o *ExportOrchestrator) scanEdgesFromAttrs(
+	attrs map[string]interface{},
+	defs []schema.AttributeDefinition,
+	fromType, fromID string,
+	g *graph.DependencyGraph,
+) {
+	for _, attrDef := range defs {
+		tName := attrDef.TerraformName
+		if tName == "" {
+			tName = strings.ToLower(attrDef.Name)
+		}
+
+		// Direct reference attribute
+		if attrDef.ReferencesType != "" && attrDef.ReferencesType != "pingone_environment" {
+			val, ok := attrs[tName]
+			if !ok || val == nil {
+				continue
+			}
+			uuid, ok := val.(string)
+			if !ok || uuid == "" {
+				continue
+			}
+			// Try to add edge (silently skip if target not in graph)
+			_ = g.AddEdge(fromType, fromID, attrDef.ReferencesType, uuid, tName, "")
+			continue
+		}
+
+		// Nested object
+		if attrDef.Type == "object" && len(attrDef.NestedAttributes) > 0 {
+			if m, ok := attrs[tName].(map[string]interface{}); ok {
+				o.scanEdgesFromAttrs(m, attrDef.NestedAttributes, fromType, fromID, g)
+			}
+			continue
+		}
+
+		// Nested list/set
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
+			if slice, ok := attrs[tName].([]interface{}); ok {
+				for _, item := range slice {
+					if itemMap, ok := item.(map[string]interface{}); ok {
+						o.scanEdgesFromAttrs(itemMap, attrDef.NestedAttributes, fromType, fromID, g)
+					}
+				}
+			}
+			continue
+		}
+
+		// Nested map
+		if attrDef.Type == "map" && len(attrDef.NestedAttributes) > 0 {
+			if m, ok := attrs[tName].(map[string]interface{}); ok {
+				for _, entryVal := range m {
+					if entryMap, ok := entryVal.(map[string]interface{}); ok {
+						o.scanEdgesFromAttrs(entryMap, attrDef.NestedAttributes, fromType, fromID, g)
+					}
+				}
+			}
+		}
+	}
 }

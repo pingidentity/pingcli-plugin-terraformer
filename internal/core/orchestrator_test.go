@@ -1536,3 +1536,393 @@ func TestCollectFallbackVars_MixedTypes(t *testing.T) {
 	require.Len(t, out, 1)
 	assert.Equal(t, "pingone_davinci_application_pingcli__my_app_id", out[0].Name)
 }
+
+// --- IncludeUpstream Tests ---
+
+// flowStruct is a mock API struct that includes a connection reference.
+type flowStruct struct {
+	ID           *string
+	Name         *string
+	ConnectionID *string
+}
+
+// chainBStruct is a mock API struct for transitive dependency testing.
+type chainBStruct struct {
+	ID   *string
+	Name *string
+	ARef *string
+}
+
+// chainCStruct is a mock API struct for transitive dependency testing.
+type chainCStruct struct {
+	ID   *string
+	Name *string
+	BRef *string
+}
+
+// TestExportOrchestrator_Export_IncludeUpstream_Basic tests that IncludeUpstream
+// expands the filtered seed set to include upstream dependencies via graph edges.
+func TestExportOrchestrator_Export_IncludeUpstream_Basic(t *testing.T) {
+	// Setup: type_conn (connector, no deps) and type_flow (flow, depends on type_conn)
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	// Add connection_id attribute with references_type and SourcePath
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			SourcePath: "ConnectionID", Transform: "passthrough",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-1"), Name: strPtr("myconn")},
+			},
+			"type_flow": {
+				flowStruct{ID: strPtr("flow-1"), Name: strPtr("myflow"), ConnectionID: strPtr("conn-1")},
+			},
+		},
+	}
+
+	// Create filter: include only type_flow* + IncludeUpstream: true
+	filterObj, err := filter.NewResourceFilter([]string{"type_flow*"}, nil)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+		IncludeUpstream: true,
+	})
+	require.NoError(t, err)
+
+	// Assert: both type_flow AND type_conn in result (upstream expansion)
+	require.Len(t, result.ResourcesByType, 2)
+	
+	// Find flow and conn resources
+	var flowTypeData, connTypeData *ExportedResourceData
+	for _, erd := range result.ResourcesByType {
+		if erd.ResourceType == "type_flow" {
+			flowTypeData = erd
+		} else if erd.ResourceType == "type_conn" {
+			connTypeData = erd
+		}
+	}
+	
+	require.NotNil(t, flowTypeData, "type_flow should be in result")
+	require.NotNil(t, connTypeData, "type_conn should be in result (upstream dep)")
+	
+	require.Len(t, flowTypeData.Resources, 1)
+	assert.Equal(t, "flow-1", flowTypeData.Resources[0].ID)
+	
+	require.Len(t, connTypeData.Resources, 1)
+	assert.Equal(t, "conn-1", connTypeData.Resources[0].ID)
+
+	// Assert: flow resource has connection_id resolved to resource reference (not fallback variable)
+	flowRes := flowTypeData.Resources[0]
+	require.NotNil(t, flowRes)
+	connIDAttr, ok := flowRes.Attributes["connection_id"]
+	require.True(t, ok, "connection_id attribute should exist")
+	connRef, ok := connIDAttr.(ResolvedReference)
+	require.True(t, ok, "connection_id should resolve to ResolvedReference")
+	assert.False(t, connRef.IsVariable, "connection_id should NOT be a variable (resource in result)")
+	assert.Equal(t, "type_conn", connRef.ResourceType)
+	
+	// Assert: no fallback variables for type_conn
+	assert.Empty(t, result.FallbackVariables, "no fallback variables should exist")
+}
+
+// TestExportOrchestrator_Export_IncludeUpstream_NoFilter tests that IncludeUpstream
+// has no effect when no ResourceFilter is active.
+func TestExportOrchestrator_Export_IncludeUpstream_NoFilter(t *testing.T) {
+	// Same setup as Basic
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			SourcePath: "ConnectionID", Transform: "passthrough",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-1"), Name: strPtr("myconn")},
+			},
+			"type_flow": {
+				flowStruct{ID: strPtr("flow-1"), Name: strPtr("myflow"), ConnectionID: strPtr("conn-1")},
+			},
+		},
+	}
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: nil, // No filter
+		IncludeUpstream: true,
+	})
+	require.NoError(t, err)
+
+	// Assert: all resources included regardless (IncludeUpstream has no effect without filter)
+	require.Len(t, result.ResourcesByType, 2)
+}
+
+// TestExportOrchestrator_Export_IncludeUpstream_ExcludeWins tests that explicit
+// --exclude-resources overrides upstream expansion.
+func TestExportOrchestrator_Export_IncludeUpstream_ExcludeWins(t *testing.T) {
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			SourcePath: "ConnectionID", Transform: "passthrough",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-1"), Name: strPtr("myconn")},
+			},
+			"type_flow": {
+				flowStruct{ID: strPtr("flow-1"), Name: strPtr("myflow"), ConnectionID: strPtr("conn-1")},
+			},
+		},
+	}
+
+	// Include flow, exclude connector, IncludeUpstream: true
+	filterObj, err := filter.NewResourceFilter([]string{"type_flow*"}, []string{"type_conn*"})
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:   "env-1",
+		ResourceFilter:  filterObj,
+		IncludeUpstream: true,
+	})
+	require.NoError(t, err)
+
+	// Assert: only type_flow in result (explicit exclude wins)
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Equal(t, "type_flow", result.ResourcesByType[0].ResourceType)
+	assert.Len(t, result.ResourcesByType[0].Resources, 1)
+
+	// Assert: type_conn NOT in result
+	for _, erd := range result.ResourcesByType {
+		assert.NotEqual(t, "type_conn", erd.ResourceType, "type_conn should not be in result despite being upstream")
+	}
+
+	// Assert: fallback variable generated for the excluded type_conn dependency
+	require.Len(t, result.FallbackVariables, 1)
+	assert.Equal(t, "type_conn", result.FallbackVariables[0].ResourceType)
+}
+
+// TestExportOrchestrator_Export_IncludeUpstream_Transitive tests that IncludeUpstream
+// expands transitively: c→b→a all included when filtering for just c.
+func TestExportOrchestrator_Export_IncludeUpstream_Transitive(t *testing.T) {
+	// Setup: type_a (no deps), type_b (depends on type_a), type_c (depends on type_b)
+	aDef := baseDef("type_a", "p", "A", "a")
+	
+	bDef := baseDef("type_b", "p", "B", "b")
+	bDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_a"}}
+	bDef.Attributes = append(bDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "a_ref", TerraformName: "a_ref", Type: "string",
+			SourcePath: "ARef", Transform: "passthrough",
+			ReferencesType: "type_a", ReferenceField: "id",
+		},
+	)
+	
+	cDef := baseDef("type_c", "p", "C", "c")
+	cDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_b"}}
+	cDef.Attributes = append(cDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "b_ref", TerraformName: "b_ref", Type: "string",
+			SourcePath: "BRef", Transform: "passthrough",
+			ReferencesType: "type_b", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, aDef, bDef, cDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_a": {
+				simpleStruct{ID: strPtr("a-1"), Name: strPtr("alpha")},
+			},
+			"type_b": {
+				chainBStruct{ID: strPtr("b-1"), Name: strPtr("bravo"), ARef: strPtr("a-1")},
+			},
+			"type_c": {
+				chainCStruct{ID: strPtr("c-1"), Name: strPtr("charlie"), BRef: strPtr("b-1")},
+			},
+		},
+	}
+
+	// Filter: include only type_c* + IncludeUpstream: true
+	filterObj, err := filter.NewResourceFilter([]string{"type_c*"}, nil)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:   "env-1",
+		ResourceFilter:  filterObj,
+		IncludeUpstream: true,
+	})
+	require.NoError(t, err)
+
+	// Assert: all 3 types in result (transitive chain: c→b→a all pulled in)
+	require.Len(t, result.ResourcesByType, 3)
+	
+	typeMap := make(map[string]*ExportedResourceData)
+	for _, erd := range result.ResourcesByType {
+		typeMap[erd.ResourceType] = erd
+	}
+	
+	require.Contains(t, typeMap, "type_a", "type_a should be in result (upstream of upstream)")
+	require.Contains(t, typeMap, "type_b", "type_b should be in result (upstream)")
+	require.Contains(t, typeMap, "type_c", "type_c should be in result (seed)")
+	
+	assert.Len(t, typeMap["type_a"].Resources, 1)
+	assert.Len(t, typeMap["type_b"].Resources, 1)
+	assert.Len(t, typeMap["type_c"].Resources, 1)
+
+	// Assert: no fallback variables (all transitive deps are in result)
+	assert.Empty(t, result.FallbackVariables)
+}
+
+// TestExportOrchestrator_Export_IncludeUpstream_False tests that when IncludeUpstream
+// is false, upstream dependencies are NOT pulled in (current behavior).
+func TestExportOrchestrator_Export_IncludeUpstream_False(t *testing.T) {
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			SourcePath: "ConnectionID", Transform: "passthrough",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-1"), Name: strPtr("myconn")},
+			},
+			"type_flow": {
+				flowStruct{ID: strPtr("flow-1"), Name: strPtr("myflow"), ConnectionID: strPtr("conn-1")},
+			},
+		},
+	}
+
+	// Filter: include flow, IncludeUpstream: FALSE
+	filterObj, err := filter.NewResourceFilter([]string{"type_flow*"}, nil)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:   "env-1",
+		ResourceFilter:  filterObj,
+		IncludeUpstream: false, // Explicitly false
+	})
+	require.NoError(t, err)
+
+	// Assert: only type_flow in result (upstream NOT pulled in)
+	require.Len(t, result.ResourcesByType, 1)
+	assert.Equal(t, "type_flow", result.ResourcesByType[0].ResourceType)
+
+	// Assert: fallback variable generated for excludeed type_conn
+	require.Len(t, result.FallbackVariables, 1)
+	assert.Equal(t, "type_conn", result.FallbackVariables[0].ResourceType)
+}
+
+// TestExportOrchestrator_Export_IncludeUpstream_ListOnly tests that upstream
+// expansion happens before ListOnly returns results.
+func TestExportOrchestrator_Export_IncludeUpstream_ListOnly(t *testing.T) {
+	connDef := baseDef("type_conn", "p", "Connector", "conn")
+	flowDef := baseDef("type_flow", "p", "Flow", "flow")
+	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
+		{ResourceType: "type_conn"},
+	}
+	flowDef.Attributes = append(flowDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "conn_id", TerraformName: "connection_id", Type: "string",
+			SourcePath: "ConnectionID", Transform: "passthrough",
+			ReferencesType: "type_conn", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, connDef, flowDef)
+	proc := NewProcessor(reg)
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_conn": {
+				simpleStruct{ID: strPtr("conn-1"), Name: strPtr("myconn")},
+			},
+			"type_flow": {
+				flowStruct{ID: strPtr("flow-1"), Name: strPtr("myflow"), ConnectionID: strPtr("conn-1")},
+			},
+		},
+	}
+
+	// Filter: include flow, IncludeUpstream: true, ListOnly: true
+	filterObj, err := filter.NewResourceFilter([]string{"type_flow*"}, nil)
+	require.NoError(t, err)
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{
+		EnvironmentID:   "env-1",
+		ResourceFilter:  filterObj,
+		IncludeUpstream: true,
+		ListOnly:        true, // Skip reference resolution
+	})
+	require.NoError(t, err)
+
+	// Assert: both type_flow AND type_conn listed (upstream expansion applies before ListOnly)
+	require.Len(t, result.ResourcesByType, 2)
+	
+	typeMap := make(map[string]*ExportedResourceData)
+	for _, erd := range result.ResourcesByType {
+		typeMap[erd.ResourceType] = erd
+	}
+	
+	require.Contains(t, typeMap, "type_flow", "type_flow should be listed")
+	require.Contains(t, typeMap, "type_conn", "type_conn should be listed (upstream dep)")
+}

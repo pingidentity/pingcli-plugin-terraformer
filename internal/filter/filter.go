@@ -136,3 +136,13 @@ func (f *ResourceFilter) Allow(address string) bool {
 func (f *ResourceFilter) IsActive() bool {
 	return len(f.includes) > 0 || len(f.excludes) > 0
 }
+
+// IsExplicitlyExcluded returns true if address matches any exclude pattern.
+func (f *ResourceFilter) IsExplicitlyExcluded(address string) bool {
+	for _, exc := range f.excludes {
+		if exc.Match(address) {
+			return true
+		}
+	}
+	return false
+}

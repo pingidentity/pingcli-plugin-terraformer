@@ -64,6 +64,12 @@ var (
     --exclude-resources "*Test*" \
     --out ./output
 
+  # Export a specific flow and its upstream dependencies (e.g., connector instances)
+  pingcli tf export \
+    --include-resources "pingone_davinci_flow.pingcli__Login*" \
+    --include-upstream \
+    --out ./output
+
   # Use environment variables for credentials
   export PINGCLI_PINGONE_ENVIRONMENT_ID="..."
   export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID="..."
@@ -94,6 +100,9 @@ Resource Filtering:
   Patterns match against: resource_type.terraform_label (e.g., pingone_davinci_flow.pingcli__Login)
   Glob wildcards (* and ?) are supported. Use 'regex:' prefix for regex patterns.
   Matching is case-insensitive. Multiple patterns combine via OR (union).
+  Use --include-upstream with --include-resources to automatically include upstream dependencies
+  (resources referenced by matched resources). This is transitive: dependencies of dependencies are
+  also included. Explicit --exclude-resources patterns always take priority.
   Use --list-resources to discover available resource addresses before filtering.`
 
 	// ExportShort provides a brief, one-line description of the command
@@ -151,6 +160,7 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	includeResources := flags.StringSlice("include-resources", []string{}, "Include resources matching glob pattern(s) (repeatable). Use 'regex:' prefix for regex. Pattern matches against resource_type.terraform_label")
 	excludeResources := flags.StringSlice("exclude-resources", []string{}, "Exclude resources matching glob pattern(s) (repeatable). Use 'regex:' prefix for regex. Pattern matches against resource_type.terraform_label")
 	listResources := flags.Bool("list-resources", false, "List all resource addresses (resource_type.terraform_label) and exit")
+	includeUpstream := flags.Bool("include-upstream", false, "Automatically include upstream dependencies of filtered resources")
 
 	// Parse the provided arguments
 	if err := flags.Parse(args); err != nil {
@@ -166,12 +176,12 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	}
 
 	// Execute export
-	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources)
+	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources, *includeUpstream)
 }
 
 // runExport handles API export of all resources from an environment
 // All exports now generate Terraform module structure
-func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool) error {
+func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
 	// Get credentials from environment variables if not provided via flags
 	if workerEnvironmentID == "" {
 		workerEnvironmentID = os.Getenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
@@ -230,12 +240,12 @@ func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, expor
 		return fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return c.exportAsModule(ctx, client, logger, skipDeps, includeImports, includeValues, moduleDir, moduleName, out, exportEnvironmentID, outputFormat, includeResources, excludeResources, listResources)
+	return c.exportAsModule(ctx, client, logger, skipDeps, includeImports, includeValues, moduleDir, moduleName, out, exportEnvironmentID, outputFormat, includeResources, excludeResources, listResources, includeUpstream)
 }
 
 // exportAsModule uses the schema-driven orchestrator pipeline to export
 // resources and generate a Terraform module.
-func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool) error {
+func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
 	outputDir := out
 	if outputDir == "" {
 		outputDir = "."
@@ -286,6 +296,7 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 		EnvironmentID:    environmentID,
 		ResourceFilter:   resourceFilter,
 		ListOnly:         listResources,
+		IncludeUpstream:  includeUpstream,
 	})
 	if err != nil {
 		return fmt.Errorf("orchestrator export failed: %w", err)

@@ -2,6 +2,7 @@ package graph
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 
@@ -310,4 +311,190 @@ func TestDiamondDependency(t *testing.T) {
 	assert.Less(t, idxOf("d"), idxOf("c"))
 	assert.Less(t, idxOf("b"), idxOf("a"))
 	assert.Less(t, idxOf("c"), idxOf("a"))
+}
+
+func TestWalkDependencies_EmptySeeds(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+
+	result := g.WalkDependencies([]ResourceNode{})
+	assert.Empty(t, result)
+}
+
+func TestWalkDependencies_SingleSeedNoDeps(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+
+	a, _ := g.GetNode("t", "a")
+	result := g.WalkDependencies([]ResourceNode{a})
+
+	require.Len(t, result, 1)
+	assert.Equal(t, "a", result[0].ID)
+}
+
+func TestWalkDependencies_LinearChain(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+	g.AddResource("t", "c", "c")
+
+	a, _ := g.GetNode("t", "a")
+	b, _ := g.GetNode("t", "b")
+	c, _ := g.GetNode("t", "c")
+
+	g.AddDependency(a, b, "ref", "")
+	g.AddDependency(b, c, "ref", "")
+
+	result := g.WalkDependencies([]ResourceNode{a})
+
+	require.Len(t, result, 3)
+	resultKeys := nodeKeys(result)
+	expectedKeys := []string{makeKey("t", "a"), makeKey("t", "b"), makeKey("t", "c")}
+	assert.Equal(t, expectedKeys, resultKeys)
+}
+
+func TestWalkDependencies_DiamondGraph(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+	g.AddResource("t", "c", "c")
+	g.AddResource("t", "d", "d")
+
+	a, _ := g.GetNode("t", "a")
+	b, _ := g.GetNode("t", "b")
+	c, _ := g.GetNode("t", "c")
+	d, _ := g.GetNode("t", "d")
+
+	g.AddDependency(a, b, "ref", "")
+	g.AddDependency(a, c, "ref", "")
+	g.AddDependency(b, d, "ref", "")
+	g.AddDependency(c, d, "ref", "")
+
+	result := g.WalkDependencies([]ResourceNode{a})
+
+	require.Len(t, result, 4)
+	resultKeys := nodeKeys(result)
+	expectedKeys := []string{
+		makeKey("t", "a"),
+		makeKey("t", "b"),
+		makeKey("t", "c"),
+		makeKey("t", "d"),
+	}
+	assert.Equal(t, expectedKeys, resultKeys)
+}
+
+func TestWalkDependencies_CircularDeps(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+	g.AddResource("t", "c", "c")
+
+	a, _ := g.GetNode("t", "a")
+	b, _ := g.GetNode("t", "b")
+	c, _ := g.GetNode("t", "c")
+
+	g.AddDependency(a, b, "ref", "")
+	g.AddDependency(b, c, "ref", "")
+	g.AddDependency(c, a, "ref", "")
+
+	result := g.WalkDependencies([]ResourceNode{a})
+
+	require.Len(t, result, 3)
+	resultKeys := nodeKeys(result)
+	expectedKeys := []string{
+		makeKey("t", "a"),
+		makeKey("t", "b"),
+		makeKey("t", "c"),
+	}
+	assert.Equal(t, expectedKeys, resultKeys)
+}
+
+func TestWalkDependencies_MultipleSeeds(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+	g.AddResource("t", "c", "c")
+	g.AddResource("t", "d", "d")
+
+	a, _ := g.GetNode("t", "a")
+	b, _ := g.GetNode("t", "b")
+	c, _ := g.GetNode("t", "c")
+	d, _ := g.GetNode("t", "d")
+
+	g.AddDependency(a, b, "ref", "")
+	g.AddDependency(c, d, "ref", "")
+
+	result := g.WalkDependencies([]ResourceNode{a, c})
+
+	require.Len(t, result, 4)
+	resultKeys := nodeKeys(result)
+	expectedKeys := []string{
+		makeKey("t", "a"),
+		makeKey("t", "b"),
+		makeKey("t", "c"),
+		makeKey("t", "d"),
+	}
+	assert.Equal(t, expectedKeys, resultKeys)
+}
+
+func TestWalkDependencies_SeedNotInGraph(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+
+	a, _ := g.GetNode("t", "a")
+	b, _ := g.GetNode("t", "b")
+	missingNode := ResourceNode{
+		ResourceType: "t",
+		ID:           "missing",
+		Name:         "missing",
+	}
+
+	g.AddDependency(a, b, "ref", "")
+
+	result := g.WalkDependencies([]ResourceNode{a, missingNode})
+
+	require.Len(t, result, 2)
+	resultKeys := nodeKeys(result)
+	expectedKeys := []string{
+		makeKey("t", "a"),
+		makeKey("t", "b"),
+	}
+	assert.Equal(t, expectedKeys, resultKeys)
+}
+
+func TestWalkDependencies_PartialOverlap(t *testing.T) {
+	g := New()
+	g.AddResource("t", "a", "a")
+	g.AddResource("t", "b", "b")
+	g.AddResource("t", "c", "c")
+
+	a, _ := g.GetNode("t", "a")
+	b, _ := g.GetNode("t", "b")
+	c, _ := g.GetNode("t", "c")
+
+	g.AddDependency(a, b, "ref", "")
+	g.AddDependency(c, b, "ref", "")
+
+	result := g.WalkDependencies([]ResourceNode{a, c})
+
+	require.Len(t, result, 3)
+	resultKeys := nodeKeys(result)
+	expectedKeys := []string{
+		makeKey("t", "a"),
+		makeKey("t", "b"),
+		makeKey("t", "c"),
+	}
+	assert.Equal(t, expectedKeys, resultKeys)
+}
+
+// nodeKeys is a helper that extracts and sorts the composite keys from a slice of ResourceNodes.
+func nodeKeys(nodes []ResourceNode) []string {
+	keys := make([]string, len(nodes))
+	for i, n := range nodes {
+		keys[i] = makeKey(n.ResourceType, n.ID)
+	}
+	sort.Strings(keys)
+	return keys
 }
