@@ -71,6 +71,27 @@ func RegisterCustomHandlers(reg *core.CustomHandlerRegistry) {
 	customHandlerQueue.LoadInto(reg)
 }
 
+// ── Embedded reference rule dispatch ────────────────────────────
+
+// embeddedRefRules collects rules registered during init().
+var embeddedRefRules []core.EmbeddedReferenceRule
+
+// registerEmbeddedReferenceRule queues an embedded reference rule for
+// bulk registration. Called from init() in resource_*.go files.
+func registerEmbeddedReferenceRule(rule core.EmbeddedReferenceRule) {
+	embeddedRefRules = append(embeddedRefRules, rule)
+}
+
+// NewEmbeddedReferenceRegistry creates an EmbeddedReferenceRegistry populated
+// with all rules registered during init(). Call once during application startup.
+func NewEmbeddedReferenceRegistry() *core.EmbeddedReferenceRegistry {
+	reg := core.NewEmbeddedReferenceRegistry()
+	for _, rule := range embeddedRefRules {
+		reg.Register(rule)
+	}
+	return reg
+}
+
 // RegisteredHandlerNames returns sorted names of all queued handlers.
 func RegisteredHandlerNames() []string {
 	return customHandlerQueue.HandlerNames()

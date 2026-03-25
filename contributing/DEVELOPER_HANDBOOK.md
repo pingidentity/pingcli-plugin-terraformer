@@ -377,6 +377,173 @@ No resource currently uses a resource-level custom handler. All current customiz
 
 ---
 
+## Adding Embedded Reference Rules
+
+When a resource stores UUID references **inside JSON-encoded blobs** (via `jsonencode_raw`), the standard schema-driven reference system cannot resolve them — it cannot walk into opaque strings. Embedded reference rules solve this by post-processing specific paths within JSON structures to find and replace UUIDs with Terraform references.
+
+**Use Case**: DaVinci flows can nest other flows. The reference is stored in the `properties` JSON field as `subFlowId.value.value`. Standard reference resolution never sees it because the entire `properties` value is a `RawHCLValue` (an opaque JSON-encoded string).
+
+### When an Embedded Reference Rule Is Needed
+
+The orchestrator's standard reference resolution (via `references_type` on attributes) handles **top-level UUID attributes** in an API response. It cannot find UUIDs buried inside JSON strings.
+
+**Indicator**: Your resource has a JSON-encoded attribute (using `jsonencode_raw` transform) that **contains UUID references to other resources**. Examples:
+
+- DaVinci flow `properties` containing `subFlowId`
+- Nested JSON structures with embedded resource identifiers
+- Dynamically-shaped JSON with references in non-standard paths
+
+If the UUID is a top-level attribute, use `references_type` in the YAML instead — no code needed.
+
+### Rule Definition
+
+An `EmbeddedReferenceRule` specifies:
+
+```go
+type EmbeddedReferenceRule struct {
+    ResourceType       string  // owning resource type ("pingone_davinci_flow")
+    AttributePath      string  // dot-path to the JSON blob, * for map iteration ("graph_data.elements.nodes.*.data.properties")
+    TargetResourceType string  // resource type the UUID references ("pingone_davinci_flow")
+    JSONKeyPath        string  // path inside the JSON object ("subFlowId.value.value")
+    ReferenceField     string  // attribute on target resource ("id")
+}
+```
+
+**AttributePath rules**:
+- Use `terraform_name` keys (snake_case), matching the keys in `ResourceData.Attributes`
+- Dot notation separates nested levels: `graph_data.elements.nodes`
+- `*` matches all keys in a map: `nodes.*.data` iterates `nodes[key].data` for all keys
+- The final segment is the attribute containing the `RawHCLValue`
+
+**JSONKeyPath rules**:
+- Dot notation only (no wildcards)
+- Keys must exist in the JSON for the subFlowId to be found and replaced
+- Missing keys are silently skipped (not an error)
+
+### Step 1: Analyze the Structure
+
+Find the API struct and the YAML attribute:
+
+```go
+// github.com/pingidentity/pingone-go-client/davinci
+type Flow struct {
+    GraphData string // JSON-encoded flow structure
+}
+
+// Inside GraphData (unmarshalled):
+{
+  "elements": {
+    "nodes": [
+      {
+        "data": {
+          "properties": {
+            "subFlowId": { "value": { "value": "uuid-string" } }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+YAML attribute:
+
+```yaml
+attributes:
+  - name: GraphData
+    terraform_name: graph_data
+    type: string
+    source_path: GraphData
+    transform: jsonencode_raw  # ← produces RawHCLValue
+```
+
+### Step 2: Register the Rule
+
+Add the rule registration to the resource handler's `init()` function:
+
+```go
+// internal/platform/pingone/resource_flow.go
+
+func init() {
+    // Existing registrations
+    registerResource("pingone_davinci_flow", resourceHandler{
+        list: listFlows,
+        get:  getFlow,
+    })
+
+    // Register embedded reference rule
+    registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+        ResourceType:       "pingone_davinci_flow",
+        AttributePath:      "graph_data.elements.nodes.*.data.properties",
+        TargetResourceType: "pingone_davinci_flow",
+        JSONKeyPath:        "subFlowId.value.value",
+        ReferenceField:     "id",
+    })
+}
+```
+
+### Step 3: Verify
+
+Run the pipeline and check the output:
+
+```bash
+go test ./internal/core -v -run TestEmbeddedReferences
+
+# Manual check: export a flow with nested flows and verify the properties
+# contain ${pingone_davinci_flow.label.id} instead of raw UUIDs
+```
+
+**Expected output in HCL**:
+
+```hcl
+resource "pingone_davinci_flow" "parent_flow_label" {
+  environment_id = var.pingone_environment_id
+
+  graph_data = jsonencode({
+    elements = {
+      nodes = [
+        {
+          data = {
+            properties = {
+              subFlowId = {
+                value = {
+                  value = "${pingone_davinci_flow.child_flow_label.id}"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  })
+
+  depends_on = [pingone_davinci_flow.child_flow_label]
+}
+```
+
+### How It Works Internally
+
+1. **Rule Matching**: After all resources are processed and added to the dependency graph, `ResolveEmbeddedReferences()` iterates all rules.
+2. **Attribute Navigation**: For each rule, walk `ResourceData.Attributes` following `AttributePath`. The `*` wildcard matches all map keys at that level.
+3. **JSON Extraction**: For each `RawHCLValue` at the final path, extract the JSON object from inside the `jsonencode(...)` expression.
+4. **UUID Lookup**: Navigate the JSON blob via `JSONKeyPath`, find the UUID string.
+5. **Graph Resolution**: Query the dependency graph for a `TargetResourceType` resource with that UUID to get its Terraform label.
+6. **Replacement**: Replace the UUID with `${resource_type.label.reference_field}` (Terraform interpolation).
+7. **Serialization**: Re-marshal the JSON and update the `RawHCLValue`.
+8. **Graph Update**: Record the dependency edge so `--include-upstream` and cycle detection work correctly.
+
+### Debugging Embedded References
+
+If embedded references are not being resolved:
+
+1. **Verify the rule is registered**: Add a temporary log or check that `registerEmbeddedReferenceRule()` was called in the resource's `init()`.
+2. **Check AttributePath**: Inspect the actual `ResourceData.Attributes` to see if the path and structure match the rule. Use `json.MarshalIndent` to pretty-print for inspection.
+3. **Validate JSONKeyPath**: Extract and inspect the actual JSON blob. Is `subFlowId.value.value` the correct path? Use a JSON viewer if needed.
+4. **Verify UUID lookup**: Confirm that the UUID extracted from the JSON exists in the dependency graph. Check that another flow with that UUID was exported.
+5. **Test with a simpler rule first**: If adding a complex rule, start with a test rule that matches a known structure, then refine.
+
+---
+
 ## Adding a New Platform
 
 All PingOne resources (base and DaVinci) share a single flat package at `internal/platform/pingone/`. To add a new PingOne resource, use the Quick Start steps above — no new package is needed.

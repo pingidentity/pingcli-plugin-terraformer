@@ -89,10 +89,11 @@ type ProgressFunc func(message string)
 
 // ExportOrchestrator coordinates the end-to-end schema-driven export pipeline.
 type ExportOrchestrator struct {
-	registry   *schema.Registry
-	processor  *Processor
-	client     clients.APIClient
-	progressFn ProgressFunc
+	registry     *schema.Registry
+	processor    *Processor
+	client       clients.APIClient
+	progressFn   ProgressFunc
+	embeddedRefs *EmbeddedReferenceRegistry
 }
 
 // OrchestratorOption configures optional ExportOrchestrator behaviour.
@@ -102,6 +103,14 @@ type OrchestratorOption func(*ExportOrchestrator)
 func WithProgressFunc(fn ProgressFunc) OrchestratorOption {
 	return func(o *ExportOrchestrator) {
 		o.progressFn = fn
+	}
+}
+
+// WithEmbeddedReferences sets the registry of embedded reference rules
+// for post-processing UUID references inside RawHCLValue blobs.
+func WithEmbeddedReferences(reg *EmbeddedReferenceRegistry) OrchestratorOption {
+	return func(o *ExportOrchestrator) {
+		o.embeddedRefs = reg
 	}
 }
 
@@ -226,6 +235,14 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 			Definition:   def,
 			Resources:    processed,
 		})
+	}
+
+	// Resolve embedded references in RawHCLValue blobs (e.g., subFlowId
+	// inside jsonencode'd node properties). Must run after the graph is
+	// fully populated and before upstream expansion so discovered edges
+	// are visible to the graph walker.
+	if o.embeddedRefs != nil && !opts.SkipDependencies {
+		ResolveEmbeddedReferences(results, depGraph, o.embeddedRefs.Rules())
 	}
 
 	// When IncludeUpstream is active, build edges and apply filter + expansion

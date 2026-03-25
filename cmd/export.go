@@ -286,9 +286,10 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 	}
 
 	// 5. Create and run orchestrator.
+	embeddedRefs := pingoneplatform.NewEmbeddedReferenceRegistry()
 	orch := core.NewExportOrchestrator(registry, proc, apiClient, core.WithProgressFunc(func(msg string) {
 		_ = logger.Message(msg, nil)
-	}))
+	}), core.WithEmbeddedReferences(embeddedRefs))
 
 	result, err := orch.Export(ctx, core.ExportOptions{
 		SkipDependencies: skipDeps,
