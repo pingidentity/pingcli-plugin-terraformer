@@ -20,6 +20,8 @@ type ResourceMetadata struct {
 	Name         string `yaml:"name"`
 	ShortName    string `yaml:"short_name"`
 	Version      string `yaml:"version"`
+	// Enabled is a tri-state flag: nil = enabled by default, false = disabled, true = explicitly enabled.
+	Enabled *bool `yaml:"enabled,omitempty"`
 }
 
 // APIDefinition defines API interaction configuration

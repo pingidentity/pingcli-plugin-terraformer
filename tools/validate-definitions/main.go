@@ -82,7 +82,11 @@ func main() {
 		}
 
 		attrCount := countAttributes(def)
-		fmt.Printf("  PASS  %s (%s) - %d attributes\n", relPath, def.Metadata.ResourceType, attrCount)
+		disabledStatus := ""
+		if def.Metadata.Enabled != nil && !*def.Metadata.Enabled {
+			disabledStatus = " [DISABLED]"
+		}
+		fmt.Printf("  PASS  %s (%s) - %d attributes%s\n", relPath, def.Metadata.ResourceType, attrCount, disabledStatus)
 		totalPass++
 	}
 

@@ -161,7 +161,6 @@ pingcli-terraformer export --out ./output
 
 | Resource | Terraform Type |
 |----------|---------------|
-| PingOne Environment | `pingone_environment` |
 | DaVinci Flow | `pingone_davinci_flow` |
 | DaVinci Variable | `pingone_davinci_variable` |
 | DaVinci Connector Instance | `pingone_davinci_connector_instance` |
