@@ -20,7 +20,6 @@ func TestProcessorCustomTransformInvoked(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_ct",
 			APIType:      "TestCT",
 			Name:         "Test Custom Transform",
@@ -74,7 +73,6 @@ func TestProcessorCustomTransformNotRegistered(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_ctnr",
 			APIType:      "TestCTNR",
 			Name:         "Test Custom Transform Not Registered",
@@ -119,7 +117,6 @@ func TestProcessorNoHandlerRegistryPassthrough(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_nhr",
 			APIType:      "TestNHR",
 			Name:         "Test No Handler Registry",
@@ -170,7 +167,6 @@ func TestProcessorResourceLevelTransformerHandler(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_rlt",
 			APIType:      "TestRLT",
 			Name:         "Test Resource Level Transformer",
@@ -223,7 +219,6 @@ func TestProcessorResourceLevelHCLGeneratorHandler(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_hcl",
 			APIType:      "TestHCL",
 			Name:         "Test HCL Generator",
@@ -270,7 +265,6 @@ func TestProcessorBothHandlerTypes(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_both",
 			APIType:      "TestBoth",
 			Name:         "Test Both Handlers",
@@ -320,7 +314,6 @@ func TestProcessorCustomHandlerNotRegistered(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_chnr",
 			APIType:      "TestCHNR",
 			Name:         "Test Custom Handler Not Registered",
@@ -364,7 +357,6 @@ func TestProcessorCustomTransformReceivesAPIData(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_api",
 			APIType:      "TestAPI",
 			Name:         "Test API Data Access",
@@ -417,7 +409,6 @@ func TestProcessorHandlerQueueIntegration(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_qi",
 			APIType:      "TestQI",
 			Name:         "Test Queue Integration",

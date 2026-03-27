@@ -2,7 +2,6 @@
 
 metadata:
   platform: pingone
-  service: davinci
   resource_type: pingone_davinci_application
   api_type: Application
   name: DaVinci Application

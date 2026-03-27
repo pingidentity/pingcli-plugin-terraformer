@@ -8,8 +8,8 @@ import (
 
 var (
 	// Parent command metadata
-	TfExample = `  # Export PingOne DaVinci resources to Terraform HCL
-  pingcli tf export --services pingone-davinci --environment-id <uuid> --out ./environment.tf
+	TfExample = `  # Export PingOne resources to Terraform HCL
+  pingcli tf export --out ./environment.tf
 
   # Get help for subcommands
   pingcli tf export --help`
@@ -20,10 +20,7 @@ Provides tools to export resources to Terraform HCL format
 compatible with the PingOne Terraform Provider.
 
 Available subcommands:
-  export - Export Ping Identity resources from live environments to HCL
-
-Supported services for export:
-  pingone-davinci - PingOne DaVinci flows, variables, connections, apps, policies`
+  export - Export PingOne resources from live environments to Terraform configuration`
 
 	TfShort = "Terraform utilities for Ping Identity"
 

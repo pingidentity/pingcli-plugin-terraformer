@@ -27,6 +27,7 @@ go.work
 *.swo
 *~
 .github/agents/**
+.github/prompts/**
 
 # OS specific files
 .DS_Store

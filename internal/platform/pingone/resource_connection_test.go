@@ -1,4 +1,4 @@
-package davinci
+package pingone
 
 import (
 	"testing"

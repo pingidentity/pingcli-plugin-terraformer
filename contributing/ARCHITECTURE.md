@@ -21,7 +21,8 @@ This project is a **schema-driven, multi-format Terraform configuration export e
 │  └── pingone/                                                       │
 │      └── davinci/                                                   │
 │          ├── application.yaml                                       │
-│          ├── connection.yaml                                        │
+│          ├── connector_instance.yaml                                │
+│          ├── environment.yaml                                       │
 │          ├── flow.yaml                                              │
 │          ├── flow_deploy.yaml                                       │
 │          ├── flow_enable.yaml                                       │
@@ -182,7 +183,6 @@ type ResourceDefinition struct {
 ```go
 type ResourceMetadata struct {
     Platform     string `yaml:"platform"`       // "pingone"
-    Service      string `yaml:"service"`        // "davinci"
     ResourceType string `yaml:"resource_type"`  // "pingone_davinci_variable"
     APIType      string `yaml:"api_type"`       // "Variable"
     Name         string `yaml:"name"`           // "DaVinci Variable"
@@ -305,7 +305,6 @@ func (r *Registry) Register(def *ResourceDefinition) error
 func (r *Registry) Get(resourceType string) (*ResourceDefinition, error)
 func (r *Registry) ListAll() []*ResourceDefinition
 func (r *Registry) ListByPlatform(platform string) []*ResourceDefinition
-func (r *Registry) ListByService(platform, service string) []*ResourceDefinition
 func (r *Registry) LoadFromFS(fsys fs.FS, dir string) error
 func (r *Registry) LoadFromDirectory(dir string) error
 ```
@@ -532,7 +531,6 @@ type APIClient interface {
     ListResources(ctx context.Context, resourceType string, envID string) ([]interface{}, error)
     GetResource(ctx context.Context, resourceType string, envID string, resourceID string) (interface{}, error)
     Platform() string
-    Service() string
 }
 ```
 
@@ -691,7 +689,6 @@ The CLI export command orchestrates the full pipeline:
 # definitions/pingone/davinci/variable.yaml
 metadata:
   platform: pingone
-  service: davinci
   resource_type: pingone_davinci_variable
   api_type: Variable
   name: DaVinci Variable

@@ -1,0 +1,163 @@
+# PingOne Environment Resource Definition
+
+metadata:
+  platform: pingone
+  resource_type: pingone_environment
+  api_type: EnvironmentResponse
+  name: PingOne Environment
+  short_name: environment
+  version: "1.0"
+
+api:
+  sdk_package: github.com/pingidentity/pingone-go-client/pingone
+  sdk_type: EnvironmentResponse
+  list_method: EnvironmentsApi.GetEnvironmentById
+  get_method: EnvironmentsApi.GetEnvironmentById
+  id_field: id
+  name_field: name
+  pagination_type: none
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Description - optional string
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  # Type - optional string (SANDBOX or PRODUCTION)
+  - name: Type
+    terraform_name: type
+    type: string
+    source_path: Type
+
+  # Region - optional string (AP, AU, CA, EU, NA, SG)
+  - name: Region
+    terraform_name: region
+    type: string
+    source_path: Region
+
+  # License ID - required, nested in License object
+  - name: LicenseID
+    terraform_name: license_id
+    type: string
+    source_path: License.Id
+    required: true
+
+  # Organization ID - computed only, nested in Organization object
+  - name: OrganizationID
+    terraform_name: organization_id
+    type: string
+    source_path: Organization.Id
+    computed: true
+
+  # Solution - optional string (CUSTOMER, CIAM_TRIAL)
+  - name: Solution
+    terraform_name: solution
+    type: string
+    source_path: BillOfMaterials.SolutionType
+
+  # Services - required set of objects from BillOfMaterials.Products
+  - name: Services
+    terraform_name: services
+    type: set
+    source_path: BillOfMaterials.Products
+    required: true
+    nested_attributes:
+      # Service Type - required, value_map from API product type codes to Terraform names
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+        required: true
+        transform: value_map
+        value_map:
+          PING_ONE_BASE: "SSO"
+          PING_ONE_MFA: "MFA"
+          PING_ONE_RISK: "Risk"
+          PING_ONE_VERIFY: "Verify"
+          PING_ONE_CREDENTIALS: "Credentials"
+          PING_ONE_DAVINCI: "DaVinci"
+          PING_ONE_AUTHORIZE: "Authorize"
+          PING_FEDERATE: "PingFederate"
+          PING_ACCESS: "PingAccess"
+          PING_DIRECTORY: "PingDirectory"
+          PING_CENTRAL: "PingCentral"
+          PING_ID: "PingID"
+          PING_ID_SDK: "PingID-v2"
+          PING_INTELLIGENCE: "APIIntelligence"
+          PING_ONE_ORCHESTRATE: "Orchestrate"
+          PING_ONE_FRAUD: "Fraud"
+          PING_ONE_PROVISIONING: "Provisioning"
+          IDENTITY_CLOUD: "IdentityCloud"
+          PING_DATA_GOVERNANCE: "PingDataGovernance"
+          PING_DATA_SYNC: "PingDataSync"
+          PING_AUTHORIZE: "PingAuthorize"
+          PING_ONE_FOR_ENTERPRISE: "PingOneForEnterprise"
+          PING_ONE_FOR_SAAS: "PingOneForSaaS"
+          PING_ONE_ID: "PingOneID"
+          PING_ONE_LEGACY: "PingOneLegacy"
+        value_map_default: ""
+
+      # Console URL - optional, nested in Console object
+      - name: ConsoleURL
+        terraform_name: console_url
+        type: string
+        source_path: Console.Href
+
+      # Deployment - computed object
+      - name: Deployment
+        terraform_name: deployment
+        type: object
+        source_path: Deployment
+        computed: true
+        nested_attributes:
+          - name: ID
+            terraform_name: id
+            type: string
+            source_path: Id
+            computed: true
+
+      # Bookmarks - optional set of objects
+      - name: Bookmarks
+        terraform_name: bookmarks
+        type: set
+        source_path: Bookmarks
+        nested_attributes:
+          - name: Name
+            terraform_name: name
+            type: string
+            source_path: Name
+            required: true
+
+          - name: URL
+            terraform_name: url
+            type: string
+            source_path: Href
+            required: true
+
+      # Tags - optional set of strings
+      - name: Tags
+        terraform_name: tags
+        type: set
+        source_path: Tags
+
+dependencies:
+  depends_on: []
+  import_id_format: "{resource_id}"
+
+variables:
+  eligible_attributes: []

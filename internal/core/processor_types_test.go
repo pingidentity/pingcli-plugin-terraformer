@@ -28,7 +28,6 @@ func TestProcessorAllAttributeTypes(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_types",
 			APIType:      "TestTypes",
 			Name:         "Test All Types",
@@ -120,7 +119,6 @@ func TestProcessorNumberAsString(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_nas",
 			APIType:      "TestNAS",
 			Name:         "Test Number As String",
@@ -156,7 +154,6 @@ func TestProcessorUnknownType(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_unk",
 			APIType:      "TestUnk",
 			Name:         "Test Unknown Type",
@@ -193,7 +190,6 @@ func TestProcessorTypeMismatchSkipsAttribute(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     "pingone",
-			Service:      "davinci",
 			ResourceType: "pingone_davinci_test_mm",
 			APIType:      "TestMM",
 			Name:         "Test Type Mismatch",

@@ -12,12 +12,10 @@ import (
 // mockClient implements APIClient for testing interface contract.
 type mockClient struct {
 	platform string
-	service  string
 	data     map[string][]interface{}
 }
 
 func (m *mockClient) Platform() string { return m.platform }
-func (m *mockClient) Service() string  { return m.service }
 
 func (m *mockClient) ListResources(_ context.Context, resourceType string, _ string) ([]interface{}, error) {
 	if d, ok := m.data[resourceType]; ok {
@@ -41,7 +39,6 @@ func (m *mockClient) GetResource(_ context.Context, resourceType string, _ strin
 func TestAPIClientInterface(t *testing.T) {
 	client := &mockClient{
 		platform: "pingone",
-		service:  "davinci",
 		data: map[string][]interface{}{
 			"pingone_davinci_variable": {
 				map[string]interface{}{"id": "v1", "name": "myVar"},
@@ -54,7 +51,6 @@ func TestAPIClientInterface(t *testing.T) {
 	var _ APIClient = client
 
 	assert.Equal(t, "pingone", client.Platform())
-	assert.Equal(t, "davinci", client.Service())
 
 	// ListResources
 	resources, err := client.ListResources(context.Background(), "pingone_davinci_variable", "env-1")

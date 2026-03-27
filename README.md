@@ -4,7 +4,7 @@ Export PingOne resources to Terraform configuration with automatic dependency re
 
 ## Features
 
-- **Complete DaVinci Export**: Export DaVinci flows, variables, connector instances, applications, and flow policies
+- **Complete DaVinci Export**: Export PingOne environments, DaVinci flows, variables, connector instances, applications, and flow policies
 - **Multiple Output Formats**: Supports Terraform HCL (`.tf`) or Terraform JSON (`.tf.json`) output
 - **Automatic Dependency Resolution**: Generates Terraform references between resources
 - **Import Block Generation**: Terraform import blocks to manage existing resources (Terraform 1.5+)
@@ -51,7 +51,7 @@ docker run --rm \
   -e PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="..." \
   -v $(pwd)/output:/output \
   ghcr.io/pingidentity/pingcli-plugin-terraformer:latest \
-  export --services pingone-davinci --out /output
+  export --out /output
 ```
 
 ### From Source
@@ -100,7 +100,6 @@ pingcli-terraformer export \
 
 ```bash
 pingcli-terraformer export \
-  --services pingone-davinci \
   --pingone-worker-environment-id <uuid> \
   --pingone-worker-client-id <client-id> \
   --pingone-worker-client-secret <secret> \
@@ -112,7 +111,6 @@ pingcli-terraformer export \
 
 ```bash
 pingcli-terraformer export \
-  --services pingone-davinci \
   --output-format tfjson \
   --out ./output
 ```
@@ -125,7 +123,7 @@ export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID="..."
 export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="..."
 export PINGCLI_PINGONE_REGION_CODE="NA"
 
-pingcli-terraformer export --services pingone-davinci --out ./output
+pingcli-terraformer export --out ./output
 ```
 
 ## Command Reference
@@ -134,7 +132,6 @@ pingcli-terraformer export --services pingone-davinci --out ./output
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--services` | `pingone-davinci` | Services to export (comma-separated) |
 | `--pingone-worker-environment-id` | - | Worker environment ID |
 | `--pingone-export-environment-id` | Worker env | Target environment ID |
 | `--pingone-worker-client-id` | - | OAuth2 client ID |
@@ -160,6 +157,7 @@ pingcli-terraformer export --services pingone-davinci --out ./output
 
 | Resource | Terraform Type |
 |----------|---------------|
+| PingOne Environment | `pingone_environment` |
 | DaVinci Flow | `pingone_davinci_flow` |
 | DaVinci Variable | `pingone_davinci_variable` |
 | DaVinci Connector Instance | `pingone_davinci_connector_instance` |

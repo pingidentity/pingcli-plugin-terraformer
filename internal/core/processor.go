@@ -217,7 +217,7 @@ func (p *Processor) ProcessResource(resourceType string, apiData interface{}) (*
 
 			// For list types with nested_attributes, extract each element
 			// through nested attribute processing.
-			if attrDef.Type == "list" && len(attrDef.NestedAttributes) > 0 {
+			if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 				listVal, lErr := p.extractListOfNestedAttributes(value, attrDef.NestedAttributes)
 				if lErr != nil {
 					continue
@@ -478,8 +478,8 @@ func (p *Processor) extractNestedAttributes(parent interface{}, nested []schema.
 				continue
 			}
 
-			// Recursively handle list of objects with nested attributes.
-			if attr.Type == "list" && len(attr.NestedAttributes) > 0 {
+			// Recursively handle list/set of objects with nested attributes.
+			if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
 				listVal, lErr := p.extractListOfNestedAttributes(val, attr.NestedAttributes)
 				if lErr == nil && len(listVal) > 0 {
 					result[tfName] = listVal
@@ -763,7 +763,19 @@ func (p *Processor) convertValue(field reflect.Value, attrType string) (interfac
 		if field.Kind() == reflect.Slice || field.Kind() == reflect.Array {
 			result := make([]interface{}, field.Len())
 			for i := 0; i < field.Len(); i++ {
-				result[i] = field.Index(i).Interface()
+				elem := field.Index(i)
+				// Coerce typed string aliases to plain strings (same as list case).
+				if elem.Kind() == reflect.String {
+					result[i] = elem.String()
+				} else if elem.CanInterface() {
+					if s, ok := elem.Interface().(fmt.Stringer); ok {
+						result[i] = s.String()
+					} else {
+						result[i] = elem.Interface()
+					}
+				} else {
+					result[i] = elem.Interface()
+				}
 			}
 			return result, nil
 		}

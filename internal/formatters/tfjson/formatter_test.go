@@ -322,6 +322,76 @@ func TestFormat_ListOfObjects(t *testing.T) {
 	assert.Equal(t, float64(1), first["count"])
 }
 
+func TestFormat_SetWithNestedAttributes(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "tags", TerraformName: "tags", Type: "set",
+		NestedAttributes: []schema.AttributeDefinition{
+			{Name: "key", TerraformName: "key", Type: "string"},
+			{Name: "value", TerraformName: "value", Type: "string"},
+			{Name: "enabled", TerraformName: "enabled", Type: "bool"},
+		},
+	})
+	data := baseData("res1", "id1", map[string]interface{}{
+		"tags": []interface{}{
+			map[string]interface{}{"key": "env", "value": "prod", "enabled": true},
+			map[string]interface{}{"key": "team", "value": "alpha", "enabled": false},
+		},
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	tags, ok := attrs["tags"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, tags, 2)
+	tag0, ok := tags[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "env", tag0["key"])
+	assert.Equal(t, "prod", tag0["value"])
+	assert.Equal(t, true, tag0["enabled"])
+	tag1, ok := tags[1].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "team", tag1["key"])
+	assert.Equal(t, "alpha", tag1["value"])
+	assert.Equal(t, false, tag1["enabled"])
+}
+
+func TestFormat_SetWithNestedAttributesEmpty(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "tags", TerraformName: "tags", Type: "set",
+		NestedAttributes: []schema.AttributeDefinition{
+			{Name: "key", TerraformName: "key", Type: "string"},
+		},
+	})
+	data := baseData("res1", "id1", map[string]interface{}{
+		"tags": []interface{}{},
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	// Empty set should be omitted by the formatter
+	_, ok := attrs["tags"]
+	assert.False(t, ok, "empty set should be omitted")
+}
+
+func TestFormat_SetWithNestedAttributesNil(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "tags", TerraformName: "tags", Type: "set",
+		NestedAttributes: []schema.AttributeDefinition{
+			{Name: "key", TerraformName: "key", Type: "string"},
+		},
+	})
+	data := baseData("res1", "id1", map[string]interface{}{})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	// Nil set should not be present
+	_, ok := attrs["tags"]
+	assert.False(t, ok, "nil set should be omitted")
+}
+
 func TestFormat_DynamicObject_Map(t *testing.T) {
 	f := NewFormatter()
 	def := baseDef(schema.AttributeDefinition{
