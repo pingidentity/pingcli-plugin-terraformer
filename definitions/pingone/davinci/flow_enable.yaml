@@ -6,7 +6,6 @@
 
 metadata:
   platform: pingone
-  service: davinci
   resource_type: pingone_davinci_flow_enable
   api_type: Flow
   name: DaVinci Flow Enable

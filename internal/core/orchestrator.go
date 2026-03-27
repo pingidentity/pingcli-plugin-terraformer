@@ -115,12 +115,11 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 		return nil, fmt.Errorf("environment ID is required")
 	}
 
-	// 1. Discover resource types for this client's platform/service.
+	// 1. Discover resource types for this client's platform.
 	platform := o.client.Platform()
-	service := o.client.Service()
-	defs := o.registry.ListByService(platform, service)
+	defs := o.registry.ListByPlatform(platform)
 	if len(defs) == 0 {
-		return nil, fmt.Errorf("no resource definitions found for %s/%s", platform, service)
+		return nil, fmt.Errorf("no resource definitions found for platform %s", platform)
 	}
 
 	// 2. Determine processing order from declared dependencies.
@@ -129,7 +128,7 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 		return nil, fmt.Errorf("dependency ordering: %w", err)
 	}
 
-	o.progress(fmt.Sprintf("Exporting %d resource types from %s/%s", len(ordered), platform, service))
+	o.progress(fmt.Sprintf("Exporting %d resource types from %s", len(ordered), platform))
 
 	// 3. Process each resource type in dependency order.
 	depGraph := graph.New()
@@ -275,7 +274,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 		}
 
 		// Nested list of objects — recurse into each list item.
-		if attrDef.Type == "list" && len(attrDef.NestedAttributes) > 0 {
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 			val, ok := attrs[tName]
 			if !ok || val == nil {
 				continue
@@ -304,15 +303,6 @@ func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *gra
 	varName := attrDef.ReferencesType
 	if attrDef.ReferenceField != "" {
 		varName = attrDef.ReferencesType + "_" + attrDef.ReferenceField
-	}
-
-	// Environment references always use variable references.
-	if attrDef.ReferencesType == "pingone_environment" {
-		return ResolvedReference{
-			IsVariable:    true,
-			VariableName:  varName,
-			OriginalValue: uuid,
-		}
 	}
 
 	// Try graph lookup for resource-to-resource references.
@@ -386,7 +376,7 @@ func collectResolvedReferences(attrs map[string]interface{}, defs []schema.Attri
 		}
 
 		// Recurse into nested lists.
-		if attrDef.Type == "list" && len(attrDef.NestedAttributes) > 0 {
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 			if slice, ok := val.([]interface{}); ok {
 				for _, item := range slice {
 					if itemMap, ok := item.(map[string]interface{}); ok {
@@ -465,7 +455,7 @@ func applyCorrelatedReferences(attrs map[string]interface{}, defs []schema.Attri
 		}
 
 		// Recurse into nested lists.
-		if attrDef.Type == "list" && len(attrDef.NestedAttributes) > 0 {
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 			if slice, ok := val.([]interface{}); ok {
 				for _, item := range slice {
 					if itemMap, ok := item.(map[string]interface{}); ok {

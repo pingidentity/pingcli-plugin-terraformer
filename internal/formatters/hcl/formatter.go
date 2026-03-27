@@ -93,7 +93,7 @@ func (f *Formatter) Format(data *core.ResourceData, def *schema.ResourceDefiniti
 		}
 
 		// List of objects with nested schema (e.g. input_schema).
-		if attrDef.Type == "list" && len(attrDef.NestedAttributes) > 0 {
+		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 			writeListOfObjectsBlock(body, attrDef, data, opts)
 			continue
 		}
@@ -413,8 +413,8 @@ func nestedObjectTokens(indent, closingIndent string, nested []schema.AttributeD
 			continue
 		}
 
-		// Nested list of objects: render as name = [ { ... }, { ... } ]
-		if attr.Type == "list" && len(attr.NestedAttributes) > 0 {
+		// Nested list/set of objects: render as name = [ { ... }, { ... } ]
+		if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
 			slice, ok := nVal.([]interface{})
 			if !ok || len(slice) == 0 {
 				continue

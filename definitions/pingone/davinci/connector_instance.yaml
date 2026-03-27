@@ -2,7 +2,6 @@
 
 metadata:
   platform: pingone
-  service: davinci
   resource_type: pingone_davinci_connector_instance
   api_type: ConnectorInstance
   name: DaVinci Connector Instance

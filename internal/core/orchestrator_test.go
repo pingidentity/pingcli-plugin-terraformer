@@ -15,7 +15,6 @@ import (
 
 type mockAPIClient struct {
 	platform  string
-	service   string
 	resources map[string][]interface{} // resourceType -> list
 }
 
@@ -32,7 +31,6 @@ func (m *mockAPIClient) GetResource(_ context.Context, _ string, _ string, _ str
 }
 
 func (m *mockAPIClient) Platform() string { return m.platform }
-func (m *mockAPIClient) Service() string  { return m.service }
 
 // --- helpers ---
 
@@ -53,11 +51,10 @@ func newTestRegistry(t *testing.T, defs ...*schema.ResourceDefinition) *schema.R
 	return reg
 }
 
-func baseDef(resourceType, platform, service, name, shortName string) *schema.ResourceDefinition {
+func baseDef(resourceType, platform, name, shortName string) *schema.ResourceDefinition {
 	return &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{
 			Platform:     platform,
-			Service:      service,
 			ResourceType: resourceType,
 			APIType:      "MockType",
 			Name:         name,
@@ -83,14 +80,13 @@ func baseDef(resourceType, platform, service, name, shortName string) *schema.Re
 // --- tests ---
 
 func TestExportOrchestrator_Export_SingleType(t *testing.T) {
-	def := baseDef("test_resource", "testplatform", "testsvc", "Test Resource", "test")
+	def := baseDef("test_resource", "testplatform", "Test Resource", "test")
 
 	reg := newTestRegistry(t, def)
 	proc := NewProcessor(reg)
 
 	client := &mockAPIClient{
 		platform: "testplatform",
-		service:  "testsvc",
 		resources: map[string][]interface{}{
 			"test_resource": {
 				simpleStruct{ID: strPtr("id-1"), Name: strPtr("alpha")},
@@ -124,8 +120,8 @@ func TestExportOrchestrator_Export_SingleType(t *testing.T) {
 
 func TestExportOrchestrator_Export_DependencyOrdering(t *testing.T) {
 	// varDef has no deps, appDef depends on varDef.
-	varDef := baseDef("test_variable", "p", "s", "Variable", "variable")
-	appDef := baseDef("test_application", "p", "s", "Application", "application")
+	varDef := baseDef("test_variable", "p", "Variable", "variable")
+	appDef := baseDef("test_application", "p", "Application", "application")
 	appDef.Dependencies.DependsOn = []schema.DependencyRule{
 		{ResourceType: "test_variable"},
 	}
@@ -134,7 +130,7 @@ func TestExportOrchestrator_Export_DependencyOrdering(t *testing.T) {
 	proc := NewProcessor(reg)
 
 	client := &mockAPIClient{
-		platform: "p", service: "s",
+		platform: "p",
 		resources: map[string][]interface{}{
 			"test_variable":    {simpleStruct{ID: strPtr("v1"), Name: strPtr("var1")}},
 			"test_application": {simpleStruct{ID: strPtr("a1"), Name: strPtr("app1")}},
@@ -154,7 +150,7 @@ func TestExportOrchestrator_Export_DependencyOrdering(t *testing.T) {
 func TestExportOrchestrator_Export_EmptyEnvironmentID(t *testing.T) {
 	reg := schema.NewRegistry()
 	proc := NewProcessor(reg)
-	client := &mockAPIClient{platform: "p", service: "s"}
+	client := &mockAPIClient{platform: "p"}
 
 	o := NewExportOrchestrator(reg, proc, client)
 	_, err := o.Export(context.Background(), ExportOptions{})
@@ -165,7 +161,7 @@ func TestExportOrchestrator_Export_EmptyEnvironmentID(t *testing.T) {
 func TestExportOrchestrator_Export_NoDefinitions(t *testing.T) {
 	reg := schema.NewRegistry()
 	proc := NewProcessor(reg)
-	client := &mockAPIClient{platform: "p", service: "s"}
+	client := &mockAPIClient{platform: "p"}
 
 	o := NewExportOrchestrator(reg, proc, client)
 	_, err := o.Export(context.Background(), ExportOptions{EnvironmentID: "env-1"})
@@ -174,12 +170,12 @@ func TestExportOrchestrator_Export_NoDefinitions(t *testing.T) {
 }
 
 func TestExportOrchestrator_Export_ProgressReporting(t *testing.T) {
-	def := baseDef("test_res", "p", "s", "Test", "test")
+	def := baseDef("test_res", "p", "Test", "test")
 	reg := newTestRegistry(t, def)
 	proc := NewProcessor(reg)
 
 	client := &mockAPIClient{
-		platform: "p", service: "s",
+		platform: "p",
 		resources: map[string][]interface{}{
 			"test_res": {simpleStruct{ID: strPtr("1"), Name: strPtr("one")}},
 		},
@@ -198,13 +194,13 @@ func TestExportOrchestrator_Export_ProgressReporting(t *testing.T) {
 }
 
 func TestExportOrchestrator_Export_APIError(t *testing.T) {
-	def := baseDef("test_res", "p", "s", "Test", "test")
+	def := baseDef("test_res", "p", "Test", "test")
 	reg := newTestRegistry(t, def)
 	proc := NewProcessor(reg)
 
 	// Client that returns error for the resource type.
 	client := &mockAPIClient{
-		platform: "p", service: "s",
+		platform: "p",
 		resources: map[string][]interface{}{}, // no entry = error
 	}
 
@@ -215,14 +211,14 @@ func TestExportOrchestrator_Export_APIError(t *testing.T) {
 }
 
 func TestExportOrchestrator_Export_CircularDependency(t *testing.T) {
-	aDef := baseDef("type_a", "p", "s", "A", "a")
+	aDef := baseDef("type_a", "p", "A", "a")
 	aDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_b"}}
-	bDef := baseDef("type_b", "p", "s", "B", "b")
+	bDef := baseDef("type_b", "p", "B", "b")
 	bDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_a"}}
 
 	reg := newTestRegistry(t, aDef, bDef)
 	proc := NewProcessor(reg)
-	client := &mockAPIClient{platform: "p", service: "s"}
+	client := &mockAPIClient{platform: "p"}
 
 	o := NewExportOrchestrator(reg, proc, client)
 	_, err := o.Export(context.Background(), ExportOptions{EnvironmentID: "env-1"})
@@ -232,17 +228,17 @@ func TestExportOrchestrator_Export_CircularDependency(t *testing.T) {
 
 func TestExportOrchestrator_Export_MultipleTypes(t *testing.T) {
 	// 3 types: C depends on B, B depends on A, A has no deps.
-	aDef := baseDef("type_a", "p", "s", "A", "a")
-	bDef := baseDef("type_b", "p", "s", "B", "b")
+	aDef := baseDef("type_a", "p", "A", "a")
+	bDef := baseDef("type_b", "p", "B", "b")
 	bDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_a"}}
-	cDef := baseDef("type_c", "p", "s", "C", "c")
+	cDef := baseDef("type_c", "p", "C", "c")
 	cDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_b"}}
 
 	reg := newTestRegistry(t, cDef, aDef, bDef) // deliberate disorder
 	proc := NewProcessor(reg)
 
 	client := &mockAPIClient{
-		platform: "p", service: "s",
+		platform: "p",
 		resources: map[string][]interface{}{
 			"type_a": {simpleStruct{ID: strPtr("a1"), Name: strPtr("alpha")}},
 			"type_b": {simpleStruct{ID: strPtr("b1"), Name: strPtr("bravo")}},
@@ -262,12 +258,12 @@ func TestExportOrchestrator_Export_MultipleTypes(t *testing.T) {
 }
 
 func TestExportOrchestrator_Export_EmptyResourceList(t *testing.T) {
-	def := baseDef("test_res", "p", "s", "Test", "test")
+	def := baseDef("test_res", "p", "Test", "test")
 	reg := newTestRegistry(t, def)
 	proc := NewProcessor(reg)
 
 	client := &mockAPIClient{
-		platform: "p", service: "s",
+		platform: "p",
 		resources: map[string][]interface{}{
 			"test_res": {}, // empty list, not an error
 		},
@@ -284,8 +280,8 @@ func TestExportOrchestrator_Export_EmptyResourceList(t *testing.T) {
 
 func TestExportOrchestrator_Export_ResolvesReferences(t *testing.T) {
 	// connDef has no deps; flowDef depends on connDef and has a reference to it.
-	connDef := baseDef("test_conn", "p", "s", "Connector", "conn")
-	flowDef := baseDef("test_flow", "p", "s", "Flow", "flow")
+	connDef := baseDef("test_conn", "p", "Connector", "conn")
+	flowDef := baseDef("test_flow", "p", "Flow", "flow")
 	flowDef.Dependencies.DependsOn = []schema.DependencyRule{
 		{ResourceType: "test_conn"},
 	}
@@ -305,7 +301,7 @@ func TestExportOrchestrator_Export_ResolvesReferences(t *testing.T) {
 	proc := NewProcessor(reg)
 
 	client := &mockAPIClient{
-		platform: "p", service: "s",
+		platform: "p",
 		resources: map[string][]interface{}{
 			"test_conn": {simpleStruct{ID: strPtr("conn-1"), Name: strPtr("myconn")}},
 			"test_flow": {simpleStruct{ID: strPtr("flow-1"), Name: strPtr("myflow")}},
@@ -507,4 +503,112 @@ func TestResolveCorrelatedReferences_AlreadyResolved(t *testing.T) {
 	// Should be unchanged.
 	ref := attrs["ref"].(ResolvedReference)
 	assert.Equal(t, "some_type.my_resource.id", ref.Expression())
+}
+
+// TestResolveEnvironmentReference_InGraph tests that when pingone_environment
+// IS in the dependency graph, environment references resolve to resource traversals.
+func TestResolveEnvironmentReference_InGraph(t *testing.T) {
+	// Create a definition with an environment reference
+	envAttrDef := schema.AttributeDefinition{
+		Name:           "environment_id",
+		TerraformName:  "environment_id",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "id",
+	}
+
+	// Create a mock attribute value (UUID)
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Build graph with pingone_environment resource
+	g := graph.New()
+	g.AddResource("pingone_environment", environmentUUID, "pingcli__production")
+
+	// Resolve the reference
+	result := resolveOneReference(envAttrDef, environmentUUID, g)
+
+	// Should resolve to resource traversal, not variable
+	assert.False(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment", result.ResourceType)
+	assert.Equal(t, "pingcli__production", result.ResourceName)
+	assert.Equal(t, "id", result.Field)
+	assert.Equal(t, "pingone_environment.pingcli__production.id", result.Expression())
+}
+
+// TestResolveEnvironmentReference_NotInGraph tests that when pingone_environment
+// is NOT in the dependency graph, environment references fall back to variable references.
+func TestResolveEnvironmentReference_NotInGraph(t *testing.T) {
+	// Create a definition with an environment reference
+	envAttrDef := schema.AttributeDefinition{
+		Name:           "environment_id",
+		TerraformName:  "environment_id",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "id",
+	}
+
+	// Create a mock attribute value (UUID)
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Build empty graph (no pingone_environment resource)
+	g := graph.New()
+
+	// Resolve the reference
+	result := resolveOneReference(envAttrDef, environmentUUID, g)
+
+	// Should fall back to variable reference
+	assert.True(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment_id", result.VariableName)
+	assert.Equal(t, environmentUUID, result.OriginalValue)
+	assert.Equal(t, "var.pingone_environment_id", result.Expression())
+}
+
+// TestResolveEnvironmentReference_NilGraph tests that when graph is nil,
+// environment references fall back to variable references.
+func TestResolveEnvironmentReference_NilGraph(t *testing.T) {
+	// Create a definition with an environment reference
+	envAttrDef := schema.AttributeDefinition{
+		Name:           "environment_id",
+		TerraformName:  "environment_id",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "id",
+	}
+
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Resolve with nil graph
+	result := resolveOneReference(envAttrDef, environmentUUID, nil)
+
+	// Should fall back to variable reference
+	assert.True(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment_id", result.VariableName)
+	assert.Equal(t, "var.pingone_environment_id", result.Expression())
+}
+
+// TestResolveEnvironmentReference_CustomField tests reference resolution
+// when a custom ReferenceField is specified.
+func TestResolveEnvironmentReference_CustomField(t *testing.T) {
+	// Use a custom reference field (unusual but valid for testing)
+	customAttrDef := schema.AttributeDefinition{
+		Name:           "env_name",
+		TerraformName:  "env_name",
+		Type:           "string",
+		ReferencesType: "pingone_environment",
+		ReferenceField: "name",
+	}
+
+	environmentUUID := "env-550e8400-e29b-41d4-a716-446655440000"
+
+	// Build graph with environment resource
+	g := graph.New()
+	g.AddResource("pingone_environment", environmentUUID, "pingcli__staging")
+
+	result := resolveOneReference(customAttrDef, environmentUUID, g)
+
+	// Should resolve with custom field
+	assert.False(t, result.IsVariable)
+	assert.Equal(t, "pingone_environment", result.ResourceType)
+	assert.Equal(t, "name", result.Field)
+	assert.Equal(t, "pingone_environment.pingcli__staging.name", result.Expression())
 }

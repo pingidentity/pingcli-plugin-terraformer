@@ -145,7 +145,7 @@ func (v *Validator) validateAttribute(attr *AttributeDefinition, path string) er
 		}
 	}
 
-	if (attr.Type == "object" || attr.Type == "list" || attr.Type == "map") && len(attr.NestedAttributes) > 0 {
+	if (attr.Type == "object" || attr.Type == "list" || attr.Type == "set" || attr.Type == "map") && len(attr.NestedAttributes) > 0 {
 		for i, nested := range attr.NestedAttributes {
 			nestedPath := fmt.Sprintf("%s.nested_attributes[%d]", path, i)
 			if err := v.validateAttribute(&nested, nestedPath); err != nil {

@@ -1,4 +1,4 @@
-package davinci
+package pingone
 
 import (
 	"testing"
@@ -13,10 +13,9 @@ func TestClientImplementsInterface(t *testing.T) {
 	var _ clients.APIClient = (*Client)(nil)
 }
 
-func TestPlatformAndService(t *testing.T) {
+func TestPlatform(t *testing.T) {
 	c := &Client{}
 	assert.Equal(t, "pingone", c.Platform())
-	assert.Equal(t, "davinci", c.Service())
 }
 
 func TestNewClient(t *testing.T) {

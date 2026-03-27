@@ -17,7 +17,4 @@ type APIClient interface {
 
 	// Platform returns the platform identifier (e.g., "pingone").
 	Platform() string
-
-	// Service returns the service identifier within the platform (e.g., "davinci").
-	Service() string
 }

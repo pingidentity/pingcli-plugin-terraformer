@@ -1,4 +1,4 @@
-package davinci
+package pingone
 
 import (
 	"testing"
@@ -20,6 +20,7 @@ func TestSupportedResourceTypes(t *testing.T) {
 		"pingone_davinci_flow_deploy",
 		"pingone_davinci_flow_enable",
 		"pingone_davinci_variable",
+		"pingone_environment",
 	}
 	assert.Equal(t, expected, SupportedResourceTypes())
 }

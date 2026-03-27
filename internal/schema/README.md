@@ -15,11 +15,11 @@ This package provides the schema definition system that allows resources to be d
 
 ```go
 // Load a single definition
-def, err := schema.LoadDefinition("definitions/pingone-davinci/variable.yaml")
+def, err := schema.LoadDefinition("definitions/pingone/davinci/variable.yaml")
 
 // Load all definitions from directory
 registry := schema.NewRegistry()
-err := registry.LoadFromDirectory("definitions/pingone-davinci")
+err := registry.LoadFromDirectory("definitions/pingone")
 
 // Get a definition
 def, err := registry.Get("pingone_davinci_variable")
