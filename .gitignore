@@ -26,6 +26,7 @@ go.work
 *.swp
 *.swo
 *~
+.github/agents/**
 .github/prompts/**
 
 # OS specific files
