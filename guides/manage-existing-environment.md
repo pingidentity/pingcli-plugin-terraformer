@@ -314,7 +314,7 @@ git commit -m "Initial Terraform configuration for DaVinci environment"
 ### Common Issues
 
 **Import failures:**
-- Verify your terraform provider worker application has the correct DaVinci Admin R role
+- Verify your terraform provider worker application has the correct DaVinci Admin Role
 - Check that resource IDs in the imports file are correct
 - Ensure your Terraform version is 1.5 or higher
 

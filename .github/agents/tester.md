@@ -2,8 +2,8 @@
 name: Tester
 description: "Test generation and execution agent. Creates unit tests and integration tests. Enforces TDD by writing failing tests before implementation. Validates test coverage and identifies missing test cases."
 user-invokable: false
-model: ["Claude Sonnet 4.5 (Preview)", "Claude Haiku 4.5"]
-tools: ['read', 'search', 'edit', 'terminal']
+model: ["Claude Sonnet 4.6", "Claude Haiku 4.5"]
+tools: ['read', 'search', 'edit']
 ---
 
 # Tester Agent — Ping CLI Terraform Exporter
