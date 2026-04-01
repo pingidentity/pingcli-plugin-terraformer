@@ -774,6 +774,67 @@ func TestGenerator_GenerateTFVarsTemplate_WithValues(t *testing.T) {
 	}
 }
 
+// TestGenerator_GenerateTFVars_EscapesHCLTemplateSequences verifies that
+// string values containing "${" or "%{" are escaped to "$${" / "%%{" so
+// Terraform does not interpret them as interpolation / directives.
+func TestGenerator_GenerateTFVars_EscapesHCLTemplateSequences(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := ModuleConfig{
+		OutputDir:     tmpDir,
+		ModuleDirName: "davinci-module",
+		IncludeValues: true,
+		EnvironmentID: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+	}
+	generator := NewGenerator(config)
+
+	// JavaScript code snippet that contains JS template literal "${...}" patterns.
+	jsCode := "const linkparsed = `[${parsed.stringA},${parsed.stringB}]`"
+
+	structure := &ModuleStructure{
+		Config: config,
+		Variables: []Variable{
+			{
+				Name:         "davinci_connection_Code_0020_Snippet_code",
+				Type:         "string",
+				Description:  "code property for Code Snippet connector",
+				Default:      jsCode,
+				ResourceType: "pingone_davinci_connector_instance",
+				ResourceName: "Code_0020_Snippet",
+			},
+			{
+				Name:         "davinci_connection_test_directive",
+				Type:         "string",
+				Description:  "value with HCL directive syntax",
+				Default:      "before %{if true}yes%{endif} after",
+				ResourceType: "pingone_davinci_connector_instance",
+				ResourceName: "test",
+			},
+		},
+	}
+
+	err := generator.generateTFVarsFile(structure)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "ping-export-terraform.auto.tfvars"))
+	require.NoError(t, err)
+	contentStr := string(content)
+
+	// "${" must be escaped to "$${" so Terraform treats it as literal text.
+	assert.Contains(t, contentStr, `$${parsed.stringA}`)
+	assert.Contains(t, contentStr, `$${parsed.stringB}`)
+
+	// "%{" must be escaped to "%%{" so Terraform treats it as literal text.
+	assert.Contains(t, contentStr, `%%{if true}`)
+	assert.Contains(t, contentStr, `%%{endif}`)
+
+	// Ensure no unescaped "${" remains (other than the escaped form "$${").
+	// Remove all escaped sequences then check for bare "${".
+	stripped := strings.ReplaceAll(contentStr, "$${", "")
+	// The environment_id line uses %q which doesn't produce "${", so no issues.
+	assert.NotContains(t, stripped, "${parsed.")
+}
+
 // TestGenerator_DefaultModuleName tests that the default module name "ping-export" is used in module.tf
 func TestGenerator_DefaultModuleName(t *testing.T) {
 	tmpDir := t.TempDir()

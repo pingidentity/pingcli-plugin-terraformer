@@ -1,0 +1,11 @@
+```release-note:bug
+Fixed `nil_value: keep_empty` not applying to nested attributes inside objects, lists, and sets. Attributes with this setting now correctly emit `""` at any nesting depth.
+```
+
+```release-note:bug
+Fixed HCL template sequences (`${` and `%{`) in string values not being escaped in generated `.tfvars` files, which caused Terraform interpolation/directive errors.
+```
+
+```release-note:internal
+Unified attribute processing into a single `processOneAttribute` method, eliminating duplicated logic between `ProcessResource` and `extractNestedAttributes`. Custom transforms, variable extraction, and `nil_value` handling now work consistently at all nesting levels.
+```

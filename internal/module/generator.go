@@ -276,7 +276,11 @@ func (g *Generator) formatDefaultValue(value interface{}, varType string) string
 
 	switch v := value.(type) {
 	case string:
-		return fmt.Sprintf("%q", v)
+		// Escape HCL template sequences so that literal "${" and "%{"
+		// are not interpreted as interpolation/directives in .tfvars.
+		escaped := strings.ReplaceAll(v, "${", "$${")
+		escaped = strings.ReplaceAll(escaped, "%{", "%%{")
+		return fmt.Sprintf("%q", escaped)
 	case bool:
 		if varType == "string" {
 			// Variable declared as string — quote the bool.
@@ -322,10 +326,14 @@ func (g *Generator) formatDefaultValue(value interface{}, varType string) string
 		}
 		// Complex values are always quoted as JSON strings so they
 		// match the variable's declared type (typically "string").
-		return fmt.Sprintf("%q", string(b))
+		escaped := strings.ReplaceAll(string(b), "${", "$${") 
+		escaped = strings.ReplaceAll(escaped, "%{", "%%{")
+		return fmt.Sprintf("%q", escaped)
 	default:
 		// Fall back to quoted string representation for unknown types.
-		return fmt.Sprintf("%q", fmt.Sprintf("%v", v))
+		escaped := strings.ReplaceAll(fmt.Sprintf("%v", v), "${", "$${") 
+		escaped = strings.ReplaceAll(escaped, "%{", "%%{")
+		return fmt.Sprintf("%q", escaped)
 	}
 }
 
