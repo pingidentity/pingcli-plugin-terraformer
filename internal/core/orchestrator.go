@@ -275,6 +275,12 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	var fallbackVars []FallbackVariable
 	if !opts.SkipDependencies {
 		fallbackVars = o.resolveReferences(results, depGraph, opts.EnvironmentID, excludedIDs)
+
+		// Resolve runtime depends_on entries (custom handler __depends_on)
+		// to Terraform labels via the dependency graph.
+		for _, erd := range results {
+			resolveDependsOnResources(erd.Resources, depGraph)
+		}
 	} else {
 		// Even in skip-dependencies mode, inject the raw environment ID for
 		// attributes that reference pingone_environment but have no extracted
@@ -1083,6 +1089,24 @@ func (o *ExportOrchestrator) scanEdgesFromAttrs(
 						o.scanEdgesFromAttrs(entryMap, attrDef.NestedAttributes, fromType, fromID, g)
 					}
 				}
+			}
+		}
+	}
+}
+
+// resolveDependsOnResources resolves RuntimeDependsOn entries on each resource
+// by looking up the ResourceID in the dependency graph to populate the Label field.
+// Entries whose ID is not in the graph retain an empty Label; formatters skip those.
+func resolveDependsOnResources(resources []*ResourceData, g *graph.DependencyGraph) {
+	if g == nil {
+		return
+	}
+	for _, rd := range resources {
+		for i := range rd.DependsOnResources {
+			dep := &rd.DependsOnResources[i]
+			label, err := g.GetReferenceName(dep.ResourceType, dep.ResourceID)
+			if err == nil {
+				dep.Label = label
 			}
 		}
 	}

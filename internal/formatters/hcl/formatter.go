@@ -128,9 +128,43 @@ func (f *Formatter) Format(data *core.ResourceData, def *schema.ResourceDefiniti
 		writeScalarValue(body, tName, val)
 	}
 
+	// Render depends_on meta-argument if runtime dependencies exist.
+	if resolved := resolvedDependsOn(data.DependsOnResources); len(resolved) > 0 {
+		body.AppendNewline()
+		// Build the traversal list: [resource_type.label, ...]
+		var tokens hclwrite.Tokens
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte("depends_on")})
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenEqual, Bytes: []byte(" = ")})
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")})
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
+		for _, dep := range resolved {
+			ref := dep.ResourceType + "." + dep.Label
+			tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte("    " + ref)})
+			tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenComma, Bytes: []byte(",")})
+			tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
+		}
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("  ]")})
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
+		body.AppendUnstructuredTokens(tokens)
+	}
+
 	rawBytes := file.Bytes()
 	formatted := hclwrite.Format(rawBytes)
 	return string(formatted), nil
+}
+
+// resolvedDependsOn filters RuntimeDependsOn entries to those with non-empty labels.
+func resolvedDependsOn(deps []core.RuntimeDependsOn) []core.RuntimeDependsOn {
+	if len(deps) == 0 {
+		return nil
+	}
+	var out []core.RuntimeDependsOn
+	for _, d := range deps {
+		if d.Label != "" {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // FormatImportBlock generates a Terraform 1.5+ import block for a resource.

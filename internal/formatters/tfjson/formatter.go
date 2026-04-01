@@ -271,7 +271,30 @@ func buildAttributes(data *core.ResourceData, def *schema.ResourceDefinition, op
 		attrs[tName] = renderScalar(val)
 	}
 
+	// Add depends_on array if runtime dependencies have resolved labels.
+	if deps := resolvedDependsOn(data.DependsOnResources); len(deps) > 0 {
+		var arr []interface{}
+		for _, d := range deps {
+			arr = append(arr, d.ResourceType+"."+d.Label)
+		}
+		attrs["depends_on"] = arr
+	}
+
 	return attrs
+}
+
+// resolvedDependsOn filters RuntimeDependsOn entries to those with non-empty labels.
+func resolvedDependsOn(deps []core.RuntimeDependsOn) []core.RuntimeDependsOn {
+	if len(deps) == 0 {
+		return nil
+	}
+	var out []core.RuntimeDependsOn
+	for _, d := range deps {
+		if d.Label != "" {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // renderNestedObject recursively builds a JSON-compatible map from nested attributes.

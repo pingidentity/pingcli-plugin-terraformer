@@ -717,6 +717,77 @@ func TestFormatter_Format_NestedResolvedReference(t *testing.T) {
 
 // ── Regression tests: variable-eligible attributes rendering ────
 
+// ── depends_on rendering tests ─────────────────────────────────
+
+// TestFormatter_Format_DependsOnRendered verifies that when DependsOnResources
+// is non-empty with resolved labels, the HCL output contains a depends_on block.
+func TestFormatter_Format_DependsOnRendered(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := minimalVariableDef()
+	data := resourceData()
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-1", Label: "pingcli__my_var"},
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-2", Label: "pingcli__other_var"},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	assert.Contains(t, output, "depends_on")
+	assert.Contains(t, output, "pingone_davinci_variable.pingcli__my_var")
+	assert.Contains(t, output, "pingone_davinci_variable.pingcli__other_var")
+}
+
+// TestFormatter_Format_DependsOnEmpty_NotRendered verifies that no depends_on
+// block is produced when DependsOnResources is nil.
+func TestFormatter_Format_DependsOnEmpty_NotRendered(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := minimalVariableDef()
+	data := resourceData()
+	data.DependsOnResources = nil
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	assert.NotContains(t, output, "depends_on")
+}
+
+// TestFormatter_Format_DependsOnUnresolvedLabelsSkipped verifies that entries
+// with an empty Label are skipped, while resolved entries still appear.
+func TestFormatter_Format_DependsOnUnresolvedLabelsSkipped(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := minimalVariableDef()
+	data := resourceData()
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-1", Label: "pingcli__my_var"},
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-unresolved", Label: ""},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	assert.Contains(t, output, "depends_on")
+	assert.Contains(t, output, "pingone_davinci_variable.pingcli__my_var")
+	// Unresolved entry (empty label) must be absent.
+	assert.NotContains(t, output, "var-unresolved")
+}
+
+// TestFormatter_Format_DependsOnAllUnresolved_NotRendered verifies that the
+// depends_on block is omitted entirely when all entries have empty labels.
+func TestFormatter_Format_DependsOnAllUnresolved_NotRendered(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := minimalVariableDef()
+	data := resourceData()
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-1", Label: ""},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	assert.NotContains(t, output, "depends_on")
+}
+
 // Regression test: variable-eligible attributes must render as var.X references
 func TestFormatter_Format_ScalarVariableEligibleAttribute(t *testing.T) {
 	f := hclformatter.NewFormatter()

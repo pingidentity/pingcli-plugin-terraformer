@@ -16,3 +16,7 @@ Unified attribute processing into a single `processOneAttribute` method, elimina
 
 ```release-note:enhancement
 `resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes.
+```
+
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Added `depends_on` block generation referencing `pingone_davinci_variable` resources used by the flow. Variable dependencies are discovered at runtime via the flow versions API and rendered as Terraform `depends_on` meta-arguments in both HCL and TF JSON output formats.

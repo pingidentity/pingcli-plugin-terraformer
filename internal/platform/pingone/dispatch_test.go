@@ -39,8 +39,12 @@ func TestIsSupportedFalse(t *testing.T) {
 
 func TestRegisteredHandlerNames(t *testing.T) {
 	names := RegisteredHandlerNames()
-	// No custom handlers are currently registered (flow stubs removed).
-	assert.Empty(t, names)
+	expected := []string{
+		"handleFlowVariableDependencies",
+	}
+	for _, name := range expected {
+		assert.Contains(t, names, name, "missing handler: %s", name)
+	}
 }
 
 func TestRegisteredTransformNames(t *testing.T) {
@@ -62,8 +66,8 @@ func TestRegisterCustomHandlersLoadsAll(t *testing.T) {
 	reg := core.NewCustomHandlerRegistry()
 	RegisterCustomHandlers(reg)
 
-	// No custom handlers registered.
-	assert.False(t, reg.HasHandler("generateFlowHCL"), "flow handler should be removed")
+	// handleFlowVariableDependencies should be registered as a handler.
+	assert.True(t, reg.HasHandler("handleFlowVariableDependencies"))
 
 	// Only connector properties transform remains.
 	assert.True(t, reg.HasTransform("handleConnectorProperties"))

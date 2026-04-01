@@ -128,6 +128,21 @@ type TransformResultWithVariables struct {
 	Variables []ExtractedVariable
 }
 
+// RuntimeDependsOn represents a runtime-discovered dependency that should be
+// rendered as a Terraform depends_on meta-argument. Custom handlers populate
+// these entries; the orchestrator resolves ResourceID to a Label via the graph.
+type RuntimeDependsOn struct {
+	// ResourceType is the Terraform resource type (e.g. "pingone_davinci_variable").
+	ResourceType string
+
+	// ResourceID is the raw UUID of the dependency.
+	ResourceID string
+
+	// Label is the resolved Terraform label (e.g. "pingcli__my_var").
+	// Populated by the orchestrator during resolveDependsOnResources.
+	Label string
+}
+
 // ResourceData represents the intermediate representation of a resource
 type ResourceData struct {
 	ResourceType string
@@ -141,6 +156,11 @@ type ResourceData struct {
 	Attributes         map[string]interface{}
 	Dependencies       []Dependency
 	ExtractedVariables []ExtractedVariable
+
+	// DependsOnResources holds runtime-discovered dependencies that render as
+	// a Terraform depends_on meta-argument. Populated by custom handlers via
+	// the "__depends_on" sentinel key.
+	DependsOnResources []RuntimeDependsOn
 }
 
 // Dependency represents a resource dependency
@@ -269,6 +289,13 @@ func (p *Processor) runCustomHandlers(def *schema.ResourceDefinition, apiData in
 			return fmt.Errorf("custom handler %q: %w", name, err)
 		}
 		for k, v := range extra {
+			// Intercept the __depends_on sentinel key.
+			if k == "__depends_on" {
+				if deps, ok := v.([]RuntimeDependsOn); ok {
+					result.DependsOnResources = append(result.DependsOnResources, deps...)
+				}
+				continue
+			}
 			result.Attributes[k] = v
 		}
 	}

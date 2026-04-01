@@ -706,6 +706,9 @@ conditional_defaults:
     when_all:
       - attribute_empty: log_level
 
+custom_handlers:
+  transformer: handleFlowVariableDependencies
+
 dependencies:
   depends_on:
     - resource_type: pingone_environment
