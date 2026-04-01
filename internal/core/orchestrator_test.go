@@ -34,6 +34,8 @@ func (m *mockAPIClient) GetResource(_ context.Context, _ string, _ string, _ str
 
 func (m *mockAPIClient) Platform() string { return m.platform }
 
+func (m *mockAPIClient) Warnings() []string { return nil }
+
 // --- helpers ---
 
 // simpleStruct is used as mock API data.

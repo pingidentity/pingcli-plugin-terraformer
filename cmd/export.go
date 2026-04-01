@@ -303,6 +303,11 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 		return fmt.Errorf("orchestrator export failed: %w", err)
 	}
 
+	// Log any warnings collected by the API client during export.
+	for _, w := range apiClient.Warnings() {
+		_ = logger.Warn(w, nil)
+	}
+
 	// Handle --list-resources mode: print resource addresses and exit
 	if listResources {
 		for _, erd := range result.ResourcesByType {

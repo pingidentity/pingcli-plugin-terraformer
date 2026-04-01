@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"reflect"
 	"sync"
 
@@ -65,9 +64,9 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 		// Fetch version details for variable dependencies.
 		if err := fetchFlowVariableDeps(ctx, c, flow.GetId(), fmt.Sprintf("%g", flow.GetCurrentVersion())); err != nil {
 			if errors.Is(err, errAccessDenied) {
-				fmt.Fprintf(os.Stderr, "Warning: unable to fetch flow variable dependencies for flow %s: %v. "+
+				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
 					"The flow versions endpoint requires a role with higher privileges than Read Only. "+
-					"Flow will be exported without depends_on references to DaVinci variables.\n", flow.GetId(), err)
+					"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
 			} else {
 				return nil, fmt.Errorf("fetch flow variable deps for %s: %w", flow.GetId(), err)
 			}
@@ -88,9 +87,9 @@ func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (inter
 	if cv, ok := detail.GetCurrentVersionOk(); ok && cv != nil {
 		if err := fetchFlowVariableDeps(ctx, c, detail.GetId(), fmt.Sprintf("%g", *cv)); err != nil {
 			if errors.Is(err, errAccessDenied) {
-				fmt.Fprintf(os.Stderr, "Warning: unable to fetch flow variable dependencies for flow %s: %v. "+
+				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
 					"The flow versions endpoint requires a role with higher privileges than Read Only. "+
-					"Flow will be exported without depends_on references to DaVinci variables.\n", detail.GetId(), err)
+					"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
 			} else {
 				return nil, fmt.Errorf("fetch flow variable deps for %s: %w", detail.GetId(), err)
 			}
