@@ -9,3 +9,10 @@ Fixed HCL template sequences (`${` and `%{`) in string values not being escaped 
 ```release-note:internal
 Unified attribute processing into a single `processOneAttribute` method, eliminating duplicated logic between `ProcessResource` and `extractNestedAttributes`. Custom transforms, variable extraction, and `nil_value` handling now work consistently at all nesting levels.
 ```
+
+```release-note:enhancement
+`resource/pingone_davinci_flow_deploy`: Added support for import block generation.
+```
+
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes.
