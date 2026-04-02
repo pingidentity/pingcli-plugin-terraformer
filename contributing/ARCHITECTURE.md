@@ -19,10 +19,11 @@ This project is a **schema-driven, multi-format Terraform configuration export e
 │                                                                     │
 │  definitions/                                                       │
 │  └── pingone/                                                       │
+│      ├── base/                                                      │
+│      │   └── environment.yaml                                       │
 │      └── davinci/                                                   │
 │          ├── application.yaml                                       │
 │          ├── connector_instance.yaml                                │
-│          ├── environment.yaml                                       │
 │          ├── flow.yaml                                              │
 │          ├── flow_deploy.yaml                                       │
 │          ├── flow_enable.yaml                                       │
@@ -111,7 +112,9 @@ cmd/
 
 definitions/
     embed.go               # go:embed for YAML definitions
-    pingone/davinci/       # YAML resource definitions
+    pingone/
+        base/              # PingOne base resource definitions
+        davinci/           # DaVinci resource definitions
 
 internal/
     api/                   # Legacy API client (being replaced)
@@ -131,6 +134,8 @@ internal/
         formatter.go       # OutputFormatter interface + factory
         hcl/               # HCL formatter (hclwrite-based)
         tfjson/            # Terraform JSON formatter
+    filter/
+        filter.go          # Resource filtering (glob and regex patterns)
     graph/
         graph.go           # DependencyGraph (cycle detection, topo sort)
     imports/
@@ -139,7 +144,7 @@ internal/
         generator.go       # Module structure generation
         types.go           # Module types (Variable, Output, etc.)
     platform/
-        pingone/davinci/   # DaVinci API client + resource handlers
+        pingone/           # PingOne API client + resource handlers (all services)
     schema/
         keys.go            # CanonicalAttributeKey
         loader.go          # YAML file loading
@@ -425,6 +430,133 @@ type ExportResult struct {
 
 The caller (cmd/export.go) is responsible for formatting, variable extraction, import block generation, and module assembly using the returned `ExportResult`.
 
+### Embedded Reference Resolution
+
+The existing schema-driven reference system (via `references_type` on `AttributeDefinition`) resolves UUID strings in typed, structured attributes. However, some resources store UUID references **inside opaque `RawHCLValue` blobs** produced by `jsonencode_raw` transforms. These embedded UUIDs cannot be discovered by the standard reference resolution pass because they are buried inside JSON-encoded strings.
+
+**The Problem**: DaVinci flow nodes contain a `properties` JSON field. Within that JSON, flows can reference other flows via `subFlowId.value.value` — but this UUID is embedded inside the `jsonencode(...)` expression added by the `jsonencode_raw` transform. The standard reference resolver sees only strings and cannot walk into JSON blobs.
+
+**The Solution**: The embedded reference resolution system uses declarative `EmbeddedReferenceRule` entries to specify exactly where UUIDs are located within JSON structures. Post-processing walks these rules, extracts UUIDs from JSON blobs, and replaces them with Terraform interpolation expressions.
+
+#### How It Works
+
+**Types** (in `internal/core/embedded_references.go`):
+
+```go
+type EmbeddedReferenceRule struct {
+    ResourceType       string  // owning resource type (e.g., "pingone_davinci_flow")
+    AttributePath      string  // dot-path with * wildcard (e.g., "graph_data.elements.nodes.*.data.properties")
+    TargetResourceType string  // what the UUID references (e.g., "pingone_davinci_flow")
+    JSONKeyPath        string  // path inside JSON blob (e.g., "subFlowId.value.value")
+    ReferenceField     string  // TF attribute to reference (e.g., "id")
+}
+
+type EmbeddedReferenceRegistry struct { ... }
+```
+
+**Pipeline Placement** (in orchestrator `Export()`):
+
+```
+1. Processing loop → all resources fetched, processed, labels assigned, added to dependency graph
+2. ★ ResolveEmbeddedReferences() → scans RawHCLValue blobs, replaces UUIDs with ${...} expressions, adds graph edges
+3. applyUpstreamExpansion() → uses graph (now with embedded edges) for --include-upstream
+4. resolveReferences() → standard schema-driven reference resolution
+5. Validate graph → detect cycles, etc.
+```
+
+**Processing Steps for Each Rule**:
+
+1. **Walk attribute path**: Navigate `ResourceData.Attributes` following dot-notation path segments. `*` matches all map keys at that level.
+2. **Extract JSON**: For each `RawHCLValue`, parse the `jsonencode(...)` expression to extract the JSON object inside.
+3. **Walk JSON**: Navigate the JSON structure following `JSONKeyPath` (dot-notation) to locate the UUID string.
+4. **Lookup**: Query the dependency graph for a resource matching `TargetResourceType` with the extracted UUID.
+5. **Replace**: Update the JSON blob, replacing the UUID with `${resource_type.label.reference_field}` (Terraform interpolation syntax with single `$`).
+6. **Serialize**: Re-marshal the JSON and update the `RawHCLValue` in the attributes map.
+7. **Add Graph Edge**: Record the dependency in the graph so `--include-upstream` and cycle detection work correctly.
+
+#### Example: DaVinci Flow `subFlowId` Rule
+
+```go
+// In internal/platform/pingone/resource_flow.go init()
+registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+    ResourceType:       "pingone_davinci_flow",
+    AttributePath:      "graph_data.elements.nodes.*.data.properties",
+    TargetResourceType: "pingone_davinci_flow",
+    JSONKeyPath:        "subFlowId.value.value",
+    ReferenceField:     "id",
+})
+```
+
+A flow with a nested subflow will have its properties JSON transformed from:
+
+```javascript
+{"subFlowId": {"value": {"value": "abc-123-uuid"}}}
+```
+
+to:
+
+```javascript
+{"subFlowId": {"value": {"value": "${pingone_davinci_flow.nested_flow.id}"}}}
+```
+
+Then the HCL output becomes:
+
+```hcl
+resource "pingone_davinci_flow" "my_parent_flow" {
+  environment_id = var.pingone_environment_id
+
+  graph_data = jsonencode({
+    elements = {
+      nodes = [
+        {
+          data = {
+            properties = {
+              subFlowId = {
+                value = {
+                  value = "${pingone_davinci_flow.nested_flow.id}"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  })
+
+  depends_on = [pingone_davinci_flow.nested_flow]
+}
+```
+
+#### Registration
+
+Rules are registered during `init()` in resource handler files, similar to custom transforms:
+
+```go
+// internal/platform/pingone/resource_flow.go
+
+func init() {
+    registerResource("pingone_davinci_flow", resourceHandler{ ... })
+    
+    registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+        ResourceType:       "pingone_davinci_flow",
+        AttributePath:      "graph_data.elements.nodes.*.data.properties",
+        TargetResourceType: "pingone_davinci_flow",
+        JSONKeyPath:        "subFlowId.value.value",
+        ReferenceField:     "id",
+    })
+}
+```
+
+The queue mechanism (similar to custom transforms) collects rules at startup. Wiring occurs in `cmd/export.go`:
+
+```go
+embeddedRefs := pingoneplatform.NewEmbeddedReferenceRegistry()
+orch := core.NewExportOrchestrator(
+    registry, proc, apiClient,
+    core.WithEmbeddedReferences(embeddedRefs),
+)
+```
+
 ### Transforms
 
 Standard transforms are registered in `internal/core/transforms.go`:
@@ -538,12 +670,13 @@ The orchestrator calls **only** `ListResources`. It never calls `GetResource` di
 
 ### Platform Package Structure
 
-Each service package follows a unified pattern under `internal/platform/{platform}/{service}/`:
+All PingOne resource handlers live in a single flat package at `internal/platform/pingone/`. There are no sub-packages per service — base and DaVinci resources share one package:
 
 ```
-internal/platform/pingone/davinci/
+internal/platform/pingone/
 ├── client.go              # Client struct, dispatches through handler table
 ├── dispatch.go            # Handler dispatch table + custom handler queuing
+├── resource_environment.go
 ├── resource_application.go
 ├── resource_connection.go
 ├── resource_flow.go
@@ -569,17 +702,18 @@ func init() {
 
 ### Adding a New Resource
 
-1. Create `resource_{short_name}.go` in the service package
+1. Create `resource_{short_name}.go` in `internal/platform/pingone/`
 2. Implement `list` and `get` functions
 3. Register via `init()` calling `registerResource()`
 4. Optionally register custom handlers/transforms
-5. Create the YAML definition in `definitions/{platform}/{service}/`
+5. Create the YAML definition in `definitions/pingone/{category}/` (e.g., `base/` or `davinci/`)
 6. No edits to `client.go` or `dispatch.go` required
 
 ### Currently Supported Resources
 
 | Resource Type | Custom Handler |
 |--------------|----------------|
+| `pingone_environment` | None (projection struct) |
 | `pingone_davinci_variable` | None (fully declarative) |
 | `pingone_davinci_flow` | None (fully declarative) |
 | `pingone_davinci_flow_deploy` | None (projection struct) |

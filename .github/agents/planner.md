@@ -2,7 +2,7 @@
 name: Planner
 description: "Task decomposition agent. Breaks feature requests, bug fixes, and multi-step work into ordered implementation tasks with clear deliverables. Read-only — does not write code."
 user-invokable: false
-model: ["Claude Sonnet 4.5 (Preview)"]
+model: ["Claude Sonnet 4.6"]
 tools: ['read', 'search']
 ---
 

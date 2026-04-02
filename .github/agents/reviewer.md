@@ -2,7 +2,7 @@
 name: Reviewer
 description: "Code review agent. Checks implementation quality against project conventions, architecture constraints, and test coverage. Read-only — does not modify code."
 user-invokable: false
-model: ["Claude Sonnet 4.5 (Preview)"]
+model: ["Claude Sonnet 4.6"]
 tools: ['read', 'search']
 ---
 

@@ -145,6 +145,10 @@ pingcli-terraformer export --out ./output
 | `--include-imports` | `false` | Generate import blocks in root module |
 | `--skip-imports` | `false` | Skip generating import blocks |
 | `--skip-dependencies` | `false` | Use hardcoded UUIDs instead of references |
+| `--include-resources` | - | Include resources matching glob/regex pattern (repeatable) |
+| `--exclude-resources` | - | Exclude resources matching glob/regex pattern (repeatable) |
+| `--include-upstream` | `false` | Include upstream dependencies of filtered resources |
+| `--list-resources` | `false` | List resource addresses and exit |
 
 ### Output Formats
 
@@ -157,12 +161,112 @@ pingcli-terraformer export --out ./output
 
 | Resource | Terraform Type |
 |----------|---------------|
-| PingOne Environment | `pingone_environment` |
 | DaVinci Flow | `pingone_davinci_flow` |
 | DaVinci Variable | `pingone_davinci_variable` |
 | DaVinci Connector Instance | `pingone_davinci_connector_instance` |
 | DaVinci Application | `pingone_davinci_application` |
 | DaVinci Flow Policy | `pingone_davinci_application_flow_policy` |
+
+## Resource Filtering
+
+Export only specific resources using glob or regex patterns:
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--include-resources <pattern>` | Include resources matching pattern(s). Repeatable. Patterns match `resource_type.terraform_label` (case-insensitive). Use `regex:` prefix for regex. |
+| `--exclude-resources <pattern>` | Exclude resources matching pattern(s). Repeatable. Same matching rules as include. |
+| `--include-upstream` | Automatically include upstream dependencies of matched resources. Transitive — dependencies of dependencies are also included. |
+| `--list-resources` | List available resource addresses (`resource_type.terraform_label`) and exit. Useful for discovering exact addresses to filter. |
+
+### Pattern Syntax
+
+- **Glob** (default): `*` matches any characters, `?` matches single character
+  - `pingone_davinci_flow.*` — all flows
+  - `pingone_davinci_variable.dev*` — variables starting with "dev"
+  
+- **Regex**: Prefix pattern with `regex:`, uses Go regexp syntax
+  - `regex:pingone_davinci_(flow|variable)\..*` — flows or variables
+  - `regex:^pingone_davinci_flow\.(login|logout)` — specific flow names
+
+- Multiple patterns combine via OR (union)
+- No filters = export all resources (backwards compatible)
+
+### Upstream Dependencies
+
+Use `--include-upstream` with `--include-resources` to automatically pull in resources that matched resources depend on. This follows the dependency graph transitively:
+
+- A **flow** depends on its **connector instances**
+- A **flow_deploy** depends on its **flow**
+- A **flow_policy** depends on its **application** and **flow**
+- A **variable** depends on its referenced **flow**
+
+For example, exporting a single flow with `--include-upstream` also exports all connector instances used by that flow. Exporting a flow_deploy with `--include-upstream` exports the deploy, its flow, and all connector instances used by the flow.
+
+Explicit `--exclude-resources` patterns always take priority over upstream expansion. If an upstream dependency is explicitly excluded, it will not be included and a Terraform variable will be generated as a placeholder.
+
+### Examples
+
+List all available resource addresses:
+```bash
+pingcli-terraformer export --list-resources
+```
+
+Export only DaVinci flows and variables:
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci_flow.*" \
+  --include-resources "pingone_davinci_variable.*" \
+  --out ./output
+```
+
+Export everything except flow policies:
+```bash
+pingcli-terraformer export \
+  --exclude-resources "pingone_davinci_application_flow_policy.*" \
+  --out ./output
+```
+
+Export flows with specific name patterns using regex:
+```bash
+pingcli-terraformer export \
+  --include-resources "regex:pingone_davinci_flow\.(login|mfa|consent)" \
+  --out ./output
+```
+
+Combine include and exclude (exclude takes precedence for overlaps):
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci*" \
+  --exclude-resources "pingone_davinci_application_flow_policy.*" \
+  --out ./output
+```
+
+Export a specific flow and all its upstream dependencies:
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci_flow.pingcli__My-0020-Flow" \
+  --include-upstream \
+  --out ./output
+```
+
+Export flow policies with full dependency chain (policies → apps → flows → connectors):
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci_application_flow_policy.*" \
+  --include-upstream \
+  --out ./output
+```
+
+Export a flow with upstream, but exclude specific connectors:
+```bash
+pingcli-terraformer export \
+  --include-resources "pingone_davinci_flow.*" \
+  --include-upstream \
+  --exclude-resources "pingone_davinci_connector_instance.pingcli__Http" \
+  --out ./output
+```
 
 ## Contributing
 

@@ -151,6 +151,64 @@ func (g *DependencyGraph) GetDependents(resourceType, id string) []Edge {
 	return result
 }
 
+// WalkDependencies performs a BFS from the given seed nodes, following outgoing
+// edges (dependencies), and returns all transitively reachable nodes including
+// the seeds themselves. Seeds not present in the graph are silently skipped.
+// The result is deterministic (sorted by composite key).
+func (g *DependencyGraph) WalkDependencies(seeds []ResourceNode) []ResourceNode {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	if len(seeds) == 0 {
+		return []ResourceNode{}
+	}
+
+	visited := make(map[string]bool)
+	var queue []string // composite keys for BFS queue
+	var result []ResourceNode
+
+	// Add seeds to queue, but only if they exist in the graph.
+	// Silently skip seeds not in the graph.
+	for _, seed := range seeds {
+		key := makeKey(seed.ResourceType, seed.ID)
+		if _, ok := g.nodes[key]; ok {
+			if !visited[key] {
+				visited[key] = true
+				queue = append(queue, key)
+				result = append(result, g.nodes[key])
+			}
+		}
+	}
+
+	// BFS traversal following outgoing edges.
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		// Find all outgoing edges from current node.
+		for _, edge := range g.edges {
+			fromKey := makeKey(edge.From.ResourceType, edge.From.ID)
+			if fromKey == current {
+				toKey := makeKey(edge.To.ResourceType, edge.To.ID)
+				if !visited[toKey] {
+					visited[toKey] = true
+					queue = append(queue, toKey)
+					result = append(result, g.nodes[toKey])
+				}
+			}
+		}
+	}
+
+	// Sort by composite key for determinism.
+	sort.Slice(result, func(i, j int) bool {
+		keyI := makeKey(result[i].ResourceType, result[i].ID)
+		keyJ := makeKey(result[j].ResourceType, result[j].ID)
+		return keyI < keyJ
+	})
+
+	return result
+}
+
 // AllNodes returns all nodes in the graph.
 func (g *DependencyGraph) AllNodes() []ResourceNode {
 	g.mu.RLock()

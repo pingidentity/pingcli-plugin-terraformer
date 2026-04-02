@@ -3,6 +3,8 @@ package pingone
 import (
 	"context"
 	"fmt"
+
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 )
 
 func init() {
@@ -10,6 +12,15 @@ func init() {
 	registerResource("pingone_davinci_flow", resourceHandler{
 		list: listFlows,
 		get:  getFlow,
+	})
+
+	// Embedded reference: subFlowId inside node properties references another flow.
+	registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_flow",
+		JSONKeyPath:        "subFlowId.value.value",
+		ReferenceField:     "id",
 	})
 }
 

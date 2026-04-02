@@ -20,6 +20,8 @@ type ResourceMetadata struct {
 	Name         string `yaml:"name"`
 	ShortName    string `yaml:"short_name"`
 	Version      string `yaml:"version"`
+	// Enabled is a tri-state flag: nil = enabled by default, false = disabled, true = explicitly enabled.
+	Enabled *bool `yaml:"enabled,omitempty"`
 }
 
 // APIDefinition defines API interaction configuration
@@ -87,6 +89,11 @@ type AttributeDefinition struct {
 	// other processing. Useful when the Terraform provider expects a fixed
 	// sentinel (e.g. version = -1) that differs from what the API returns.
 	OverrideValue interface{} `yaml:"override_value,omitempty"`
+
+	// NilValue controls how the processor handles nil values for this attribute.
+	// Options: "keep_empty" (emit empty string for nil) or "omit" (skip, current behavior).
+	// When not specified, defaults to "omit" for backward compatibility.
+	NilValue string `yaml:"nil_value,omitempty"`
 }
 
 // DependencyDefinition defines resource relationship configuration

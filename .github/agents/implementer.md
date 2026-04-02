@@ -2,7 +2,7 @@
 name: Implementer
 description: "Code writing agent. Implements production code, YAML definitions, custom handlers, and configuration files. Follows TDD — writes code to pass existing failing tests."
 user-invokable: false
-model: ["Claude Sonnet 4.5 (Preview)", "Claude Haiku 4.5"]
+model: ["Claude Sonnet 4.6", "Claude Haiku 4.5"]
 ---
 
 # Implementer Agent — Ping CLI Terraform Exporter

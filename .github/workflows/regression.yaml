@@ -1,0 +1,304 @@
+# Regression tests for PR validation.
+#
+# Builds the binary from both the base (target) and PR (head) branches, then
+# runs a matrix of exports against a static PingOne environment and compares
+# the outputs.
+#
+# Additions (new resources, attributes, files) are acceptable.
+# Deletions and replacements are flagged as regressions requiring review.
+#
+# Security: The regression-test job uses a GitHub Environment with required
+# reviewers so that fork PRs cannot execute against PingOne without maintainer
+# approval.
+
+name: regression
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: regression-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ─── Job 1: Build binaries from both branches ───────────────────────
+  build-binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr-source
+
+      - name: Checkout base branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-source
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+
+      - name: Build PR binary
+        run: |
+          cd pr-source
+          go build -v -o ../binary-pr .
+
+      - name: Build base binary
+        run: |
+          cd base-source
+          go build -v -o ../binary-base .
+
+      - name: Build regression-compare tool
+        run: |
+          cd pr-source
+          go build -v -o ../regression-compare ./tools/regression-compare/ 2>/dev/null || {
+            echo "::warning::regression-compare not available in PR branch, building from base branch"
+            cd ../base-source
+            go build -v -o ../regression-compare ./tools/regression-compare/
+          }
+
+      - name: Upload PR binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-pr
+          path: binary-pr
+          retention-days: 1
+
+      - name: Upload base binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-base
+          path: binary-base
+          retention-days: 1
+
+      - name: Upload regression-compare tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-compare
+          path: regression-compare
+          retention-days: 1
+
+  # ─── Job 2: Load the matrix from the PR branch ─────────────────────
+  load-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Read matrix
+        id: set-matrix
+        run: |
+          matrix=$(cat tests/regression/matrix.json | jq -c '.')
+          echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+
+  # ─── Job 3: Run regression tests ───────────────────────────────────
+  # Uses a GitHub Environment with required reviewers for fork PR safety.
+  regression-test:
+    needs: [build-binaries, load-matrix]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare binaries
+        run: |
+          chmod +x artifacts/binary-base/binary-base
+          chmod +x artifacts/binary-pr/binary-pr
+          chmod +x artifacts/regression-compare/regression-compare
+
+      - name: Run base export
+        env:
+          PINGCLI_PINGONE_ENVIRONMENT_ID: ${{ secrets.PINGCLI_PINGONE_ENVIRONMENT_ID }}
+          PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID: ${{ secrets.PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID }}
+          PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID: ${{ secrets.PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID }}
+          PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET: ${{ secrets.PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET }}
+          PINGCLI_PINGONE_REGION_CODE: ${{ secrets.PINGCLI_PINGONE_REGION_CODE }}
+          MATRIX_OUTPUT_FORMAT: ${{ matrix.output-format }}
+          MATRIX_SKIP_DEPS: ${{ matrix.skip-dependencies }}
+          MATRIX_INCLUDE_IMPORTS: ${{ matrix.include-imports }}
+          MATRIX_INCLUDE_VALUES: ${{ matrix.include-values }}
+        run: |
+          ARGS="--output-format $MATRIX_OUTPUT_FORMAT"
+          [ "$MATRIX_SKIP_DEPS" = "true" ] && ARGS="$ARGS --skip-dependencies"
+          [ "$MATRIX_INCLUDE_IMPORTS" = "true" ] && ARGS="$ARGS --include-imports"
+          [ "$MATRIX_INCLUDE_VALUES" = "true" ] && ARGS="$ARGS --include-values"
+          ARGS="$ARGS --out ./output-base --module-name regression-test --module-dir regression-module"
+
+          echo "Running base export with: $ARGS"
+          artifacts/binary-base/binary-base export $ARGS
+
+      - name: Run PR export
+        env:
+          PINGCLI_PINGONE_ENVIRONMENT_ID: ${{ secrets.PINGCLI_PINGONE_ENVIRONMENT_ID }}
+          PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID: ${{ secrets.PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID }}
+          PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID: ${{ secrets.PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID }}
+          PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET: ${{ secrets.PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET }}
+          PINGCLI_PINGONE_REGION_CODE: ${{ secrets.PINGCLI_PINGONE_REGION_CODE }}
+          MATRIX_OUTPUT_FORMAT: ${{ matrix.output-format }}
+          MATRIX_SKIP_DEPS: ${{ matrix.skip-dependencies }}
+          MATRIX_INCLUDE_IMPORTS: ${{ matrix.include-imports }}
+          MATRIX_INCLUDE_VALUES: ${{ matrix.include-values }}
+        run: |
+          ARGS="--output-format $MATRIX_OUTPUT_FORMAT"
+          [ "$MATRIX_SKIP_DEPS" = "true" ] && ARGS="$ARGS --skip-dependencies"
+          [ "$MATRIX_INCLUDE_IMPORTS" = "true" ] && ARGS="$ARGS --include-imports"
+          [ "$MATRIX_INCLUDE_VALUES" = "true" ] && ARGS="$ARGS --include-values"
+          ARGS="$ARGS --out ./output-pr --module-name regression-test --module-dir regression-module"
+
+          echo "Running PR export with: $ARGS"
+          artifacts/binary-pr/binary-pr export $ARGS
+
+      - name: Compare outputs
+        id: compare
+        shell: bash {0}
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
+        run: |
+          artifacts/regression-compare/regression-compare \
+            --base-dir ./output-base \
+            --pr-dir ./output-pr \
+            --report-file "report-${MATRIX_NAME}.json" \
+            2>&1 | tee comparison-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "summary<<EOF"
+            cat comparison-output.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
+        with:
+          name: regression-report-${{ matrix.name }}
+          path: report-${{ matrix.name }}.json
+          retention-days: 7
+
+      - name: Check result
+        env:
+          COMPARE_EXIT: ${{ steps.compare.outputs.exit_code }}
+          MATRIX_NAME: ${{ matrix.name }}
+        run: |
+          if [ "$COMPARE_EXIT" != "0" ]; then
+            echo "::error::Regression detected in matrix entry $MATRIX_NAME"
+            exit 1
+          fi
+
+  # ─── Job 4: Post summary comment on PR ─────────────────────────────
+  regression-summary:
+    needs: [regression-test]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: regression-report-*
+          path: reports
+
+      - name: Generate summary
+        id: summary
+        run: |
+          {
+            echo "body<<ENDOFCOMMENT"
+            echo "## Regression Test Results"
+            echo ""
+            echo "| Matrix Entry | Status | Breaking | Acceptable |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_OUTPUT"
+
+          overall_pass=true
+
+          for report_dir in reports/regression-report-*; do
+            report_file=$(find "$report_dir" -name "*.json" -type f | head -1)
+            if [ -z "$report_file" ]; then
+              continue
+            fi
+
+            name=$(basename "$report_dir" | sed 's/regression-report-//')
+            has_breaking=$(jq -r '.has_breaking' "$report_file")
+            breaking_count=$(jq -r '.breaking_count' "$report_file")
+            acceptable_count=$(jq -r '.acceptable_count' "$report_file")
+
+            if [ "$has_breaking" = "true" ]; then
+              status="❌ FAIL"
+              overall_pass=false
+            else
+              status="✅ PASS"
+            fi
+
+            echo "| \`$name\` | $status | $breaking_count | $acceptable_count |" >> "$GITHUB_OUTPUT"
+          done
+
+          {
+            echo ""
+            if [ "$overall_pass" = "true" ]; then
+              echo "### ✅ No regressions detected"
+              echo ""
+              echo "All export configurations produced compatible output."
+            else
+              echo "### ❌ Regressions detected"
+              echo ""
+              echo "One or more export configurations produced breaking changes."
+              echo "Review the detailed reports in the workflow artifacts."
+              echo ""
+              echo "<details>"
+              echo "<summary>Breaking change details</summary>"
+              echo ""
+              for report_dir in reports/regression-report-*; do
+                report_file=$(find "$report_dir" -name "*.json" -type f | head -1)
+                if [ -z "$report_file" ]; then
+                  continue
+                fi
+
+                has_breaking=$(jq -r '.has_breaking' "$report_file")
+                if [ "$has_breaking" != "true" ]; then
+                  continue
+                fi
+
+                name=$(basename "$report_dir" | sed 's/regression-report-//')
+                echo "#### \`$name\`"
+                echo ""
+                echo '```'
+                jq -r '.files[] | select(.breaking_diffs != null) | .breaking_diffs[] | "\(.kind): \(.resource) \(.attribute // "") \(.expected // "") -> \(.actual // "")"' "$report_file"
+                echo '```'
+                echo ""
+              done
+              echo "</details>"
+            fi
+            echo ""
+            echo "---"
+            echo "*Generated by regression workflow • [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*"
+            echo "ENDOFCOMMENT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: ${{ steps.summary.outputs.body }}

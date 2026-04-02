@@ -195,7 +195,10 @@ func (p *Processor) ProcessResource(resourceType string, apiData interface{}) (*
 
 		value, err := p.extractAttribute(val, attrDef)
 		if err != nil {
-			// Skip attributes that can't be extracted (optional fields)
+			// If nil_value is "keep_empty", emit empty string instead of skipping
+			if attrDef.NilValue == "keep_empty" {
+				result.Attributes[tfName] = ""
+			}
 			continue
 		}
 
@@ -264,6 +267,8 @@ func (p *Processor) ProcessResource(resourceType string, apiData interface{}) (*
 					result.Name = nameStr
 				}
 			}
+		} else if attrDef.NilValue == "keep_empty" {
+			result.Attributes[tfName] = ""
 		}
 	}
 

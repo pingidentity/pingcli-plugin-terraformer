@@ -55,7 +55,9 @@ cmd/
 
 definitions/
     embed.go               # go:embed for YAML definitions
-    pingone/davinci/       # YAML resource definitions (7 files)
+    pingone/
+        base/              # PingOne base resource definitions (1 file)
+        davinci/           # DaVinci resource definitions (7 files)
 
 internal/
     clients/interface.go   # APIClient interface
@@ -71,11 +73,12 @@ internal/
         formatter.go       # OutputFormatter interface + factory
         hcl/               # HCL formatter (hclwrite-based)
         tfjson/            # Terraform JSON formatter
+    filter/filter.go       # Resource filtering (include/exclude patterns)
     graph/graph.go         # DependencyGraph (cycle detection, topo sort)
     imports/generator.go   # Terraform import block generation
     module/generator.go    # Module structure generation
     platform/
-        pingone/davinci/   # DaVinci API client + resource handlers
+        pingone/           # PingOne API client + resource handlers (all services)
     schema/
         types.go           # All YAML-mapped type definitions
         registry.go        # Thread-safe definition registry
@@ -96,7 +99,7 @@ tools/
 
 ## Quick Start: Add a Resource
 
-Adding a new resource to an existing service (PingOne DaVinci) requires **two files** and **zero edits** to existing code.
+Adding a new PingOne resource requires **two files** and **zero edits** to existing code.
 
 ### Step 1: Analyze the SDK Type
 
@@ -125,7 +128,7 @@ Document:
 
 ### Step 2: Create the YAML Definition
 
-Create `definitions/pingone/davinci/{short_name}.yaml`:
+Create `definitions/pingone/{category}/{short_name}.yaml` (e.g., `base/` for PingOne base resources, `davinci/` for DaVinci resources):
 
 **Naming Strategy**: The YAML `label_fields` list combines attributes to form a unique resource label. This label is automatically sanitized via `utils.SanitizeResourceName()` (or `utils.SanitizeMultiKeyResourceName()` for composites) to produce a valid Terraform resource name. You do not specify sanitization in the YAML; the processing engine handles it.
 
@@ -212,10 +215,10 @@ variables:
 
 ### Step 3: Create the Resource Handler
 
-Create `internal/platform/pingone/davinci/resource_{short_name}.go`:
+Create `internal/platform/pingone/resource_{short_name}.go`:
 
 ```go
-package davinci
+package pingone
 
 import (
     "context"
@@ -259,10 +262,10 @@ The `init()` call to `registerResource` self-registers the handler into the disp
 
 ```bash
 # Validate definition syntax and schema rules
-go run ./tools/validate-definitions definitions/pingone/davinci
+go run ./tools/validate-definitions definitions/pingone
 
 # Verify the resource handler compiles
-go build ./internal/platform/pingone/davinci/...
+go build ./internal/platform/pingone/...
 
 # Run tests
 go test ./internal/... -v -count=1
@@ -283,7 +286,7 @@ These are shared utilities maintained in `internal/utils/sanitize.go`. Duplicati
 
 ### When a Custom Transform Is Needed
 
-The only custom transform currently in the codebase is `handleConnectorProperties` in [internal/platform/pingone/davinci/resource_connection.go](internal/platform/pingone/davinci/resource_connection.go). It handles connector instance property mapping, which requires:
+The only custom transform currently in the codebase is `handleConnectorProperties` in [internal/platform/pingone/resource_connection.go](internal/platform/pingone/resource_connection.go). It handles connector instance property mapping, which requires:
 - Iterating a dynamic property map
 - Detecting masked secrets and replacing with variable references
 - Handling nested complex properties
@@ -309,7 +312,7 @@ type CustomTransformFunc func(
 Custom transforms are registered during `init()` in the resource handler file and queued for bulk loading at startup:
 
 ```go
-// internal/platform/pingone/davinci/resource_connection.go
+// internal/platform/pingone/resource_connection.go
 
 func init() {
     // Register API dispatch
@@ -348,7 +351,7 @@ attributes:
 ### How the Queue Works
 
 1. Resource files call `registerTransform()` in `init()` — this adds to a package-level `CustomHandlerQueue`
-2. At startup, `cmd/export.go` creates a `CustomHandlerRegistry` and calls `davinci.RegisterCustomHandlers(registry)`
+2. At startup, `cmd/export.go` creates a `CustomHandlerRegistry` and calls `pingoneplatform.RegisterCustomHandlers(customReg)`
 3. `RegisterCustomHandlers` calls `queue.LoadInto(registry)`, which bulk-registers all queued transforms
 4. The `Processor` uses the registry to look up transforms by name at processing time
 
@@ -374,19 +377,185 @@ No resource currently uses a resource-level custom handler. All current customiz
 
 ---
 
-## Adding a New Platform or Service
+## Adding Embedded Reference Rules
 
-### Terminology
+When a resource stores UUID references **inside JSON-encoded blobs** (via `jsonencode_raw`), the standard schema-driven reference system cannot resolve them — it cannot walk into opaque strings. Embedded reference rules solve this by post-processing specific paths within JSON structures to find and replace UUIDs with Terraform references.
 
-- **Platform** = product family (e.g., `pingone`)
-- **Service** = capability within a platform (e.g., `davinci` within `pingone`)
+**Use Case**: DaVinci flows can nest other flows. The reference is stored in the `properties` JSON field as `subFlowId.value.value`. Standard reference resolution never sees it because the entire `properties` value is a `RawHCLValue` (an opaque JSON-encoded string).
+
+### When an Embedded Reference Rule Is Needed
+
+The orchestrator's standard reference resolution (via `references_type` on attributes) handles **top-level UUID attributes** in an API response. It cannot find UUIDs buried inside JSON strings.
+
+**Indicator**: Your resource has a JSON-encoded attribute (using `jsonencode_raw` transform) that **contains UUID references to other resources**. Examples:
+
+- DaVinci flow `properties` containing `subFlowId`
+- Nested JSON structures with embedded resource identifiers
+- Dynamically-shaped JSON with references in non-standard paths
+
+If the UUID is a top-level attribute, use `references_type` in the YAML instead — no code needed.
+
+### Rule Definition
+
+An `EmbeddedReferenceRule` specifies:
+
+```go
+type EmbeddedReferenceRule struct {
+    ResourceType       string  // owning resource type ("pingone_davinci_flow")
+    AttributePath      string  // dot-path to the JSON blob, * for map iteration ("graph_data.elements.nodes.*.data.properties")
+    TargetResourceType string  // resource type the UUID references ("pingone_davinci_flow")
+    JSONKeyPath        string  // path inside the JSON object ("subFlowId.value.value")
+    ReferenceField     string  // attribute on target resource ("id")
+}
+```
+
+**AttributePath rules**:
+- Use `terraform_name` keys (snake_case), matching the keys in `ResourceData.Attributes`
+- Dot notation separates nested levels: `graph_data.elements.nodes`
+- `*` matches all keys in a map: `nodes.*.data` iterates `nodes[key].data` for all keys
+- The final segment is the attribute containing the `RawHCLValue`
+
+**JSONKeyPath rules**:
+- Dot notation only (no wildcards)
+- Keys must exist in the JSON for the subFlowId to be found and replaced
+- Missing keys are silently skipped (not an error)
+
+### Step 1: Analyze the Structure
+
+Find the API struct and the YAML attribute:
+
+```go
+// github.com/pingidentity/pingone-go-client/davinci
+type Flow struct {
+    GraphData string // JSON-encoded flow structure
+}
+
+// Inside GraphData (unmarshalled):
+{
+  "elements": {
+    "nodes": [
+      {
+        "data": {
+          "properties": {
+            "subFlowId": { "value": { "value": "uuid-string" } }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+YAML attribute:
+
+```yaml
+attributes:
+  - name: GraphData
+    terraform_name: graph_data
+    type: string
+    source_path: GraphData
+    transform: jsonencode_raw  # ← produces RawHCLValue
+```
+
+### Step 2: Register the Rule
+
+Add the rule registration to the resource handler's `init()` function:
+
+```go
+// internal/platform/pingone/resource_flow.go
+
+func init() {
+    // Existing registrations
+    registerResource("pingone_davinci_flow", resourceHandler{
+        list: listFlows,
+        get:  getFlow,
+    })
+
+    // Register embedded reference rule
+    registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+        ResourceType:       "pingone_davinci_flow",
+        AttributePath:      "graph_data.elements.nodes.*.data.properties",
+        TargetResourceType: "pingone_davinci_flow",
+        JSONKeyPath:        "subFlowId.value.value",
+        ReferenceField:     "id",
+    })
+}
+```
+
+### Step 3: Verify
+
+Run the pipeline and check the output:
+
+```bash
+go test ./internal/core -v -run TestEmbeddedReferences
+
+# Manual check: export a flow with nested flows and verify the properties
+# contain ${pingone_davinci_flow.label.id} instead of raw UUIDs
+```
+
+**Expected output in HCL**:
+
+```hcl
+resource "pingone_davinci_flow" "parent_flow_label" {
+  environment_id = var.pingone_environment_id
+
+  graph_data = jsonencode({
+    elements = {
+      nodes = [
+        {
+          data = {
+            properties = {
+              subFlowId = {
+                value = {
+                  value = "${pingone_davinci_flow.child_flow_label.id}"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  })
+
+  depends_on = [pingone_davinci_flow.child_flow_label]
+}
+```
+
+### How It Works Internally
+
+1. **Rule Matching**: After all resources are processed and added to the dependency graph, `ResolveEmbeddedReferences()` iterates all rules.
+2. **Attribute Navigation**: For each rule, walk `ResourceData.Attributes` following `AttributePath`. The `*` wildcard matches all map keys at that level.
+3. **JSON Extraction**: For each `RawHCLValue` at the final path, extract the JSON object from inside the `jsonencode(...)` expression.
+4. **UUID Lookup**: Navigate the JSON blob via `JSONKeyPath`, find the UUID string.
+5. **Graph Resolution**: Query the dependency graph for a `TargetResourceType` resource with that UUID to get its Terraform label.
+6. **Replacement**: Replace the UUID with `${resource_type.label.reference_field}` (Terraform interpolation).
+7. **Serialization**: Re-marshal the JSON and update the `RawHCLValue`.
+8. **Graph Update**: Record the dependency edge so `--include-upstream` and cycle detection work correctly.
+
+### Debugging Embedded References
+
+If embedded references are not being resolved:
+
+1. **Verify the rule is registered**: Add a temporary log or check that `registerEmbeddedReferenceRule()` was called in the resource's `init()`.
+2. **Check AttributePath**: Inspect the actual `ResourceData.Attributes` to see if the path and structure match the rule. Use `json.MarshalIndent` to pretty-print for inspection.
+3. **Validate JSONKeyPath**: Extract and inspect the actual JSON blob. Is `subFlowId.value.value` the correct path? Use a JSON viewer if needed.
+4. **Verify UUID lookup**: Confirm that the UUID extracted from the JSON exists in the dependency graph. Check that another flow with that UUID was exported.
+5. **Test with a simpler rule first**: If adding a complex rule, start with a test rule that matches a known structure, then refine.
+
+---
+
+## Adding a New Platform
+
+All PingOne resources (base and DaVinci) share a single flat package at `internal/platform/pingone/`. To add a new PingOne resource, use the Quick Start steps above — no new package is needed.
+
+This section covers adding support for an entirely new product platform (not PingOne). Follow the same flat-package pattern:
 
 ### Required Files
 
-Create a unified service package at `internal/platform/{platform}/{service}/`:
+Create a platform package at `internal/platform/{platform}/`:
 
 ```
-internal/platform/{platform}/{service}/
+internal/platform/{platform}/
 ├── client.go              # Client struct, ListResources/GetResource dispatch
 ├── dispatch.go            # Handler dispatch table + custom handler queuing
 └── resource_{short_name}.go  # One per resource, self-registers via init()
@@ -395,13 +564,13 @@ internal/platform/{platform}/{service}/
 ### client.go
 
 ```go
-package newservice
+package newplatform
 
 import (
     "context"
     "fmt"
 
-    "github.com/samir-gandhi/pingcli-plugin-terraformer/internal/clients"
+    "github.com/pingidentity/pingcli-plugin-terraformer/internal/clients"
 )
 
 var _ clients.APIClient = (*Client)(nil)
@@ -411,13 +580,11 @@ type Client struct {
     envID string
 }
 
-func New(ctx context.Context, envID string, /* auth params */) (*Client, error) {
-    // Initialize SDK client...
-    return &Client{api: api, envID: envID}, nil
+func New(apiClient *sdk.APIClient, envID string) *Client {
+    return &Client{api: apiClient, envID: envID}
 }
 
-func (c *Client) Platform() string { return "pingone" }
-func (c *Client) Service() string  { return "newservice" }
+func (c *Client) Platform() string { return "newplatform" }
 
 func (c *Client) ListResources(ctx context.Context, resourceType string, envID string) ([]interface{}, error) {
     h, ok := resourceHandlers[resourceType]
@@ -439,9 +606,9 @@ func (c *Client) GetResource(ctx context.Context, resourceType string, envID str
 ### dispatch.go
 
 ```go
-package newservice
+package newplatform
 
-import "github.com/samir-gandhi/pingcli-plugin-terraformer/internal/core"
+import "github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 
 type resourceHandler struct {
     list func(ctx context.Context, c *Client, envID string) ([]interface{}, error)
@@ -453,11 +620,10 @@ var resourceHandlers = map[string]resourceHandler{}
 var customHandlerQueue = core.NewCustomHandlerQueue()
 
 func registerResource(resourceType string, h resourceHandler) {
+    if _, exists := resourceHandlers[resourceType]; exists {
+        panic(fmt.Sprintf("duplicate resource handler registration: %s", resourceType))
+    }
     resourceHandlers[resourceType] = h
-}
-
-func registerHandler(name string, fn core.CustomHandlerFunc) {
-    customHandlerQueue.AddHandler(name, fn)
 }
 
 func registerTransform(name string, fn core.CustomTransformFunc) {
@@ -467,21 +633,14 @@ func registerTransform(name string, fn core.CustomTransformFunc) {
 func RegisterCustomHandlers(reg *core.CustomHandlerRegistry) {
     customHandlerQueue.LoadInto(reg)
 }
-
-func SupportedResourceTypes() []string {
-    types := make([]string, 0, len(resourceHandlers))
-    for t := range resourceHandlers {
-        types = append(types, t)
-    }
-    return types
-}
 ```
 
 ### Integration
 
-After creating the service package:
-1. Create YAML definitions in `definitions/{platform}/{service}/`
-2. Update `cmd/export.go` to instantiate the new client and load definitions for the new service
+After creating the platform package:
+1. Create YAML definitions in `definitions/{platform}/{category}/`
+2. Update `definitions/embed.go` to embed the new definition directory
+3. Update `cmd/export.go` to instantiate the new client and call `RegisterCustomHandlers`
 
 ---
 
@@ -596,8 +755,8 @@ func TestSanitizeName(t *testing.T) {
 # Validate all YAML definitions
 go run ./tools/validate-definitions definitions/
 
-# Validate a specific service
-go run ./tools/validate-definitions definitions/pingone/davinci
+# Validate a specific category
+go run ./tools/validate-definitions definitions/pingone
 ```
 
 ---
@@ -665,6 +824,9 @@ go tool pprof mem.prof
 | `--skip-dependencies` | `bool` | `false` | Skip dependency resolution |
 | `--skip-imports` | `bool` | `false` | Skip generating import blocks |
 | `--include-imports` | `bool` | `false` | Generate import blocks in root module |
+| `--include-resources` | `string` | | Include resources matching glob/regex pattern(s). Repeatable. Patterns match `resource_type.terraform_label` (case-insensitive). Use `regex:` prefix for regex patterns. Multiple patterns combine via OR. |
+| `--exclude-resources` | `string` | | Exclude resources matching glob/regex pattern(s). Repeatable. Same matching rules as `include-resources`. Takes precedence over includes. |
+| `--list-resources` | `bool` | `false` | List all resource addresses (`resource_type.terraform_label`) and exit. Useful for discovering exact addresses to use with include/exclude patterns. |
 | `--include-values` | `bool` | `false` | Populate variable values from export |
 | `--module-dir` | `string` | `"ping-export-module"` | Child module directory name |
 | `--module-name` | `string` | `"ping-export"` | Module name / prefix |
@@ -847,7 +1009,7 @@ The processor coerces SDK types to Go primitives before processing:
 
 1. Add the attribute entry to the resource's YAML definition
 2. Verify the `source_path` against the SDK struct
-3. Run `go run ./tools/validate-definitions definitions/pingone/davinci`
+3. Run `go run ./tools/validate-definitions definitions/pingone`
 4. Run `go test ./internal/... -v -count=1`
 
 ### How do I handle sensitive values?

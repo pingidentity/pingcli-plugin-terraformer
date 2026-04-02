@@ -63,6 +63,11 @@ func (l *Loader) LoadFromDirectory(dir string) ([]*ResourceDefinition, error) {
 			return fmt.Errorf("failed to load %s: %w", path, err)
 		}
 
+		// Skip disabled definitions
+		if def.Metadata.Enabled != nil && !*def.Metadata.Enabled {
+			return nil
+		}
+
 		definitions = append(definitions, def)
 		return nil
 	})
@@ -115,6 +120,11 @@ func (l *Loader) LoadFromFS(fsys fs.FS, dir string) ([]*ResourceDefinition, erro
 
 		if validateErr := l.validator.Validate(&def); validateErr != nil {
 			return fmt.Errorf("validation failed for %s: %w", path, validateErr)
+		}
+
+		// Skip disabled definitions
+		if def.Metadata.Enabled != nil && !*def.Metadata.Enabled {
+			return nil
 		}
 
 		definitions = append(definitions, &def)
