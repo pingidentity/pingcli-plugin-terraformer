@@ -105,7 +105,7 @@ func (g *Generator) generateVersionsTF() error {
   required_providers {
     pingone = {
       source  = "pingidentity/pingone"
-      version = "1.16.0-beta.2"
+      version = "1.18.0"
     }
   }
 }
@@ -326,12 +326,12 @@ func (g *Generator) formatDefaultValue(value interface{}, varType string) string
 		}
 		// Complex values are always quoted as JSON strings so they
 		// match the variable's declared type (typically "string").
-		escaped := strings.ReplaceAll(string(b), "${", "$${") 
+		escaped := strings.ReplaceAll(string(b), "${", "$${")
 		escaped = strings.ReplaceAll(escaped, "%{", "%%{")
 		return fmt.Sprintf("%q", escaped)
 	default:
 		// Fall back to quoted string representation for unknown types.
-		escaped := strings.ReplaceAll(fmt.Sprintf("%v", v), "${", "$${") 
+		escaped := strings.ReplaceAll(fmt.Sprintf("%v", v), "${", "$${")
 		escaped = strings.ReplaceAll(escaped, "%{", "%%{")
 		return fmt.Sprintf("%q", escaped)
 	}
