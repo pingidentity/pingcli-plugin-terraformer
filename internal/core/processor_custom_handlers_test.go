@@ -405,6 +405,112 @@ func TestProcessorCustomTransformReceivesAPIData(t *testing.T) {
 	assert.Equal(t, "myvar:orig", result.Attributes["value"])
 }
 
+// TestProcessor_DependsOnFromCustomHandler verifies that when a custom handler
+// returns a map with key "__depends_on" containing []RuntimeDependsOn entries,
+// the processor populates result.DependsOnResources instead of adding it to
+// result.Attributes.
+func TestProcessor_DependsOnFromCustomHandler(t *testing.T) {
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "pingone",
+			ResourceType: "pingone_davinci_flow_dep",
+			APIType:      "FlowDep",
+			Name:         "DaVinci Flow Dep",
+			ShortName:    "flow_dep",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			SDKPackage: "github.com/test",
+			SDKType:    "FlowDep",
+			IDField:    "id",
+			NameField:  "name",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string"},
+			{Name: "Name", TerraformName: "name", Type: "string"},
+		},
+		CustomHandlers: &schema.CustomHandlerDefinition{
+			Transformer: "handleFlowVariableDependencies",
+		},
+	}
+
+	reg := schema.NewRegistry()
+	require.NoError(t, reg.Register(def))
+
+	chr := core.NewCustomHandlerRegistry()
+	chr.RegisterHandler("handleFlowVariableDependencies", func(data interface{}, _ *schema.ResourceDefinition) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"__depends_on": []core.RuntimeDependsOn{
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-uuid-1"},
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-uuid-2"},
+			},
+		}, nil
+	})
+
+	processor := core.NewProcessor(reg, core.WithCustomHandlers(chr))
+
+	mock := &MockTransformResource{ID: "flow-dep-1", Name: "my_flow", Value: ""}
+	result, err := processor.ProcessResource("pingone_davinci_flow_dep", mock)
+	require.NoError(t, err)
+
+	// DependsOnResources should be populated.
+	require.Len(t, result.DependsOnResources, 2)
+	assert.Equal(t, "pingone_davinci_variable", result.DependsOnResources[0].ResourceType)
+	assert.Equal(t, "var-uuid-1", result.DependsOnResources[0].ResourceID)
+	assert.Equal(t, "pingone_davinci_variable", result.DependsOnResources[1].ResourceType)
+	assert.Equal(t, "var-uuid-2", result.DependsOnResources[1].ResourceID)
+
+	// "__depends_on" sentinel key must NOT appear in Attributes.
+	_, inAttrs := result.Attributes["__depends_on"]
+	assert.False(t, inAttrs, "__depends_on sentinel key must not appear in Attributes")
+}
+
+// TestProcessor_DependsOnEmpty verifies that when no __depends_on key is returned
+// by a custom handler, DependsOnResources remains empty.
+func TestProcessor_DependsOnEmpty(t *testing.T) {
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "pingone",
+			ResourceType: "pingone_davinci_flow_nodep",
+			APIType:      "FlowNoDep",
+			Name:         "Flow No Dep",
+			ShortName:    "flow_nodep",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			SDKPackage: "github.com/test",
+			SDKType:    "FlowNoDep",
+			IDField:    "id",
+			NameField:  "name",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string"},
+			{Name: "Name", TerraformName: "name", Type: "string"},
+		},
+		CustomHandlers: &schema.CustomHandlerDefinition{
+			Transformer: "noDepHandler",
+		},
+	}
+
+	reg := schema.NewRegistry()
+	require.NoError(t, reg.Register(def))
+
+	chr := core.NewCustomHandlerRegistry()
+	chr.RegisterHandler("noDepHandler", func(data interface{}, _ *schema.ResourceDefinition) (map[string]interface{}, error) {
+		return map[string]interface{}{"some_attr": "some_value"}, nil
+	})
+
+	processor := core.NewProcessor(reg, core.WithCustomHandlers(chr))
+
+	mock := &MockTransformResource{ID: "flow-nodep-1", Name: "nodep_flow", Value: ""}
+	result, err := processor.ProcessResource("pingone_davinci_flow_nodep", mock)
+	require.NoError(t, err)
+
+	// DependsOnResources should remain empty when __depends_on key is absent.
+	assert.Empty(t, result.DependsOnResources)
+	assert.Equal(t, "some_value", result.Attributes["some_attr"])
+}
+
 func TestProcessorHandlerQueueIntegration(t *testing.T) {
 	def := &schema.ResourceDefinition{
 		Metadata: schema.ResourceMetadata{

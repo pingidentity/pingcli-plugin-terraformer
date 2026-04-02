@@ -28,6 +28,7 @@ var _ clients.APIClient = (*Client)(nil)
 type Client struct {
 	apiClient     *pingone.APIClient
 	environmentID uuid.UUID
+	warnings      []string
 }
 
 // New creates a DaVinci APIClient from a pre-built SDK client and environment ID.
@@ -54,4 +55,14 @@ func (c *Client) GetResource(ctx context.Context, resourceType string, envID str
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
 	return h.get(ctx, c, envID, resourceID)
+}
+
+// AddWarning records a non-fatal warning message for later retrieval.
+func (c *Client) AddWarning(msg string) {
+	c.warnings = append(c.warnings, msg)
+}
+
+// Warnings returns all warnings collected during resource operations.
+func (c *Client) Warnings() []string {
+	return c.warnings
 }

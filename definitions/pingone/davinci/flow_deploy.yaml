@@ -2,7 +2,7 @@
 #
 # Manages the deployment state of a DaVinci flow.
 # Data is derived from the Flow API — each flow produces one flow_deploy resource.
-# This is a manage-only resource — no Terraform import is supported.
+# Import ID format: {env_id}/{flow_id}
 
 metadata:
   platform: pingone
@@ -71,6 +71,8 @@ dependencies:
       field_path: DeployTriggerValues.DeployedVersion
       lookup_field: current_version
       reference_format: "pingone_davinci_flow.{name}.current_version"
+
+  import_id_format: "{env_id}/{resource_id}"
 
 variables:
   eligible_attributes: []

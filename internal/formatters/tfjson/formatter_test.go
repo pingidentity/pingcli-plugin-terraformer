@@ -695,6 +695,93 @@ func TestFormat_ProducesValidJSON(t *testing.T) {
 	assert.True(t, json.Valid([]byte(out)))
 }
 
+// ── depends_on rendering tests ─────────────────────────────────
+
+// TestFormat_DependsOnRendered verifies that when DependsOnResources is non-empty
+// with resolved labels, the JSON output contains a depends_on array.
+func TestFormat_DependsOnRendered(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "val", TerraformName: "val", Type: "string",
+	})
+	data := baseData("res1", "id1", map[string]interface{}{"val": "x"})
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-1", Label: "pingcli__my_var"},
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-2", Label: "pingcli__other_var"},
+	}
+
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	dependsOn, ok := attrs["depends_on"].([]interface{})
+	require.True(t, ok, "depends_on should be a JSON array")
+	require.Len(t, dependsOn, 2)
+	assert.Equal(t, "pingone_davinci_variable.pingcli__my_var", dependsOn[0])
+	assert.Equal(t, "pingone_davinci_variable.pingcli__other_var", dependsOn[1])
+}
+
+// TestFormat_DependsOnEmpty_NotRendered verifies that no depends_on key is
+// emitted when DependsOnResources is nil.
+func TestFormat_DependsOnEmpty_NotRendered(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "val", TerraformName: "val", Type: "string",
+	})
+	data := baseData("res1", "id1", map[string]interface{}{"val": "x"})
+	data.DependsOnResources = nil
+
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	_, exists := attrs["depends_on"]
+	assert.False(t, exists, "depends_on should be absent when DependsOnResources is nil")
+}
+
+// TestFormat_DependsOnUnresolvedLabelsSkipped verifies that entries with an
+// empty Label are omitted from the depends_on array.
+func TestFormat_DependsOnUnresolvedLabelsSkipped(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "val", TerraformName: "val", Type: "string",
+	})
+	data := baseData("res1", "id1", map[string]interface{}{"val": "x"})
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-1", Label: "pingcli__my_var"},
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-unresolved", Label: ""},
+	}
+
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	dependsOn, ok := attrs["depends_on"].([]interface{})
+	require.True(t, ok, "depends_on should be a JSON array")
+	require.Len(t, dependsOn, 1, "unresolved entry (empty label) should be skipped")
+	assert.Equal(t, "pingone_davinci_variable.pingcli__my_var", dependsOn[0])
+}
+
+// TestFormat_DependsOnAllUnresolved_NotRendered verifies that depends_on is
+// omitted entirely when all entries have empty labels.
+func TestFormat_DependsOnAllUnresolved_NotRendered(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "val", TerraformName: "val", Type: "string",
+	})
+	data := baseData("res1", "id1", map[string]interface{}{"val": "x"})
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-1", Label: ""},
+	}
+
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	_, exists := attrs["depends_on"]
+	assert.False(t, exists, "depends_on should be absent when all labels are unresolved")
+}
+
 // Regression test: variable-eligible attributes inside type_discriminated_block must render as var.X references
 func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 	f := NewFormatter()

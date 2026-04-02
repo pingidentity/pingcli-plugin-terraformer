@@ -17,6 +17,8 @@ type mockClient struct {
 
 func (m *mockClient) Platform() string { return m.platform }
 
+func (m *mockClient) Warnings() []string { return nil }
+
 func (m *mockClient) ListResources(_ context.Context, resourceType string, _ string) ([]interface{}, error) {
 	if d, ok := m.data[resourceType]; ok {
 		return d, nil

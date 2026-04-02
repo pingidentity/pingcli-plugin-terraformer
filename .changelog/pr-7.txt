@@ -1,0 +1,22 @@
+```release-note:bug
+Fixed `nil_value: keep_empty` not applying to nested attributes inside objects, lists, and sets. Attributes with this setting now correctly emit `""` at any nesting depth.
+```
+
+```release-note:bug
+Fixed HCL template sequences (`${` and `%{`) in string values not being escaped in generated `.tfvars` files, which caused Terraform interpolation/directive errors.
+```
+
+```release-note:internal
+Unified attribute processing into a single `processOneAttribute` method, eliminating duplicated logic between `ProcessResource` and `extractNestedAttributes`. Custom transforms, variable extraction, and `nil_value` handling now work consistently at all nesting levels.
+```
+
+```release-note:enhancement
+`resource/pingone_davinci_flow_deploy`: Added support for import block generation.
+```
+
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes.
+```
+
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Added `depends_on` block generation referencing `pingone_davinci_variable` resources used by the flow. Variable dependencies are discovered at runtime via the flow versions API and rendered as Terraform `depends_on` meta-arguments in both HCL and TF JSON output formats.

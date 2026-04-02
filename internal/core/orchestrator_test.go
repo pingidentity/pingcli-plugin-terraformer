@@ -34,6 +34,8 @@ func (m *mockAPIClient) GetResource(_ context.Context, _ string, _ string, _ str
 
 func (m *mockAPIClient) Platform() string { return m.platform }
 
+func (m *mockAPIClient) Warnings() []string { return nil }
+
 // --- helpers ---
 
 // simpleStruct is used as mock API data.
@@ -505,6 +507,127 @@ func TestResolveCorrelatedReferences_AlreadyResolved(t *testing.T) {
 	// Should be unchanged.
 	ref := attrs["ref"].(ResolvedReference)
 	assert.Equal(t, "some_type.my_resource.id", ref.Expression())
+}
+
+// --- resolveDependsOnResources tests ---
+
+// TestResolveDependsOnResources_ResolvesLabels verifies that resource IDs in
+// DependsOnResources are resolved to their Terraform labels via the graph.
+func TestResolveDependsOnResources_ResolvesLabels(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_variable", "var-uuid-1", "pingcli__my_var")
+	g.AddResource("pingone_davinci_variable", "var-uuid-2", "pingcli__other_var")
+
+	resources := []*ResourceData{
+		{
+			ResourceType: "pingone_davinci_flow",
+			ID:           "flow-1",
+			Name:         "my_flow",
+			DependsOnResources: []RuntimeDependsOn{
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-uuid-1"},
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-uuid-2"},
+			},
+		},
+	}
+
+	resolveDependsOnResources(resources, g)
+
+	require.Len(t, resources[0].DependsOnResources, 2)
+	assert.Equal(t, "pingcli__my_var", resources[0].DependsOnResources[0].Label)
+	assert.Equal(t, "pingcli__other_var", resources[0].DependsOnResources[1].Label)
+}
+
+// TestResolveDependsOnResources_UnknownID_LabelEmpty verifies that when a
+// resource ID is not in the graph, the Label field remains empty.
+func TestResolveDependsOnResources_UnknownID_LabelEmpty(t *testing.T) {
+	g := graph.New()
+	// No matching resource in graph.
+
+	resources := []*ResourceData{
+		{
+			ResourceType: "pingone_davinci_flow",
+			ID:           "flow-1",
+			Name:         "my_flow",
+			DependsOnResources: []RuntimeDependsOn{
+				{ResourceType: "pingone_davinci_variable", ResourceID: "unknown-uuid"},
+			},
+		},
+	}
+
+	resolveDependsOnResources(resources, g)
+
+	require.Len(t, resources[0].DependsOnResources, 1)
+	assert.Equal(t, "", resources[0].DependsOnResources[0].Label, "unresolved IDs should have empty label")
+}
+
+// TestResolveDependsOnResources_NoDependsOn_NoOp verifies that resources with
+// no DependsOnResources are unaffected.
+func TestResolveDependsOnResources_NoDependsOn_NoOp(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_variable", "var-uuid-1", "pingcli__my_var")
+
+	resources := []*ResourceData{
+		{
+			ResourceType:       "pingone_davinci_flow",
+			ID:                 "flow-1",
+			Name:               "my_flow",
+			DependsOnResources: nil,
+		},
+	}
+
+	resolveDependsOnResources(resources, g) // must not panic
+
+	assert.Nil(t, resources[0].DependsOnResources)
+}
+
+// TestResolveDependsOnResources_NilGraph_NoOp verifies that a nil graph does
+// not panic and leaves labels empty.
+func TestResolveDependsOnResources_NilGraph_NoOp(t *testing.T) {
+	resources := []*ResourceData{
+		{
+			ResourceType: "pingone_davinci_flow",
+			ID:           "flow-1",
+			Name:         "my_flow",
+			DependsOnResources: []RuntimeDependsOn{
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-uuid-1"},
+			},
+		},
+	}
+
+	resolveDependsOnResources(resources, nil) // must not panic
+
+	require.Len(t, resources[0].DependsOnResources, 1)
+	assert.Equal(t, "", resources[0].DependsOnResources[0].Label)
+}
+
+// TestResolveDependsOnResources_MultipleResources verifies that all resources
+// in the slice are processed.
+func TestResolveDependsOnResources_MultipleResources(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_variable", "var-a", "pingcli__var_a")
+	g.AddResource("pingone_davinci_variable", "var-b", "pingcli__var_b")
+
+	resources := []*ResourceData{
+		{
+			ResourceType: "pingone_davinci_flow",
+			ID:           "flow-1",
+			DependsOnResources: []RuntimeDependsOn{
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-a"},
+			},
+		},
+		{
+			ResourceType: "pingone_davinci_flow",
+			ID:           "flow-2",
+			DependsOnResources: []RuntimeDependsOn{
+				{ResourceType: "pingone_davinci_variable", ResourceID: "var-b"},
+			},
+		},
+	}
+
+	resolveDependsOnResources(resources, g)
+
+	assert.Equal(t, "pingcli__var_a", resources[0].DependsOnResources[0].Label)
+	assert.Equal(t, "pingcli__var_b", resources[1].DependsOnResources[0].Label)
 }
 
 // TestResolveEnvironmentReference_InGraph tests that when pingone_environment

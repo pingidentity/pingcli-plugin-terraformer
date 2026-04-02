@@ -17,4 +17,7 @@ type APIClient interface {
 
 	// Platform returns the platform identifier (e.g., "pingone").
 	Platform() string
+
+	// Warnings returns non-fatal warning messages collected during resource operations.
+	Warnings() []string
 }

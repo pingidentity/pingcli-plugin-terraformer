@@ -243,26 +243,31 @@ attributes:
             terraform_name: type
             type: string
             source_path: Type
+            nil_value: keep_empty
 
           - name: Crossorigin
             terraform_name: crossorigin
             type: string
             source_path: Crossorigin
+            nil_value: keep_empty
 
           - name: Integrity
             terraform_name: integrity
             type: string
             source_path: Integrity
+            nil_value: keep_empty
 
           - name: Referrerpolicy
             terraform_name: referrerpolicy
             type: string
             source_path: Referrerpolicy
+            nil_value: keep_empty
 
           - name: Defer
             terraform_name: defer
             type: bool
             source_path: Defer
+            nil_value: keep_empty
 
   # ── Graph Data ────────────────────────────────────────────────
   # SDK type: *DaVinciFlowGraphDataResponse
@@ -700,6 +705,9 @@ conditional_defaults:
     set_value: 4
     when_all:
       - attribute_empty: log_level
+
+custom_handlers:
+  transformer: handleFlowVariableDependencies
 
 dependencies:
   depends_on:

@@ -128,6 +128,21 @@ type TransformResultWithVariables struct {
 	Variables []ExtractedVariable
 }
 
+// RuntimeDependsOn represents a runtime-discovered dependency that should be
+// rendered as a Terraform depends_on meta-argument. Custom handlers populate
+// these entries; the orchestrator resolves ResourceID to a Label via the graph.
+type RuntimeDependsOn struct {
+	// ResourceType is the Terraform resource type (e.g. "pingone_davinci_variable").
+	ResourceType string
+
+	// ResourceID is the raw UUID of the dependency.
+	ResourceID string
+
+	// Label is the resolved Terraform label (e.g. "pingcli__my_var").
+	// Populated by the orchestrator during resolveDependsOnResources.
+	Label string
+}
+
 // ResourceData represents the intermediate representation of a resource
 type ResourceData struct {
 	ResourceType string
@@ -141,6 +156,11 @@ type ResourceData struct {
 	Attributes         map[string]interface{}
 	Dependencies       []Dependency
 	ExtractedVariables []ExtractedVariable
+
+	// DependsOnResources holds runtime-discovered dependencies that render as
+	// a Terraform depends_on meta-argument. Populated by custom handlers via
+	// the "__depends_on" sentinel key.
+	DependsOnResources []RuntimeDependsOn
 }
 
 // Dependency represents a resource dependency
@@ -187,88 +207,28 @@ func (p *Processor) ProcessResource(resourceType string, apiData interface{}) (*
 			continue
 		}
 
-		// If override_value is set, use it directly and skip extraction/transforms.
-		if attrDef.OverrideValue != nil {
-			result.Attributes[tfName] = attrDef.OverrideValue
-			continue
-		}
-
-		value, err := p.extractAttribute(val, attrDef)
+		value, err := p.processOneAttribute(val, attrDef, apiData, def, &result.ExtractedVariables)
 		if err != nil {
-			// If nil_value is "keep_empty", emit empty string instead of skipping
-			if attrDef.NilValue == "keep_empty" {
-				result.Attributes[tfName] = ""
-			}
+			return nil, err
+		}
+		if value == nil {
 			continue
 		}
 
-		// Store in attributes map
-		if value != nil {
-			// For object types with nested_attributes, recursively extract the
-			// nested fields into a map[string]interface{} that the formatter expects.
-			if attrDef.Type == "object" && len(attrDef.NestedAttributes) > 0 {
-				nestedMap, nErr := p.extractNestedAttributes(value, attrDef.NestedAttributes)
-				if nErr != nil {
-					// If nested extraction fails, skip the attribute.
-					continue
-				}
-				if len(nestedMap) > 0 {
-					result.Attributes[tfName] = nestedMap
-				}
-				continue
-			}
+		result.Attributes[tfName] = value
 
-			// For list types with nested_attributes, extract each element
-			// through nested attribute processing.
-			if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
-				listVal, lErr := p.extractListOfNestedAttributes(value, attrDef.NestedAttributes)
-				if lErr != nil {
-					continue
-				}
-				if len(listVal) > 0 {
-					result.Attributes[tfName] = listVal
-				}
-				continue
+		// Check for ID field (match against terraform_name, case-insensitive)
+		if strings.EqualFold(tfName, def.API.IDField) {
+			if idStr, ok := value.(string); ok {
+				result.ID = idStr
 			}
+		}
 
-			// Apply transform if specified
-			if attrDef.Transform == "custom" && attrDef.CustomTransform != "" {
-				// Dispatch to custom transform via registry.
-				value, err = p.applyCustomTransform(attrDef.CustomTransform, value, apiData, &attrDef, def)
-				if err != nil {
-					return nil, fmt.Errorf("custom transform %q on attribute %s: %w", attrDef.CustomTransform, attrDef.Name, err)
-				}
-				// Unwrap TransformResultWithVariables if the custom transform
-				// returned variable metadata alongside its value.
-				if wrapped, ok := value.(TransformResultWithVariables); ok {
-					value = wrapped.Value
-					result.ExtractedVariables = append(result.ExtractedVariables, wrapped.Variables...)
-				}
-			} else if attrDef.Transform != "" {
-				transformed, tErr := ApplyTransform(attrDef.Transform, value, &attrDef)
-				if tErr != nil {
-					return nil, fmt.Errorf("transform %q on attribute %s: %w", attrDef.Transform, attrDef.Name, tErr)
-				}
-				value = transformed
+		// Check for name field (match against terraform_name, case-insensitive)
+		if strings.EqualFold(tfName, def.API.NameField) {
+			if nameStr, ok := value.(string); ok {
+				result.Name = nameStr
 			}
-
-			result.Attributes[tfName] = value
-
-			// Check for ID field (match against terraform_name, case-insensitive)
-			if strings.EqualFold(tfName, def.API.IDField) {
-				if idStr, ok := value.(string); ok {
-					result.ID = idStr
-				}
-			}
-
-			// Check for name field (match against terraform_name, case-insensitive)
-			if strings.EqualFold(tfName, def.API.NameField) {
-				if nameStr, ok := value.(string); ok {
-					result.Name = nameStr
-				}
-			}
-		} else if attrDef.NilValue == "keep_empty" {
-			result.Attributes[tfName] = ""
 		}
 	}
 
@@ -329,6 +289,13 @@ func (p *Processor) runCustomHandlers(def *schema.ResourceDefinition, apiData in
 			return fmt.Errorf("custom handler %q: %w", name, err)
 		}
 		for k, v := range extra {
+			// Intercept the __depends_on sentinel key.
+			if k == "__depends_on" {
+				if deps, ok := v.([]RuntimeDependsOn); ok {
+					result.DependsOnResources = append(result.DependsOnResources, deps...)
+				}
+				continue
+			}
 			result.Attributes[k] = v
 		}
 	}
@@ -351,51 +318,134 @@ func (p *Processor) runCustomHandlers(def *schema.ResourceDefinition, apiData in
 	return nil
 }
 
-// extractAttribute extracts a single attribute value from the API data
-func (p *Processor) extractAttribute(val reflect.Value, attrDef schema.AttributeDefinition) (interface{}, error) {
-	if val.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, got %v", val.Kind())
+// processOneAttribute processes a single attribute definition against a struct
+// reflect.Value. It handles the full lifecycle: override_value, field extraction,
+// nil/empty handling, nil_value, type conversion, nested object/list recursion,
+// slice-to-map conversion, and transforms (both standard and custom).
+//
+// rv must be a struct reflect.Value (already dereferenced).
+// apiData and def provide context for custom transforms (pass the top-level
+// API response and resource definition from ProcessResource).
+// vars accumulates extracted variables; may be nil if variable tracking is not needed.
+//
+// Returns (nil, nil) when the attribute should be skipped.
+func (p *Processor) processOneAttribute(rv reflect.Value, attr schema.AttributeDefinition, apiData interface{}, def *schema.ResourceDefinition, vars *[]ExtractedVariable) (interface{}, error) {
+	// If override_value is set, use it directly and skip extraction/transforms.
+	if attr.OverrideValue != nil {
+		return attr.OverrideValue, nil
 	}
 
-	// Use source_path when available, fall back to attribute Name
-	path := attrDef.Name
-	if attrDef.SourcePath != "" {
-		path = attrDef.SourcePath
+	// Use source_path when available, fall back to attribute Name.
+	path := attr.Name
+	if attr.SourcePath != "" {
+		path = attr.SourcePath
 	}
 
-	// Find the field using dot-notation traversal
-	field, found := findFieldByPath(val, path)
+	// Find the field using dot-notation traversal.
+	field, found := findFieldByPath(rv, path)
 	if !found || !field.IsValid() {
-		return nil, fmt.Errorf("field %s not found", path)
+		if attr.NilValue == "keep_empty" {
+			return "", nil
+		}
+		return nil, nil
 	}
 
-	// Track whether original field was a pointer. Non-pointer fields at zero
-	// value are indistinguishable from "not set" and should be suppressed.
+	// Track whether original field was a pointer. Pointer-typed fields use nil
+	// to signal absence, so a non-nil pointer that dereferences to a zero value
+	// (e.g. *bool → false) is intentional and must be kept.
 	wasPointer := field.Kind() == reflect.Ptr
-
-	// Handle pointer fields
-	if field.Kind() == reflect.Ptr {
+	for field.Kind() == reflect.Ptr {
 		if field.IsNil() {
-			// Optional field not set
-			return nil, nil
+			break
 		}
 		field = field.Elem()
+	}
+
+	// Handle nil pointers.
+	if !field.IsValid() || (field.Kind() == reflect.Ptr && field.IsNil()) {
+		if attr.NilValue == "keep_empty" {
+			return "", nil
+		}
+		return nil, nil
 	}
 
 	// Skip zero-value non-pointer fields (empty string, nil slice, nil map).
 	// Booleans and numbers are kept even at zero since conditional defaults may need them.
 	if !wasPointer && isEmptyValue(field) {
+		if attr.NilValue == "keep_empty" {
+			return "", nil
+		}
 		return nil, nil
 	}
 
-	// Convert based on attribute type
-	return p.convertValue(field, attrDef.Type)
+	// Slice-to-map keying: when the schema expects a map but the source
+	// is a slice, and map_key_path is set, convert the slice to a map
+	// keyed by the specified sub-field path.
+	if attr.Type == "map" && attr.MapKeyPath != "" && field.Kind() == reflect.Slice {
+		mapped, mErr := p.convertSliceToMap(field, attr, apiData, def, vars)
+		if mErr != nil || len(mapped) == 0 {
+			return nil, nil
+		}
+		return mapped, nil
+	}
+
+	// Convert based on attribute type.
+	val, err := p.convertValue(field, attr.Type)
+	if err != nil || val == nil {
+		if attr.NilValue == "keep_empty" {
+			return "", nil
+		}
+		return nil, nil
+	}
+
+	// Recursively handle nested objects.
+	if attr.Type == "object" && len(attr.NestedAttributes) > 0 {
+		sub, subErr := p.extractNestedAttributes(val, attr.NestedAttributes, apiData, def, vars)
+		if subErr != nil || len(sub) == 0 {
+			return nil, nil
+		}
+		return sub, nil
+	}
+
+	// Recursively handle list/set of objects with nested attributes.
+	if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
+		listVal, lErr := p.extractListOfNestedAttributes(val, attr.NestedAttributes, apiData, def, vars)
+		if lErr != nil || len(listVal) == 0 {
+			return nil, nil
+		}
+		return listVal, nil
+	}
+
+	// Apply transform if specified.
+	if attr.Transform == "custom" && attr.CustomTransform != "" {
+		val, err = p.applyCustomTransform(attr.CustomTransform, val, apiData, &attr, def)
+		if err != nil {
+			return nil, fmt.Errorf("custom transform %q on attribute %s: %w", attr.CustomTransform, attr.Name, err)
+		}
+		if wrapped, ok := val.(TransformResultWithVariables); ok {
+			val = wrapped.Value
+			if vars != nil {
+				*vars = append(*vars, wrapped.Variables...)
+			}
+		}
+	} else if attr.Transform != "" {
+		transformed, tErr := ApplyTransform(attr.Transform, val, &attr)
+		if tErr != nil {
+			return nil, fmt.Errorf("transform %q on attribute %s: %w", attr.Transform, attr.Name, tErr)
+		}
+		val = transformed
+	}
+
+	return val, nil
 }
 
 // extractNestedAttributes converts a Go value (typically a struct) into a
 // map[string]interface{} keyed by terraform_name, using the nested attribute
 // definitions. This bridges struct reflection → the map format the formatter expects.
-func (p *Processor) extractNestedAttributes(parent interface{}, nested []schema.AttributeDefinition) (map[string]interface{}, error) {
+//
+// apiData and def provide context for custom transforms (passed from the
+// top-level ProcessResource call). vars accumulates extracted variables.
+func (p *Processor) extractNestedAttributes(parent interface{}, nested []schema.AttributeDefinition, apiData interface{}, def *schema.ResourceDefinition, vars *[]ExtractedVariable) (map[string]interface{}, error) {
 	rv := reflect.ValueOf(parent)
 	for rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
@@ -420,87 +470,11 @@ func (p *Processor) extractNestedAttributes(parent interface{}, nested []schema.
 	for _, attr := range nested {
 		tfName := schema.CanonicalAttributeKey(attr)
 
-		// If override_value is set, use it directly and skip extraction.
-		if attr.OverrideValue != nil {
-			result[tfName] = attr.OverrideValue
-			continue
-		}
-
-		path := attr.Name
-		if attr.SourcePath != "" {
-			path = attr.SourcePath
-		}
-
-		field, found := findFieldByPath(rv, path)
-		if !found || !field.IsValid() {
-			continue
-		}
-		// Track whether the original field was behind a pointer. Pointer-typed
-		// fields use nil to signal absence, so a non-nil pointer that dereferences
-		// to a zero value (e.g. *bool → false) is intentional and must be kept.
-		// Non-pointer fields have no nil state; their zero value is indistinguishable
-		// from "not set", so we skip them.
-		wasPointer := field.Kind() == reflect.Ptr
-		for field.Kind() == reflect.Ptr {
-			if field.IsNil() {
-				break
-			}
-			field = field.Elem()
-		}
-		if !field.IsValid() || (field.Kind() == reflect.Ptr && field.IsNil()) {
-			continue
-		}
-		// Skip empty non-pointer fields (empty string, nil slice, nil map).
-		if !wasPointer && isEmptyValue(field) {
-			continue
-		}
-
-		// Slice-to-map keying: when the schema expects a map but the source
-		// is a slice, and map_key_path is set, convert the slice to a map
-		// keyed by the specified sub-field path.
-		if attr.Type == "map" && attr.MapKeyPath != "" && field.Kind() == reflect.Slice {
-			mapped, mErr := p.convertSliceToMap(field, attr)
-			if mErr != nil {
-				continue
-			}
-			if len(mapped) > 0 {
-				result[tfName] = mapped
-			}
-			continue
-		}
-
-		val, err := p.convertValue(field, attr.Type)
+		val, err := p.processOneAttribute(rv, attr, apiData, def, vars)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		if val != nil {
-			// Recursively handle nested objects.
-			if attr.Type == "object" && len(attr.NestedAttributes) > 0 {
-				sub, subErr := p.extractNestedAttributes(val, attr.NestedAttributes)
-				if subErr == nil && len(sub) > 0 {
-					result[tfName] = sub
-				}
-				continue
-			}
-
-			// Recursively handle list/set of objects with nested attributes.
-			if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
-				listVal, lErr := p.extractListOfNestedAttributes(val, attr.NestedAttributes)
-				if lErr == nil && len(listVal) > 0 {
-					result[tfName] = listVal
-				}
-				continue
-			}
-
-			// Apply transform if specified on nested attribute.
-			if attr.Transform != "" && attr.Transform != "custom" {
-				transformed, tErr := ApplyTransform(attr.Transform, val, &attr)
-				if tErr != nil {
-					continue
-				}
-				val = transformed
-			}
-
 			result[tfName] = val
 		}
 	}
@@ -511,7 +485,7 @@ func (p *Processor) extractNestedAttributes(parent interface{}, nested []schema.
 // keyed by extracting the sub-field at mapKeyPath from each element. When nested
 // attributes are defined, each element is recursively processed through
 // extractNestedAttributes.
-func (p *Processor) convertSliceToMap(field reflect.Value, attr schema.AttributeDefinition) (map[string]interface{}, error) {
+func (p *Processor) convertSliceToMap(field reflect.Value, attr schema.AttributeDefinition, apiData interface{}, def *schema.ResourceDefinition, vars *[]ExtractedVariable) (map[string]interface{}, error) {
 	if field.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("convertSliceToMap: expected slice, got %v", field.Kind())
 	}
@@ -552,7 +526,7 @@ func (p *Processor) convertSliceToMap(field reflect.Value, attr schema.Attribute
 
 		// Process nested attributes if defined.
 		if len(attr.NestedAttributes) > 0 {
-			nestedMap, err := p.extractNestedAttributes(elem.Interface(), attr.NestedAttributes)
+			nestedMap, err := p.extractNestedAttributes(elem.Interface(), attr.NestedAttributes, apiData, def, vars)
 			if err != nil {
 				continue
 			}
@@ -568,7 +542,7 @@ func (p *Processor) convertSliceToMap(field reflect.Value, attr schema.Attribute
 // extractListOfNestedAttributes converts a slice value where each element is
 // processed through extractNestedAttributes. Returns []interface{} where each
 // element is a map[string]interface{} from nested attribute extraction.
-func (p *Processor) extractListOfNestedAttributes(value interface{}, nested []schema.AttributeDefinition) ([]interface{}, error) {
+func (p *Processor) extractListOfNestedAttributes(value interface{}, nested []schema.AttributeDefinition, apiData interface{}, def *schema.ResourceDefinition, vars *[]ExtractedVariable) ([]interface{}, error) {
 	rv := reflect.ValueOf(value)
 	for rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
@@ -594,7 +568,7 @@ func (p *Processor) extractListOfNestedAttributes(value interface{}, nested []sc
 			continue
 		}
 
-		mapped, err := p.extractNestedAttributes(elem.Interface(), nested)
+		mapped, err := p.extractNestedAttributes(elem.Interface(), nested, apiData, def, vars)
 		if err != nil {
 			continue
 		}
