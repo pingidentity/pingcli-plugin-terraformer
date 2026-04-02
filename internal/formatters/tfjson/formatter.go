@@ -224,7 +224,12 @@ func buildAttributes(data *core.ResourceData, def *schema.ResourceDefinition, op
 				continue
 			}
 			slice, ok := val.([]interface{})
-			if !ok || len(slice) == 0 {
+			if !ok {
+				continue
+			}
+			// Empty slice: emit empty array (e.g., nil_value: keep_empty).
+			if len(slice) == 0 {
+				attrs[tName] = []interface{}{}
 				continue
 			}
 			var result []interface{}
@@ -354,7 +359,12 @@ func renderNestedObject(nested []schema.AttributeDefinition, valMap map[string]i
 		// Nested list/set of objects.
 		if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
 			slice, ok := nVal.([]interface{})
-			if !ok || len(slice) == 0 {
+			if !ok {
+				continue
+			}
+			// Empty slice: emit empty array (e.g., nil_value: keep_empty).
+			if len(slice) == 0 {
+				result[nName] = []interface{}{}
 				continue
 			}
 			var listResult []interface{}

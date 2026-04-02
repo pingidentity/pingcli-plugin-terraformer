@@ -370,9 +370,10 @@ func TestFormat_SetWithNestedAttributesEmpty(t *testing.T) {
 	out, err := f.Format(data, def, FormatOptions{})
 	require.NoError(t, err)
 	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
-	// Empty set should be omitted by the formatter
-	_, ok := attrs["tags"]
-	assert.False(t, ok, "empty set should be omitted")
+	// Empty set present in attributes should be rendered as empty array
+	tags, ok := attrs["tags"]
+	assert.True(t, ok, "empty set should be rendered")
+	assert.Equal(t, []interface{}{}, tags, "empty set should be an empty array")
 }
 
 func TestFormat_SetWithNestedAttributesNil(t *testing.T) {
@@ -676,6 +677,48 @@ func TestFormat_OutputEndsWithNewline(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, len(out) > 0)
 	assert.Equal(t, "\n", string(out[len(out)-1]))
+}
+
+// ── nil_value: keep_empty on collection types formatter tests ────
+
+// TestFormat_SetWithNestedAttributesKeepEmpty verifies that an empty
+// []interface{}{} value (produced by the processor when nil_value: keep_empty is
+// configured) for a set-with-nested-attributes renders as "js_links": [] in JSON
+// output rather than being omitted.
+//
+// This test FAILS before the formatter is updated: the tfjson formatter currently
+// skips when len(slice) == 0, omitting the attribute entirely.
+func TestFormat_SetWithNestedAttributesKeepEmpty(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name:          "js_links",
+		TerraformName: "js_links",
+		Type:          "set",
+		NilValue:      "keep_empty",
+		NestedAttributes: []schema.AttributeDefinition{
+			{Name: "value", TerraformName: "value", Type: "string"},
+			{Name: "label", TerraformName: "label", Type: "string"},
+		},
+	})
+	data := baseData("res1", "id1", map[string]interface{}{
+		"js_links": []interface{}{}, // explicitly set empty slice
+	})
+
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+
+	// FAILING ASSERTION: js_links should be present as [] not absent.
+	jsLinksVal, exists := attrs["js_links"]
+	assert.True(t, exists, "js_links should be present in JSON output when nil_value: keep_empty produces an empty slice")
+	if exists {
+		jsLinksSlice, ok := jsLinksVal.([]interface{})
+		assert.True(t, ok, "js_links should be a JSON array, got %T", jsLinksVal)
+		if ok {
+			assert.Empty(t, jsLinksSlice, "js_links should be an empty JSON array []")
+		}
+	}
 }
 
 func TestFormat_ProducesValidJSON(t *testing.T) {

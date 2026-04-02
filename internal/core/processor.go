@@ -344,8 +344,8 @@ func (p *Processor) processOneAttribute(rv reflect.Value, attr schema.AttributeD
 	// Find the field using dot-notation traversal.
 	field, found := findFieldByPath(rv, path)
 	if !found || !field.IsValid() {
-		if attr.NilValue == "keep_empty" {
-			return "", nil
+		if attr.NilValue == "keep_empty" && attr.Type != "list" && attr.Type != "set" {
+			return keepEmptyValue(attr), nil
 		}
 		return nil, nil
 	}
@@ -363,8 +363,8 @@ func (p *Processor) processOneAttribute(rv reflect.Value, attr schema.AttributeD
 
 	// Handle nil pointers.
 	if !field.IsValid() || (field.Kind() == reflect.Ptr && field.IsNil()) {
-		if attr.NilValue == "keep_empty" {
-			return "", nil
+		if attr.NilValue == "keep_empty" && attr.Type != "list" && attr.Type != "set" {
+			return keepEmptyValue(attr), nil
 		}
 		return nil, nil
 	}
@@ -372,8 +372,8 @@ func (p *Processor) processOneAttribute(rv reflect.Value, attr schema.AttributeD
 	// Skip zero-value non-pointer fields (empty string, nil slice, nil map).
 	// Booleans and numbers are kept even at zero since conditional defaults may need them.
 	if !wasPointer && isEmptyValue(field) {
-		if attr.NilValue == "keep_empty" {
-			return "", nil
+		if attr.NilValue == "keep_empty" && attr.Type != "list" && attr.Type != "set" {
+			return keepEmptyValue(attr), nil
 		}
 		return nil, nil
 	}
@@ -392,8 +392,8 @@ func (p *Processor) processOneAttribute(rv reflect.Value, attr schema.AttributeD
 	// Convert based on attribute type.
 	val, err := p.convertValue(field, attr.Type)
 	if err != nil || val == nil {
-		if attr.NilValue == "keep_empty" {
-			return "", nil
+		if attr.NilValue == "keep_empty" && attr.Type != "list" && attr.Type != "set" {
+			return keepEmptyValue(attr), nil
 		}
 		return nil, nil
 	}
@@ -411,6 +411,9 @@ func (p *Processor) processOneAttribute(rv reflect.Value, attr schema.AttributeD
 	if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
 		listVal, lErr := p.extractListOfNestedAttributes(val, attr.NestedAttributes, apiData, def, vars)
 		if lErr != nil || len(listVal) == 0 {
+			if attr.NilValue == "keep_empty" {
+				return []interface{}{}, nil
+			}
 			return nil, nil
 		}
 		return listVal, nil
@@ -578,6 +581,18 @@ func (p *Processor) extractListOfNestedAttributes(value interface{}, nested []sc
 	}
 
 	return result, nil
+}
+
+// keepEmptyValue returns the appropriate "empty" value for an attribute with
+// nil_value: keep_empty. For collection types (list, set) it returns an empty
+// slice; for all other types it returns an empty string.
+func keepEmptyValue(attr schema.AttributeDefinition) interface{} {
+	switch attr.Type {
+	case "list", "set":
+		return []interface{}{}
+	default:
+		return ""
+	}
 }
 
 // isEmptyValue returns true for values that represent "not set" when the field

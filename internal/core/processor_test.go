@@ -1682,3 +1682,137 @@ func TestProcessorNilValueOmit(t *testing.T) {
 	_, exists := result.Attributes["console_url"]
 	assert.False(t, exists, "console_url should not exist when nil_value: omit")
 }
+
+// ── nil_value: keep_empty on collection types tests ─────────────
+
+// MockJsLink represents a single item in a JsLinks set/list,
+// used for nil_value: keep_empty collection tests.
+type MockJsLink struct {
+	Value string
+	Label string
+	Type  *string
+}
+
+// MockFlowWithJsLinks models a resource with a direct JsLinks slice field.
+type MockFlowWithJsLinks struct {
+	ID      string
+	Name    string
+	JsLinks []MockJsLink
+}
+
+// MockFlowWithJsLinksPtr models a resource with a pointer-to-slice JsLinks field.
+type MockFlowWithJsLinksPtr struct {
+	ID      string
+	Name    string
+	JsLinks *[]MockJsLink
+}
+
+func jsLinksCollectionDef(resourceType, nilValue, attrType string) *schema.ResourceDefinition {
+	return &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "test",
+			ResourceType: resourceType,
+			APIType:      "JsLinksResource",
+			Name:         "JsLinks Resource Test",
+			ShortName:    "jslinks",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			IDField:   "ID",
+			NameField: "Name",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string", SourcePath: "ID"},
+			{Name: "Name", TerraformName: "name", Type: "string", SourcePath: "Name"},
+			{
+				Name:          "JsLinks",
+				TerraformName: "js_links",
+				Type:          attrType,
+				SourcePath:    "JsLinks",
+				NilValue:      nilValue,
+				NestedAttributes: []schema.AttributeDefinition{
+					{Name: "Value", TerraformName: "value", Type: "string", SourcePath: "Value"},
+					{Name: "Label", TerraformName: "label", Type: "string", SourcePath: "Label"},
+					{Name: "Type", TerraformName: "type", Type: "string", SourcePath: "Type"},
+				},
+			},
+		},
+	}
+}
+
+// TestProcessorNilValueKeepEmpty_SetWithNestedAttrs_EmptySlice verifies that
+// nil_value: keep_empty on a set attribute returns []interface{}{} (not nil or absent)
+// when the API provides an empty non-nil slice.
+//
+// This test FAILS before the fix: extractListOfNestedAttributes returns an empty
+// slice which triggers the len==0 guard in processOneAttribute, returning nil,nil
+// so the attribute is omitted entirely.
+func TestProcessorNilValueKeepEmpty_SetWithNestedAttrs_EmptySlice(t *testing.T) {
+	def := jsLinksCollectionDef("test_jslinks_set_empty", "keep_empty", "set")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockFlowWithJsLinks{
+		ID:      "flow-1",
+		Name:    "my_flow",
+		JsLinks: []MockJsLink{}, // empty but non-nil slice
+	}
+
+	result, err := p.ProcessResource("test_jslinks_set_empty", mock)
+	require.NoError(t, err)
+
+	jsLinks, exists := result.Attributes["js_links"]
+	assert.True(t, exists, "js_links should exist when nil_value: keep_empty is set on a set with an empty slice")
+	assert.Equal(t, []interface{}{}, jsLinks,
+		"js_links should be []interface{}{} not nil/absent when nil_value: keep_empty on a set with empty slice")
+}
+
+// TestProcessorNilValueKeepEmpty_SetWithNestedAttrs_NilPointer verifies that
+// nil_value: keep_empty on a set attribute omits the attribute when the API
+// provides a nil pointer to a slice (meaning the field is absent from the API
+// response). Only non-nil empty slices should be kept as [].
+func TestProcessorNilValueKeepEmpty_SetWithNestedAttrs_NilPointer(t *testing.T) {
+	def := jsLinksCollectionDef("test_jslinks_set_nil", "keep_empty", "set")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockFlowWithJsLinksPtr{
+		ID:      "flow-2",
+		Name:    "my_flow_nil",
+		JsLinks: nil, // nil pointer to slice — field absent from API
+	}
+
+	result, err := p.ProcessResource("test_jslinks_set_nil", mock)
+	require.NoError(t, err)
+
+	_, exists := result.Attributes["js_links"]
+	assert.False(t, exists, "js_links should be omitted when the API provides a nil pointer (field absent)")
+}
+
+// TestProcessorNilValueKeepEmpty_ListWithNestedAttrs_EmptySlice verifies that
+// nil_value: keep_empty on a list attribute returns []interface{}{} (not nil or absent)
+// when the API provides an empty non-nil slice.
+//
+// This test FAILS before the fix: same len==0 guard as the set case omits the attribute.
+func TestProcessorNilValueKeepEmpty_ListWithNestedAttrs_EmptySlice(t *testing.T) {
+	def := jsLinksCollectionDef("test_jslinks_list_empty", "keep_empty", "list")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockFlowWithJsLinks{
+		ID:      "flow-3",
+		Name:    "my_flow_list",
+		JsLinks: []MockJsLink{}, // empty but non-nil slice
+	}
+
+	result, err := p.ProcessResource("test_jslinks_list_empty", mock)
+	require.NoError(t, err)
+
+	jsLinks, exists := result.Attributes["js_links"]
+	assert.True(t, exists, "js_links should exist when nil_value: keep_empty is set on a list with an empty slice")
+	assert.Equal(t, []interface{}{}, jsLinks,
+		"js_links should be []interface{}{} not nil/absent when nil_value: keep_empty on a list with empty slice")
+}

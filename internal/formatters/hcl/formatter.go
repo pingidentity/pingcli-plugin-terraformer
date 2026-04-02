@@ -326,7 +326,17 @@ func writeListOfObjectsBlock(parentBody *hclwrite.Body, attrDef schema.Attribute
 	}
 
 	slice, ok := val.([]interface{})
-	if !ok || len(slice) == 0 {
+	if !ok {
+		return
+	}
+
+	// Empty slice: emit attribute_name = [] (e.g., nil_value: keep_empty).
+	if len(slice) == 0 {
+		parentBody.AppendNewline()
+		parentBody.SetAttributeRaw(tName, hclwrite.Tokens{
+			{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")},
+			{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")},
+		})
 		return
 	}
 
@@ -450,7 +460,16 @@ func nestedObjectTokens(indent, closingIndent string, nested []schema.AttributeD
 		// Nested list/set of objects: render as name = [ { ... }, { ... } ]
 		if (attr.Type == "list" || attr.Type == "set") && len(attr.NestedAttributes) > 0 {
 			slice, ok := nVal.([]interface{})
-			if !ok || len(slice) == 0 {
+			if !ok {
+				continue
+			}
+			// Empty slice: emit name = [] (e.g., nil_value: keep_empty).
+			if len(slice) == 0 {
+				tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte(indent + nName)})
+				tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenEqual, Bytes: []byte(" = ")})
+				tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenOBrack, Bytes: []byte("[")})
+				tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenCBrack, Bytes: []byte("]")})
+				tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
 				continue
 			}
 			childIndent := indent + "  "
