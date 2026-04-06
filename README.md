@@ -65,8 +65,10 @@ make build
 ## Prerequisites
 
 - PingOne environment with DaVinci
-- PingOne worker application with DaVinci API Read access
 - Terraform 1.5+ (for import blocks)
+- PingOne worker application with `DaVinci Admin Read Only` role access
+
+> NOTE: Generating DaVinci Variable resource references on DaVinci Flow resources use an API POST call that requires the PingOne worker application to have the `DaVinci Admin` role. DaVinci Flows use references dependent variables to properly order the deletion of resources. The tool will produce a warning if this API call cannot be completed.
 
 ## Configuration
 

@@ -66,6 +66,7 @@ internal/
         orchestrator.go    # ExportOrchestrator — pipeline coordinator
         processor.go       # Processor — single-resource processing
         apidata.go         # Reflection-based struct field readers
+        embedded_references.go # Embedded reference resolution engine
         transforms.go      # Standard transform implementations
         custom_handlers.go # CustomHandlerRegistry, func types
         handler_queue.go   # Init-time handler queuing
@@ -283,6 +284,30 @@ Most resources need only declarative YAML with standard transforms (`passthrough
 - `utils.SanitizeVariableName(name)` for Terraform variable identifiers
 
 These are shared utilities maintained in `internal/utils/sanitize.go`. Duplicating sanitization logic across packages creates inconsistency and maintenance debt.
+
+### Runtime Dependencies in Custom Handlers
+
+When a custom handler discovers dependencies at processing time, it can emit them to be rendered as Terraform `depends_on` meta-arguments:
+
+```go
+func handleMyResource(apiData interface{}, def *schema.ResourceDefinition) (map[string]interface{}, error) {
+    result := make(map[string]interface{})
+    
+    // ... process resource ...
+    
+    // Emit runtime dependencies via the __depends_on sentinel key
+    result["__depends_on"] = []core.RuntimeDependsOn{
+        {
+            ResourceType: "pingone_davinci_flow",
+            ResourceID:   flowID,  // Raw UUID from API data
+        },
+    }
+    
+    return result, nil
+}
+```
+
+The orchestrator intercepts the `__depends_on` key, stores the entries in `ResourceData.DependsOnResources`, and resolves ResourceIDs to labels via the dependency graph. Both HCL and tfjson formatters render resolved dependencies as `depends_on` blocks.
 
 ### When a Custom Transform Is Needed
 
@@ -822,11 +847,11 @@ go tool pprof mem.prof
 | `--out`, `-o` | `string` | | Output directory path |
 | `--output-format` | `string` | `"hcl"` | Output format: `hcl` or `tfjson` |
 | `--skip-dependencies` | `bool` | `false` | Skip dependency resolution |
-| `--skip-imports` | `bool` | `false` | Skip generating import blocks |
 | `--include-imports` | `bool` | `false` | Generate import blocks in root module |
 | `--include-resources` | `string` | | Include resources matching glob/regex pattern(s). Repeatable. Patterns match `resource_type.terraform_label` (case-insensitive). Use `regex:` prefix for regex patterns. Multiple patterns combine via OR. |
 | `--exclude-resources` | `string` | | Exclude resources matching glob/regex pattern(s). Repeatable. Same matching rules as `include-resources`. Takes precedence over includes. |
 | `--list-resources` | `bool` | `false` | List all resource addresses (`resource_type.terraform_label`) and exit. Useful for discovering exact addresses to use with include/exclude patterns. |
+| `--include-upstream` | `bool` | `false` | When combined with `--include-resources`, automatically include upstream dependencies (resources referenced by matched resources). BFS traversal is transitive. Explicit `--exclude-resources` always takes priority. |
 | `--include-values` | `bool` | `false` | Populate variable values from export |
 | `--module-dir` | `string` | `"ping-export-module"` | Child module directory name |
 | `--module-name` | `string` | `"ping-export"` | Module name / prefix |
@@ -862,6 +887,7 @@ metadata:
   name: <human_readable_name>
   short_name: <short>                 # Used in filenames
   version: "1.0"
+  enabled: true|false                 # Optional; default true (enabled). Set to false to exclude from export.
 
 api:
   sdk_package: <go_import_path>
@@ -890,6 +916,7 @@ attributes:
     transform: <transform_name>         # Standard transform
     custom_transform: <handler_name>     # Custom transform (requires transform: custom)
     override_value: <constant>           # Force this value regardless of API data
+    nil_value: keep_empty|omit           # Optional; default omit. keep_empty preserves empty strings/collections
     value_map:                           # Declarative value normalization
       <api_value>: <terraform_value>
     value_map_default: <fallback>
@@ -997,9 +1024,30 @@ Custom transforms are reserved for transformations that cannot be expressed decl
 
 Verify against the actual SDK type at `github.com/pingidentity/pingone-go-client`.
 
+### How do I prevent an attribute from being omitted when the API returns nil?
+
+Set `nil_value: keep_empty` in the attribute definition. This causes nil values to produce empty strings or empty collections instead of being skipped. For collection types, this distinguishes between a nil pointer (`nil`) — which is omitted — and a non-nil empty slice (`[]`) — which is preserved as an empty array in the output.
+
+### How do I emit a depends_on from a custom handler?
+
+Return a slice of `core.RuntimeDependsOn` entries via the `__depends_on` sentinel key in your handler's result map:
+
+```go
+func myHandler(apiData interface{}, def *schema.ResourceDefinition) (map[string]interface{}, error) {
+    result := make(map[string]interface{})
+    // ... process resource ...
+    result["__depends_on"] = []core.RuntimeDependsOn{
+        {ResourceType: "pingone_davinci_flow", ResourceID: someFlowID},
+    }
+    return result, nil
+}
+```
+
+The orchestrator resolves ResourceIDs to Terraform labels and emits a `depends_on` block in the output.
+
 ### How does the processor handle SDK-specific types?
 
-The processor coerces SDK types to Go primitives before processing:
+The processor uses Go reflection (`reflect` package) to traverse struct fields. SDK-specific types are coerced to Go primitives during extraction:
 - `uuid.UUID` → `string` via `.String()`
 - SDK enum types implementing `fmt.Stringer` → `string` via `.String()`
 - Pointer types → dereferenced to underlying value

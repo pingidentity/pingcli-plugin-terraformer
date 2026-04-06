@@ -126,6 +126,7 @@ internal/
     core/
         apidata.go         # Reflection-based struct field readers
         custom_handlers.go # CustomHandlerRegistry and CustomTransformFunc
+        embedded_references.go # Embedded reference resolution engine
         handler_queue.go   # Init-time handler queuing
         orchestrator.go    # ExportOrchestrator (full pipeline)
         processor.go       # Processor (single-resource processing)
@@ -193,8 +194,16 @@ type ResourceMetadata struct {
     Name         string `yaml:"name"`           // "DaVinci Variable"
     ShortName    string `yaml:"short_name"`     // "variable"
     Version      string `yaml:"version"`        // "1.0"
+    Enabled      *bool  `yaml:"enabled,omitempty"` // Tri-state: nil = enabled (default), false = disabled, true = explicitly enabled
 }
 ```
+
+**Enabled Field**: The `Enabled` flag is a tri-state field that controls whether a resource definition is loaded into the registry:
+- `nil` (omitted in YAML): Enabled by default
+- `false`: Disabled — definition is filtered out during schema loading and never enters the registry
+- `true`: Explicitly enabled (reserved for future use)
+
+Disabled definitions are never visible to the export pipeline.
 
 ### APIDefinition
 
@@ -241,6 +250,7 @@ type AttributeDefinition struct {
     MaskedSecret           *MaskedSecretConfig           `yaml:"masked_secret,omitempty"`
     TypeDiscriminatedBlock *TypeDiscriminatedBlockConfig `yaml:"type_discriminated_block,omitempty"`
     OverrideValue          interface{}                   `yaml:"override_value,omitempty"`
+    NilValue               string                        `yaml:"nil_value,omitempty"`
 }
 ```
 
@@ -254,6 +264,7 @@ type AttributeDefinition struct {
 - `ValueMap` / `ValueMapDefault`: Declarative API-to-Terraform value normalization
 - `OverrideValue`: Forces a constant value regardless of API response
 - `MaskedSecret`: Configures sentinel detection and variable substitution for masked secret API values
+- `NilValue`: Controls how nil values are handled. When set to `"keep_empty"`, nil values produce empty strings or empty collections instead of being omitted. For collection types with non-nil empty slices, this distinguishes nil pointer (omit) from empty slice (preserve as `[]`)
 
 ### Declarative Attribute Patterns
 
@@ -342,10 +353,10 @@ func (p *Processor) ProcessResourceList(resourceType string, apiDataList interfa
 1. Extract raw values from API data per `source_path` (reflection-based)
 2. Handle `type_discriminated_block` attributes
 3. Handle `override_value` attributes
-4. Extract nested attributes for `object`/`list`/`map` types
-5. Apply transforms (standard or custom)
+4. Extract nested attributes for `object`/`list`/`map` types (via unified `processOneAttribute` helper)
+5. Apply transforms (standard or custom) and handle `nil_value` behavior for each attribute
 6. Populate dependencies from schema
-7. Run resource-level custom handlers (if any)
+7. Run resource-level custom handlers (if any) — may emit `__depends_on` sentinel for runtime dependencies
 8. Evaluate `conditional_defaults`
 
 ### ResourceData (Intermediate Representation)
@@ -359,8 +370,21 @@ type ResourceData struct {
     Attributes         map[string]interface{}    // Processed attribute values
     Dependencies       []Dependency
     ExtractedVariables []ExtractedVariable
+    DependsOnResources []RuntimeDependsOn        // Runtime-discovered dependencies for Terraform depends_on
 }
 ```
+
+### RuntimeDependsOn
+
+```go
+type RuntimeDependsOn struct {
+    ResourceType string  // e.g., "pingone_davinci_variable"
+    ResourceID   string  // Raw UUID of the dependency
+    Label        string  // Resolved Terraform label (populated by orchestrator)
+}
+```
+
+**Runtime Dependencies**: Custom handlers can discover dependencies at processing time and emit them via a special `__depends_on` sentinel key in the returned attribute map. The orchestrator intercepts this key, stores the entries in `DependsOnResources`, and resolves ResourceIDs to labels via the dependency graph. Both HCL and tfjson formatters render these as Terraform `depends_on` meta-arguments.
 
 ### ResolvedReference
 
@@ -395,10 +419,11 @@ Coordinates the full export pipeline:
 // internal/core/orchestrator.go
 
 type ExportOrchestrator struct {
-    registry   *schema.Registry
-    processor  *Processor
-    client     clients.APIClient
-    progressFn ProgressFunc
+    registry     *schema.Registry
+    processor    *Processor
+    client       clients.APIClient
+    progressFn   ProgressFunc
+    embeddedRefs *EmbeddedReferenceRegistry
 }
 
 func NewExportOrchestrator(registry, processor, client, ...opts) *ExportOrchestrator
@@ -407,24 +432,39 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 ```
 
 **Pipeline steps**:
-1. Discover resource types from registry for the client's platform/service
+1. Discover resource types from registry for the client's platform/service, filtering out disabled definitions (`enabled: false`)
 2. Order by declared dependencies (topological sort via Kahn's algorithm)
 3. For each type: fetch from API → process via Processor → assign unique labels → populate graph
-4. Resolve cross-resource references (replace UUID strings with `ResolvedReference` values)
-5. Validate dependency graph
-6. Return `ExportResult`
+4. Apply resource filtering (if configured) after label assignment — excluded resources are never added to graph
+5. Resolve embedded references (post-process RawHCLValue blobs for UUID replacements)
+6. Apply upstream expansion (if `--include-upstream`): BFS traversal adds dependencies of filtered resources
+7. Resolve cross-resource references (replace UUID strings with `ResolvedReference` values)
+8. Resolve runtime dependencies (populate `Label` field in `RuntimeDependsOn` entries via graph lookup)
+9. Validate dependency graph
+10. Return `ExportResult` with `FallbackVariables` for filter-excluded upstream resources
 
 ```go
 type ExportOptions struct {
-    SkipDependencies bool    // Raw UUIDs instead of Terraform references
+    SkipDependencies bool                    // Raw UUIDs instead of Terraform references
     GenerateImports  bool
     EnvironmentID    string
+    ResourceFilter   *filter.ResourceFilter  // Include/exclude patterns; nil = no filtering
+    ListOnly         bool                    // Return resources after processing, skip reference resolution
+    IncludeUpstream  bool                    // Auto-expand upstream dependencies when filtering
 }
 
 type ExportResult struct {
-    ResourcesByType []*ExportedResourceData
-    Graph           *graph.DependencyGraph
-    EnvironmentID   string
+    ResourcesByType   []*ExportedResourceData
+    Graph             *graph.DependencyGraph
+    EnvironmentID     string
+    FallbackVariables []FallbackVariable      // Variables for filter-excluded referenced resources
+}
+
+type FallbackVariable struct {
+    Name         string  // Terraform variable name
+    Type         string  // "string" for ID references
+    Description  string
+    ResourceType string  // For organizational grouping
 }
 ```
 
@@ -663,10 +703,13 @@ type APIClient interface {
     ListResources(ctx context.Context, resourceType string, envID string) ([]interface{}, error)
     GetResource(ctx context.Context, resourceType string, envID string, resourceID string) (interface{}, error)
     Platform() string
+    Warnings() []string  // Returns non-fatal warnings collected during resource operations
 }
 ```
 
 The orchestrator calls **only** `ListResources`. It never calls `GetResource` directly. `ListResources` returns fully-populated SDK structs. When the underlying list API returns summary data, the implementation internally calls `GetResource` for each item (list-then-get pattern).
+
+Clients may collect non-fatal warnings during resource operations (e.g., 403 errors on certain endpoints). The cmd layer drains these via `Warnings()` after `orchestrator.Export()` and logs them for user visibility.
 
 ### Platform Package Structure
 
@@ -711,16 +754,16 @@ func init() {
 
 ### Currently Supported Resources
 
-| Resource Type | Custom Handler |
-|--------------|----------------|
-| `pingone_environment` | None (projection struct) |
-| `pingone_davinci_variable` | None (fully declarative) |
-| `pingone_davinci_flow` | None (fully declarative) |
-| `pingone_davinci_flow_deploy` | None (projection struct) |
-| `pingone_davinci_flow_enable` | None |
-| `pingone_davinci_connector_instance` | `handleConnectorProperties` (custom transform) |
-| `pingone_davinci_application` | None |
-| `pingone_davinci_application_flow_policy` | None |
+| Resource Type | Custom Handler | Status |
+|--------------|-----------------|--------|
+| `pingone_environment` | None (projection struct) | Disabled (`enabled: false`) |
+| `pingone_davinci_variable` | None (fully declarative) | Enabled |
+| `pingone_davinci_flow` | Resource handler + embedded refs | Enabled |
+| `pingone_davinci_flow_deploy` | None (projection struct) | Enabled |
+| `pingone_davinci_flow_enable` | None | Enabled |
+| `pingone_davinci_connector_instance` | `handleConnectorProperties` (custom transform) | Enabled |
+| `pingone_davinci_application` | None | Enabled |
+| `pingone_davinci_application_flow_policy` | None | Enabled |
 
 ---
 
@@ -741,6 +784,7 @@ func (g *DependencyGraph) GenerateTerraformReference(resourceType, resourceID, a
 func (g *DependencyGraph) TopologicalSort() ([]ResourceNode, error)
 func (g *DependencyGraph) DetectCycles() [][]ResourceNode
 func (g *DependencyGraph) Validate() error
+func (g *DependencyGraph) WalkDependencies(seeds []ResourceNode) []ResourceNode  // BFS traversal for upstream expansion
 ```
 
 Thread-safe. Supports cycle detection via DFS, topological sorting via Kahn's algorithm, and dangling edge validation.
@@ -785,6 +829,15 @@ The `VariableExtractor` (`internal/variables/extractor.go`) evaluates schema-dri
 - Handles `type_discriminated_block` value unwrapping for tfvars output
 - Custom transforms can also produce variables via `TransformResultWithVariables`
 - **Variable names are sanitized via `utils.SanitizeVariableName()` to ensure valid Terraform identifiers**
+
+### HCL Template Character Escaping in tfvars
+
+When writing variable values to `.auto.tfvars` files, the module generator escapes HCL template sequences to prevent Terraform interpolation or directive errors:
+
+- `${` (interpolation syntax) → `$${}` 
+- `%{` (directive syntax) → `%%{`
+
+This ensures literal string values containing these sequences are preserved and not misinterpreted as Terraform expressions during plan/apply.
 
 ---
 

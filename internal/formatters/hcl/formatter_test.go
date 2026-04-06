@@ -380,8 +380,8 @@ func TestFormatter_Format_SetWithNestedAttributesEmpty(t *testing.T) {
 
 	output, err := f.Format(data, def, hclformatter.FormatOptions{})
 	require.NoError(t, err)
-	// Empty set should be omitted
-	assert.NotContains(t, output, "tags")
+	// Empty set should be rendered as attribute_name = []
+	assert.Contains(t, output, "tags = []")
 }
 
 func TestFormatter_Format_SetWithNestedAttributesNil(t *testing.T) {
@@ -867,4 +867,39 @@ func TestFormatter_Format_TypeDiscriminatedBlockVariableReference(t *testing.T) 
 		"type_discriminated_block should contain a block")
 	assert.Contains(t, output, "var.davinci_variable_test_value",
 		"variable references inside type_discriminated_block must render as var.X")
+}
+
+// ── nil_value: keep_empty on collection types formatter tests ────
+
+// TestFormatter_Format_SetWithNestedAttributesKeepEmpty verifies that an empty
+// []interface{}{} value (produced by the processor when nil_value: keep_empty is
+// configured) for a set-with-nested-attributes renders as "js_links = []" rather
+// than being omitted.
+//
+// This test FAILS before the formatter is updated: writeListOfObjectsBlock
+// currently returns early when len(slice) == 0, omitting the attribute entirely.
+func TestFormatter_Format_SetWithNestedAttributesKeepEmpty(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := minimalVariableDef()
+	def.Attributes = append(def.Attributes, schema.AttributeDefinition{
+		Name:          "JsLinks",
+		TerraformName: "js_links",
+		Type:          "set",
+		NilValue:      "keep_empty",
+		NestedAttributes: []schema.AttributeDefinition{
+			{Name: "Value", TerraformName: "value", Type: "string"},
+			{Name: "Label", TerraformName: "label", Type: "string"},
+		},
+	})
+	data := resourceData()
+	data.Attributes["js_links"] = []interface{}{} // explicitly set empty slice
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{SkipDependencies: true})
+	require.NoError(t, err)
+
+	// FAILING ASSERTIONS: js_links should be present as an empty list assignment.
+	assert.Contains(t, output, "js_links",
+		"js_links should be present in HCL output when nil_value: keep_empty produces an empty slice")
+	assert.Contains(t, output, "= []",
+		"js_links should render as an empty list assignment when value is []interface{}{}")
 }

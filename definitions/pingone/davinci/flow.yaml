@@ -228,6 +228,7 @@ attributes:
         terraform_name: js_links
         type: set
         source_path: JsLinks
+        nil_value: keep_empty
         nested_attributes:
           - name: Value
             terraform_name: value

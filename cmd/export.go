@@ -424,6 +424,7 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 			Type:         fv.Type,
 			Description:  fv.Description,
 			ResourceType: fv.ResourceType,
+			Default:      fv.Default,
 		})
 	}
 
