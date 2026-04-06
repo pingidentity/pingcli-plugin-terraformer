@@ -18,7 +18,7 @@ Fallback variables now carry a `Default` value (the original UUID) so that `--in
 
 ````plaintext
 ```release-note:enhancement
-PingOne form value is now a variable if found in `pingOneFormsConnector` properties to allow configuring value per environment.
+`resource/pingone_davinci_flow`: PingOne form value is now a variable if found in `pingOneFormsConnector` properties to allow configuring value per environment.
 ```
 ````
 
