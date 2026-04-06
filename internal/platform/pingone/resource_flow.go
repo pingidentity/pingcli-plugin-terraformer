@@ -43,6 +43,22 @@ func init() {
 		JSONKeyPath:        "subFlowId.value.value",
 		ReferenceField:     "id",
 	})
+
+	// Embedded reference with fallback: form.value inside node properties
+	// references a DaVinci form. The form resource is not yet exported, so
+	// the UUID is emitted as a Terraform variable. When pingone_davinci_form
+	// is added, the graph lookup will succeed and the variable will be
+	// automatically promoted to a resource reference.
+	registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_form",
+		JSONKeyPath:        "form.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_form",
+		VariableNamingPath: "nodeTitle.value",
+	})
 }
 
 // listFlows implements list-then-get: lists all flows to collect IDs,

@@ -1,0 +1,16 @@
+= Release Notes for v0.2.0
+:toc:
+:toclevels: 3
+:sectnums:
+
+Release Date: 2026-04-01
+
+== ENHANCEMENTS
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown[unknown] `resource/pingone_davinci_flow_deploy`: Added support for import block generation. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6[#6]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown[unknown] `resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6[#6]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown[unknown] `resource/pingone_davinci_flow`: Added `depends_on` block generation referencing `pingone_davinci_variable` resources used by the flow. Variable dependencies are discovered at runtime via the flow versions API and rendered as Terraform `depends_on` meta-arguments in both HCL and TF JSON output formats. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6[#6]
+
+== BUG FIXES
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown[unknown] Fixed `nil_value: keep_empty` not applying to nested attributes inside objects, lists, and sets. Attributes with this setting now correctly emit `""` at any nesting depth. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6[#6]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown[unknown] Fixed HCL template sequences (`${` and `%{`) in string values not being escaped in generated `.tfvars` files, which caused Terraform interpolation/directive errors. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6[#6]
+

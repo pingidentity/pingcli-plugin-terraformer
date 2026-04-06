@@ -1,0 +1,29 @@
+````plaintext
+```release-note:feature
+Added new filtering flags to specify which resources are included in the generated import as well as if upstream dependencies should be included. 
+```
+````
+
+````plaintext
+```release-note:feature
+Added embedded reference strategy system (`reference`, `reference_with_fallback`, `variable`) for resolving UUIDs inside `jsonencode` node properties. DaVinci form UUIDs in flow `graph_data` are now emitted as Terraform input variables with human-readable names derived from the node title.
+```
+````
+
+````plaintext
+```release-note:enhancement
+Fallback variables now carry a `Default` value (the original UUID) so that `--include-values` can populate `.tfvars` files with the raw ID.
+```
+````
+
+````plaintext
+```release-note:note
+bump target PingOne Teraform Provider version 0.16.0-beta.2 => 0.18.0
+```
+````
+
+````plaintext
+```release-note:note
+Updated README prerequisites: PingOne DaVinci export requires `DaVinci Admin Read Only` role. The `DaVinci Admin` role is recommended for full DaVinci Variable dependency resolution on flow resources.
+```
+````

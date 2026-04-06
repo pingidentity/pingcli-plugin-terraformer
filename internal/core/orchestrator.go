@@ -81,6 +81,9 @@ type FallbackVariable struct {
 
 	// ResourceType is the referenced resource type for organizational grouping.
 	ResourceType string
+
+	// Default is the original value (e.g., UUID) to populate in tfvars when --include-values is set.
+	Default interface{}
 }
 
 // ProgressFunc is called by the orchestrator to report status.
@@ -241,8 +244,9 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	// inside jsonencode'd node properties). Must run after the graph is
 	// fully populated and before upstream expansion so discovered edges
 	// are visible to the graph walker.
+	var embeddedFallbackVars []FallbackVariable
 	if o.embeddedRefs != nil && !opts.SkipDependencies {
-		ResolveEmbeddedReferences(results, depGraph, o.embeddedRefs.Rules())
+		embeddedFallbackVars = ResolveEmbeddedReferences(results, depGraph, o.embeddedRefs.Rules())
 	}
 
 	// When IncludeUpstream is active, build edges and apply filter + expansion
@@ -275,6 +279,9 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	var fallbackVars []FallbackVariable
 	if !opts.SkipDependencies {
 		fallbackVars = o.resolveReferences(results, depGraph, opts.EnvironmentID, excludedIDs)
+
+		// Merge in fallback variables from embedded reference resolution.
+		fallbackVars = append(fallbackVars, embeddedFallbackVars...)
 
 		// Resolve runtime depends_on entries (custom handler __depends_on)
 		// to Terraform labels via the dependency graph.
@@ -422,6 +429,7 @@ func collectFallbackVars(attrs map[string]interface{}, defs []schema.AttributeDe
 					Type:         "string",
 					Description:  fmt.Sprintf("ID of %s resource (excluded from export)", ref.ResourceType),
 					ResourceType: ref.ResourceType,
+					Default:      ref.OriginalValue,
 				})
 			}
 			continue
