@@ -17,6 +17,12 @@ Fallback variables now carry a `Default` value (the original UUID) so that `--in
 ````
 
 ````plaintext
+```release-note:enhancement
+PingOne form value is now a variable if found in `pingOneFormsConnector` properties to allow configuring value per environment.
+```
+````
+
+````plaintext
 ```release-note:note
 bump target PingOne Teraform Provider version 0.16.0-beta.2 => 0.18.0
 ```

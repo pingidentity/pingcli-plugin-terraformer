@@ -9,6 +9,7 @@
 [65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) `resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
 [65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) `resource/pingone_davinci_flow`: Added `depends_on` block generation referencing `pingone_davinci_variable` resources used by the flow. Variable dependencies are discovered at runtime via the flow versions API and rendered as Terraform `depends_on` meta-arguments in both HCL and TF JSON output formats. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
 [4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) Fallback variables now carry a `Default` value (the original UUID) so that `--include-values` can populate `.tfvars` files with the raw ID. [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
+[4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) PingOne form value is now a variable if found in `pingOneFormsConnector` properties to allow configuring value per environment. [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
 
 ### BUG FIXES
 
