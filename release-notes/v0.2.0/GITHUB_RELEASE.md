@@ -1,11 +1,22 @@
+### FEATURES
+
+[4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) Added new filtering flags to specify which resources are included in the generated import as well as if upstream dependencies should be included.  [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
+[4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) Added embedded reference strategy system (`reference`, `reference_with_fallback`, `variable`) for resolving UUIDs inside `jsonencode` node properties. DaVinci form UUIDs in flow `graph_data` are now emitted as Terraform input variables with human-readable names derived from the node title. [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
+
 ### ENHANCEMENTS
 
-[unknown](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown) `resource/pingone_davinci_flow_deploy`: Added support for import block generation. [#6](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6)
-[unknown](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown) `resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes. [#6](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6)
-[unknown](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown) `resource/pingone_davinci_flow`: Added `depends_on` block generation referencing `pingone_davinci_variable` resources used by the flow. Variable dependencies are discovered at runtime via the flow versions API and rendered as Terraform `depends_on` meta-arguments in both HCL and TF JSON output formats. [#6](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6)
+[65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) `resource/pingone_davinci_flow_deploy`: Added support for import block generation. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
+[65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) `resource/pingone_davinci_flow`: Updated definition to keep empty values on required `js_links` child attributes. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
+[65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) `resource/pingone_davinci_flow`: Added `depends_on` block generation referencing `pingone_davinci_variable` resources used by the flow. Variable dependencies are discovered at runtime via the flow versions API and rendered as Terraform `depends_on` meta-arguments in both HCL and TF JSON output formats. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
+[4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) Fallback variables now carry a `Default` value (the original UUID) so that `--include-values` can populate `.tfvars` files with the raw ID. [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
 
 ### BUG FIXES
 
-[unknown](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown) Fixed `nil_value: keep_empty` not applying to nested attributes inside objects, lists, and sets. Attributes with this setting now correctly emit `""` at any nesting depth. [#6](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6)
-[unknown](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/unknown) Fixed HCL template sequences (`${` and `%{`) in string values not being escaped in generated `.tfvars` files, which caused Terraform interpolation/directive errors. [#6](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/6)
+[65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) Fixed `nil_value: keep_empty` not applying to nested attributes inside objects, lists, and sets. Attributes with this setting now correctly emit `""` at any nesting depth. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
+[65a8bea](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/65a8bea) Fixed HCL template sequences (`${` and `%{`) in string values not being escaped in generated `.tfvars` files, which caused Terraform interpolation/directive errors. [#7](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/7)
+
+### NOTES
+
+[4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) bump target PingOne Teraform Provider version 0.16.0-beta.2 => 0.18.0 [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
+[4fa2f5b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/4fa2f5b) Updated README prerequisites: PingOne DaVinci export requires `DaVinci Admin Read Only` role. The `DaVinci Admin` role is recommended for full DaVinci Variable dependency resolution on flow resources. [#8](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/8)
 
