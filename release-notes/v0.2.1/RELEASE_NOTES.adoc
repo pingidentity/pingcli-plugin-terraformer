@@ -1,0 +1,13 @@
+= Release Notes for v0.2.1
+:toc:
+:toclevels: 3
+:sectnums:
+
+Release Date: 2026-04-16
+
+== ENHANCEMENTS
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/c98c663[c98c663] `resource/pingone_davinci_flow`: Flow variable dependency fetch errors are now treated as warnings instead of fatal errors. The export continues without `depends_on` references to DaVinci variables rather than failing entirely. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/9[#9]
+
+== BUG FIXES
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/c98c663[c98c663] `resource/pingone_davinci_flow`: Fixed flow version export URL construction to use the SDK's configured regional host instead of the default NA endpoint. This resolves 403 errors when the worker application exists in a different environment than the export target. link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/9[#9]
+
