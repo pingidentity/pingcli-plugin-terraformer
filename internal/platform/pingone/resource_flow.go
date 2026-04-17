@@ -10,15 +10,11 @@ import (
 	"reflect"
 	"sync"
 
-	pingoneGoClient "github.com/pingidentity/pingone-go-client/pingone"
-	"golang.org/x/oauth2"
-
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 )
 
 // errAccessDenied is returned by fetchFlowVariableDeps when the API returns 403.
-// Callers should log a warning and continue rather than failing the export.
 var errAccessDenied = errors.New("access denied")
 
 // flowVariableDeps caches variable dependency info per flow ID.
@@ -84,7 +80,8 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 					"The flow versions endpoint requires a role with higher privileges than Read Only. "+
 					"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
 			} else {
-				return nil, fmt.Errorf("fetch flow variable deps for %s: %w", flow.GetId(), err)
+				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
+					"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
 			}
 		}
 
@@ -107,7 +104,8 @@ func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (inter
 					"The flow versions endpoint requires a role with higher privileges than Read Only. "+
 					"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
 			} else {
-				return nil, fmt.Errorf("fetch flow variable deps for %s: %w", detail.GetId(), err)
+				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
+					"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
 			}
 		}
 	}
@@ -115,20 +113,23 @@ func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (inter
 	return detail, nil
 }
 
-// fetchFlowVariableDeps calls the flow versions endpoint via raw HTTP POST
+// fetchFlowVariableDeps calls the flow version export endpoint via raw HTTP POST
 // and caches variable dependency info for the given flow.
+// The export endpoint (POST with Content-Type application/vnd.pingidentity.flowversion.export+json)
+// returns the "variables" array that the standard GET endpoint omits.
 // Endpoint: POST /environments/{envID}/flows/{flowID}/versions/{versionID}
-// Returns an error if the API call fails. If no variables are returned, processing continues quietly.
+// Returns an error on any failure; callers log a warning and continue.
 func fetchFlowVariableDeps(ctx context.Context, c *Client, flowID string, versionID string) error {
 	cfg := c.apiClient.GetConfig()
 
-	basePath, err := cfg.ServerURLWithContext(ctx, "DaVinciFlowVersionsApiService.GetVersionByIdUsingFlowId")
-	if err != nil {
-		return fmt.Errorf("resolve base URL: %w", err)
+	// Build the request URL using the SDK's configured host and scheme,
+	// which reflect the correct regional API domain (e.g. api.pingone.eu).
+	scheme := cfg.Scheme
+	if scheme == "" {
+		scheme = "https"
 	}
-
-	reqURL := fmt.Sprintf("%s/environments/%s/flows/%s/versions/%s",
-		basePath, c.environmentID.String(), flowID, versionID)
+	reqURL := fmt.Sprintf("%s://%s/v1/environments/%s/flows/%s/versions/%s",
+		scheme, cfg.Host, c.environmentID.String(), flowID, versionID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
 	if err != nil {
@@ -137,17 +138,8 @@ func fetchFlowVariableDeps(ctx context.Context, c *Client, flowID string, versio
 	req.Header.Set("Content-Type", "application/vnd.pingidentity.flowversion.export+json")
 	req.Header.Set("Accept", "application/json")
 
-	// Extract OAuth2 token from context (same mechanism the SDK uses internally).
-	if tok, ok := ctx.Value(pingoneGoClient.ContextOAuth2).(oauth2.TokenSource); ok {
-		token, err := tok.Token()
-		if err != nil {
-			return fmt.Errorf("retrieve OAuth2 token: %w", err)
-		}
-		token.SetAuthHeader(req)
-	} else if accessToken, ok := ctx.Value(pingoneGoClient.ContextAccessToken).(string); ok {
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-	}
-
+	// Use the SDK's configured HTTP client, which includes the OAuth2 transport
+	// for automatic token injection.
 	resp, err := cfg.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
