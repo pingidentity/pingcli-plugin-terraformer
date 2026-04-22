@@ -1,0 +1,11 @@
+= Release Notes for v0.3.0
+:toc:
+:toclevels: 3
+:sectnums:
+
+Release Date: 2026-04-22
+
+== ENHANCEMENTS
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/020c949[020c949] `resource/pingone_davinci_flow`: Added user-friendly error message when the PingOne API returns `jsLinks` in a legacy string format that the SDK cannot parse. The error now directs users to a known issue with workaround steps to convert the affected flow's `jsLinks` to the current object format. See [#10](https://github.com/pingidentity/pingcli-plugin-terraformer/issues/10). link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/11[#11]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/e535e6b[e535e6b] `resource/pingone_davinci_flow`: Added support for new flow attributes: `multi_value_source_id` (edge data), `capability_class` (node data), `subtype` (trigger), and `preview_form_rendering_updates` (settings) link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+
