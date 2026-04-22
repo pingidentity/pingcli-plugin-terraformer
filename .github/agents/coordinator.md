@@ -40,6 +40,7 @@ Architecture documentation lives under `contributing/`. Read `contributing/ARCHI
 6. **Review** — Use the Reviewer agent to check the implementation against project conventions and architecture constraints.
 7. **Fix** — If the Reviewer identifies issues, use the Implementer agent to apply fixes.
 8. **Document** — Use the Docs agent to update relevant documentation.
+9. **Changelog & Commit** — Use the Implementer agent to create a `.changelog/pr-{N}.txt` entry and commit all changes. See the Changelog section below.
 
 Iterate between planning/architecture and between review/implementation until each phase converges.
 
@@ -51,6 +52,7 @@ Iterate between planning/architecture and between review/implementation until ea
 4. **Implement** — Use the Implementer agent to fix the code.
 5. **Review** — Use the Reviewer agent to verify the fix and check for regressions.
 6. **Document** — Use the Docs agent if the fix changes behavior or APIs.
+7. **Changelog & Commit** — Use the Implementer agent to create a `.changelog/pr-{N}.txt` entry and commit all changes. See the Changelog section below.
 
 ## Workflow: Add New Resource
 
@@ -86,6 +88,35 @@ Synthesize findings into a prioritized summary. Distinguish critical issues from
 - **Add new resource**: Follow `.github/prompts/add-resource.prompt.md` — it provides the full pre-analysis and phased workflow.
 - **Unclear requirements**: Ask the user for clarification rather than guessing.
 
+## Changelog
+
+Every user-facing change (feature, enhancement, bug fix, docs, etc.) must include a changelog entry.
+
+1. **Ask the user** for the PR number. If the PR does not exist yet, ask what number to use.
+2. **Create** `.changelog/pr-{N}.txt` using the format documented in `shared-configs/README-changelog.md`.
+3. **Commit** all changes with a descriptive commit message. Use the format:
+   ```
+   {scope}: {Short description}
+
+   {Optional body explaining what changed and why.}
+   ```
+   Where `{scope}` is typically `resource/{resource_type}`, the package name, or `docs`.
+
+### Changelog entry types
+
+| Type | When to use |
+|------|-------------|
+| `feature` | New user-facing capability |
+| `enhancement` | Improvement to existing functionality |
+| `bug` | Bug fix |
+| `note` | General release note |
+| `breaking-change` | Requires user action on upgrade |
+| `documentation` | Documentation-only change |
+| `new-resource` | New Terraform resource support |
+| `internal` | Internal change (not shown in release notes) |
+
+See `shared-configs/README-changelog.md` for the full list and format reference.
+
 ## Convergence Criteria
 
 A task is complete when:
@@ -93,6 +124,8 @@ A task is complete when:
 2. No new `go vet` warnings
 3. Reviewer agent has approved
 4. Documentation is current
+5. Changelog entry exists in `.changelog/pr-{N}.txt`
+6. All changes are committed
 
 ## Context Management
 

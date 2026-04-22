@@ -1,0 +1,7 @@
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Added support for new flow attributes: `multi_value_source_id` (edge data), `capability_class` (node data), `subtype` (trigger), and `preview_form_rendering_updates` (settings)
+```
+
+```release-note:internal
+Updated `pingone-go-client` dependency from `v0.8.0` to `v0.10.1`
+```
