@@ -7,10 +7,10 @@ import (
 )
 
 type reflectTestStruct struct {
-	Name     string
-	Enabled  bool
-	Value    interface{}
-	Count    int
+	Name    string
+	Enabled bool
+	Value   interface{}
+	Count   int
 }
 
 func TestReadStringField_Valid(t *testing.T) {

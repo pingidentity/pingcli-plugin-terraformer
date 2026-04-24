@@ -104,27 +104,27 @@ func TestTfCommand_Routing(t *testing.T) {
 				oldRegionCode := os.Getenv("PINGCLI_PINGONE_REGION_CODE")
 				oldExportEnvID := os.Getenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID")
 
-				os.Unsetenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
-				os.Unsetenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID")
-				os.Unsetenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET")
-				os.Unsetenv("PINGCLI_PINGONE_REGION_CODE")
-				os.Unsetenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID")
+				_ = os.Unsetenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
+				_ = os.Unsetenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID")
+				_ = os.Unsetenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET")
+				_ = os.Unsetenv("PINGCLI_PINGONE_REGION_CODE")
+				_ = os.Unsetenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID")
 
 				defer func() {
 					if oldWorkerEnvID != "" {
-						os.Setenv("PINGCLI_PINGONE_ENVIRONMENT_ID", oldWorkerEnvID)
+						_ = os.Setenv("PINGCLI_PINGONE_ENVIRONMENT_ID", oldWorkerEnvID)
 					}
 					if oldClientID != "" {
-						os.Setenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID", oldClientID)
+						_ = os.Setenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID", oldClientID)
 					}
 					if oldClientSecret != "" {
-						os.Setenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET", oldClientSecret)
+						_ = os.Setenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET", oldClientSecret)
 					}
 					if oldRegionCode != "" {
-						os.Setenv("PINGCLI_PINGONE_REGION_CODE", oldRegionCode)
+						_ = os.Setenv("PINGCLI_PINGONE_REGION_CODE", oldRegionCode)
 					}
 					if oldExportEnvID != "" {
-						os.Setenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID", oldExportEnvID)
+						_ = os.Setenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID", oldExportEnvID)
 					}
 				}()
 			}

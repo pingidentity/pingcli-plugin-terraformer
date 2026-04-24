@@ -317,7 +317,7 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 				}
 			}
 		}
-		return nil  // Exit early, don't generate module
+		return nil // Exit early, don't generate module
 	}
 
 	// 6. Format results into output, imports, and variables.

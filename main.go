@@ -15,8 +15,8 @@ import (
 	"runtime/debug"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/pingidentity/pingcli/shared/grpc"
 	"github.com/pingidentity/pingcli-plugin-terraformer/cmd"
+	"github.com/pingidentity/pingcli/shared/grpc"
 )
 
 // Version information - set at build time via ldflags or goreleaser

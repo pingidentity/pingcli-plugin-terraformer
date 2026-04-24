@@ -236,9 +236,9 @@ func TestHandleConnectorPropertiesExtractsVariables(t *testing.T) {
 
 func TestExtractResourceName(t *testing.T) {
 	tests := []struct {
-		name    string
-		data    interface{}
-		want    string
+		name string
+		data interface{}
+		want string
 	}{
 		{
 			name: "struct with Name field",
@@ -791,4 +791,3 @@ func TestHandleConnectorPropertiesComplexVariables(t *testing.T) {
 	assert.Equal(t, "Login with Apple", pn.CurrentValue)
 	assert.Equal(t, "properties.customAuth.providerName", pn.AttributePath)
 }
-

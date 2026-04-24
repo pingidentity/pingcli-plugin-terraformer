@@ -1,7 +1,7 @@
 TEST?=$$(go list ./...)
 PKG_NAME=pingcli-terraformer
 BINARY=pingcli-terraformer
-VERSION=0.2.1
+VERSION=0.3.0
 
 GOBIN?=$$(go env GOPATH)/bin
 

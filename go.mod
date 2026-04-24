@@ -7,7 +7,7 @@ require (
 	github.com/hashicorp/go-plugin v1.7.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/pingidentity/pingcli v0.8.0
-	github.com/pingidentity/pingone-go-client v0.8.0
+	github.com/pingidentity/pingone-go-client v0.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.18.0
@@ -36,7 +36,7 @@ require (
 	github.com/zalando/go-keyring v0.2.6 // indirect
 	golang.org/x/mod v0.31.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect

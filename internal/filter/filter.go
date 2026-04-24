@@ -10,9 +10,9 @@ import (
 
 // Pattern represents a compiled pattern matcher (glob or regex).
 type Pattern struct {
-	raw       string
-	isRegex   bool
-	compiled  *regexp.Regexp // Only set if isRegex is true
+	raw      string
+	isRegex  bool
+	compiled *regexp.Regexp // Only set if isRegex is true
 }
 
 // ParsePattern parses a raw pattern string.

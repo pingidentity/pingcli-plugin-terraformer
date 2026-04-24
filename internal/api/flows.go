@@ -30,8 +30,8 @@ type FlowDetail struct {
 	InputSchemaCompiled map[string]interface{} // Compiled input schema
 	Trigger             map[string]interface{} // Flow trigger configuration
 	// Provider-managed fields useful for auxiliary resources
-	Enabled           bool        // Flow enabled status (API responses)
-	PublishedVersion  *int        // Published version number (API responses)
+	Enabled          bool // Flow enabled status (API responses)
+	PublishedVersion *int // Published version number (API responses)
 	// Add other relevant fields as needed
 }
 
@@ -74,7 +74,7 @@ func (c *Client) ListFlows(ctx context.Context) ([]FlowSummary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)
@@ -155,7 +155,7 @@ func (c *Client) GetFlow(ctx context.Context, flowID string) (*FlowDetail, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(httpResp.Body)

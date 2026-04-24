@@ -11,17 +11,17 @@ import (
 
 // AllTypesResource covers all attribute types supported by the processor.
 type AllTypesResource struct {
-	ID      string
-	Name    string
-	StrVal  string
-	IntVal  int64
-	UintVal uint64
+	ID       string
+	Name     string
+	StrVal   string
+	IntVal   int64
+	UintVal  uint64
 	FloatVal float64
-	BoolVal bool
-	ObjVal  struct{ Inner string }
-	ListVal []string
-	MapVal  map[string]string
-	SetVal  []int
+	BoolVal  bool
+	ObjVal   struct{ Inner string }
+	ListVal  []string
+	MapVal   map[string]string
+	SetVal   []int
 }
 
 func TestProcessorAllAttributeTypes(t *testing.T) {
@@ -265,4 +265,3 @@ func TestProcessorResourceListNonSlice(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "expected slice")
 }
-

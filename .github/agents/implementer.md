@@ -64,6 +64,26 @@ After implementing each task:
 2. `go vet ./path/to/pkg/...` — no warnings
 3. `go test ./path/to/pkg/... -v -count=1` — all tests pass
 
+## Changelog & Commit
+
+When the Coordinator delegates a "changelog & commit" task:
+
+1. **Create `.changelog/pr-{N}.txt`** where `{N}` is the PR number provided by the Coordinator.
+2. Use the format from `shared-configs/README-changelog.md`:
+   ````plaintext
+   ```release-note:{type}
+   {Description of the change}
+   ```
+   ````
+3. For resource-scoped changes, prefix the description with the resource: `` `resource/pingone_davinci_flow`: Added ... ``
+4. Multiple entries in one file are allowed — use separate code blocks.
+5. **Commit** all staged and unstaged changes with a descriptive message:
+   ```
+   {scope}: {Short description}
+
+   {Optional body explaining what and why.}
+   ```
+
 ## Reference Files
 
 | Purpose | Path |

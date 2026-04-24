@@ -568,4 +568,3 @@ func TestProcessorHandlerQueueIntegration(t *testing.T) {
 	assert.Equal(t, "queued:data", result.Attributes["value"])
 	assert.Equal(t, "from_queue", result.Attributes["queued_attr"])
 }
-

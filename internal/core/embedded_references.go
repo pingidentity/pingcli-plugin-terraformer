@@ -93,7 +93,7 @@ func ResolveEmbeddedReferences(
 func processResourceWithRule(resource *ResourceData, rule EmbeddedReferenceRule, g *graph.DependencyGraph, varSeen map[string]bool, fallbackVars *[]FallbackVariable) {
 	// Parse the attribute path into segments
 	pathSegments := strings.Split(rule.AttributePath, ".")
-	
+
 	// Walk the path and process all matching RawHCLValues
 	walkAndProcessPath(resource.Attributes, pathSegments, 0, rule, resource, g, varSeen, fallbackVars)
 }
@@ -272,7 +272,7 @@ func addEmbeddedFallbackVariable(varName string, rule EmbeddedReferenceRule, uui
 // extractJSONFromRawHCL extracts the JSON content from jsonencode(...) format
 func extractJSONFromRawHCL(value RawHCLValue) string {
 	str := string(value)
-	
+
 	// Find jsonencode(
 	prefix := "jsonencode("
 	if !strings.HasPrefix(str, prefix) {
@@ -282,7 +282,7 @@ func extractJSONFromRawHCL(value RawHCLValue) string {
 	// Remove prefix and trailing )
 	jsonStart := len(prefix)
 	jsonEnd := len(str) - 1 // Remove the closing )
-	
+
 	if jsonEnd <= jsonStart {
 		return ""
 	}

@@ -201,6 +201,11 @@ attributes:
         type: bool
         source_path: ValidateOnSave
 
+      - name: PreviewFormRenderingUpdates
+        terraform_name: preview_form_rendering_updates
+        type: bool
+        source_path: PreviewFormRenderingUpdates
+
       # String/Object choice wrapper fields
       - name: IntermediateLoadingScreenCSS
         terraform_name: intermediate_loading_screen_css
@@ -334,6 +339,11 @@ attributes:
                     type: string
                     source_path: ConnectorId
 
+                  - name: CapabilityClass
+                    terraform_name: capability_class
+                    type: string
+                    source_path: CapabilityClass
+
                   - name: Name
                     terraform_name: name
                     type: string
@@ -452,6 +462,11 @@ attributes:
                     terraform_name: target
                     type: string
                     source_path: Target
+
+                  - name: MultiValueSourceId
+                    terraform_name: multi_value_source_id
+                    type: string
+                    source_path: MultiValueSourceId
 
               - name: Position
                 terraform_name: position
@@ -654,6 +669,11 @@ attributes:
         terraform_name: type
         type: string
         source_path: Type
+
+      - name: Subtype
+        terraform_name: subtype
+        type: string
+        source_path: Subtype
 
       - name: Configuration
         terraform_name: configuration

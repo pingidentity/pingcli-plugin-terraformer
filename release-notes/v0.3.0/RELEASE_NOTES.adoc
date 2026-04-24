@@ -1,0 +1,20 @@
+= Release Notes for v0.3.0
+:toc:
+:toclevels: 3
+:sectnums:
+
+Release Date: 2026-04-24
+
+== ENHANCEMENTS
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/af6973e[af6973e] `resource/pingone_davinci_flow`: Added user-friendly error message when the PingOne API returns `jsLinks` in a legacy string format that the SDK cannot parse. The error now directs users to a known issue with workaround steps to convert the affected flow's `jsLinks` to the current object format. See [#10](https://github.com/pingidentity/pingcli-plugin-terraformer/issues/10). link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/11[#11]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/0cef5c0[0cef5c0] `resource/pingone_davinci_flow`: Added support for new flow attributes: `multi_value_source_id` (edge data), `capability_class` (node data), `subtype` (trigger), and `preview_form_rendering_updates` (settings) link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/0cef5c0[0cef5c0] Import blocks are now sorted alphabetically by resource address for consistent output link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+
+== BUG FIXES
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/0cef5c0[0cef5c0] `resource/pingone_davinci_flow`: Fixed `intermediate_loading_screen_css` and `intermediate_loading_screen_html` settings rendering as `map[]` when the API returns an empty object `{}`; values are now correctly JSON-encoded to `"{}"` link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/0cef5c0[0cef5c0] `resource/pingone_davinci_flow`: Fixed non-deterministic ordering of `depends_on` entries; entries are now sorted alphabetically for consistent output link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+
+== NOTES
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/0cef5c0[0cef5c0] Updated `pingone-go-client` dependency from `v0.8.0` to `v0.10.1` link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+* link:https://github.com/pingidentity/pingcli-plugin-terraformer/commit/0cef5c0[0cef5c0] Updated target default `pingidentity/pingone` from `1.18.0` to `>= 1.19.1, < 2.0.0` link:https://github.com/pingidentity/pingcli-plugin-terraformer/pull/12[#12]
+

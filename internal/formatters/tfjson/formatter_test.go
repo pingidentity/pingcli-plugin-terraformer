@@ -27,7 +27,7 @@ func unmarshalResource(t *testing.T, output, resourceType, label string) map[str
 
 func baseDef(attrs ...schema.AttributeDefinition) *schema.ResourceDefinition {
 	return &schema.ResourceDefinition{
-		Metadata: schema.ResourceMetadata{ResourceType: "test_resource"},
+		Metadata:   schema.ResourceMetadata{ResourceType: "test_resource"},
 		Attributes: attrs,
 	}
 }
@@ -825,6 +825,35 @@ func TestFormat_DependsOnAllUnresolved_NotRendered(t *testing.T) {
 	assert.False(t, exists, "depends_on should be absent when all labels are unresolved")
 }
 
+// TestFormat_DependsOnSorted verifies that the depends_on JSON array is sorted
+// alphabetically by "resource_type.label", regardless of input order.
+func TestFormat_DependsOnSorted(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "val", TerraformName: "val", Type: "string",
+	})
+	data := baseData("res1", "id1", map[string]interface{}{"val": "x"})
+	// Intentionally out of alphabetical order.
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-z", Label: "z_var"},
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-a", Label: "a_var"},
+		{ResourceType: "pingone_davinci_connector_instance", ResourceID: "conn-m", Label: "m_conn"},
+	}
+
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	dependsOn, ok := attrs["depends_on"].([]interface{})
+	require.True(t, ok, "depends_on should be a JSON array")
+	require.Len(t, dependsOn, 3)
+
+	// Expect alphabetical order: connector_instance.m_conn < variable.a_var < variable.z_var
+	assert.Equal(t, "pingone_davinci_connector_instance.m_conn", dependsOn[0])
+	assert.Equal(t, "pingone_davinci_variable.a_var", dependsOn[1])
+	assert.Equal(t, "pingone_davinci_variable.z_var", dependsOn[2])
+}
+
 // Regression test: variable-eligible attributes inside type_discriminated_block must render as var.X references
 func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 	f := NewFormatter()
@@ -834,8 +863,8 @@ func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 		Type:          "type_discriminated_block",
 		TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
 			TypeKeyMap: map[string]string{
-				"string": "string",
-				"bool":   "bool",
+				"string":  "string",
+				"bool":    "bool",
 				"float32": "float32",
 			},
 		},
@@ -860,4 +889,3 @@ func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 	assert.Equal(t, "${var.davinci_variable_test_value}", value["string"],
 		"variable references inside type_discriminated_block must render as ${var.X}")
 }
-

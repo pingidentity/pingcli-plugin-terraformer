@@ -678,6 +678,17 @@ func (p *Processor) convertValue(field reflect.Value, attrType string) (interfac
 				return s.String(), nil
 			}
 		}
+		// When the schema expects a string but the underlying value is a map or
+		// slice (e.g., a choice wrapper resolved to its Object variant like an
+		// empty {}), JSON-encode so the output is valid JSON rather than the Go
+		// fmt default ("map[]").
+		if field.Kind() == reflect.Map || field.Kind() == reflect.Slice {
+			b, err := json.Marshal(field.Interface())
+			if err != nil {
+				return nil, fmt.Errorf("json-encode %s value for string attribute: %w", field.Kind(), err)
+			}
+			return string(b), nil
+		}
 		return fmt.Sprintf("%v", field.Interface()), nil
 
 	case "number":
