@@ -352,6 +352,55 @@ func TestGeneratorImportsTF(t *testing.T) {
 	assert.Contains(t, string(content), "module.davinci.pingone_davinci_variable.company_name")
 }
 
+// TestGenerator_ImportBlocksSorted verifies that generateImportsTF writes import
+// blocks in alphabetical order of the To address, regardless of input order.
+func TestGenerator_ImportBlocksSorted(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	config := ModuleConfig{
+		OutputDir:      tmpDir,
+		ModuleDirName:  "test-module",
+		IncludeImports: true,
+	}
+	generator := NewGenerator(config)
+
+	// Intentionally out of alphabetical order by To address.
+	importBlocks := []ImportBlock{
+		{
+			To: "module.davinci.pingone_davinci_variable.z_var",
+			ID: "env-id:var-z",
+		},
+		{
+			To: "module.davinci.pingone_davinci_flow.a_flow",
+			ID: "env-id:flow-a",
+		},
+		{
+			To: "module.davinci.pingone_davinci_connector_instance.m_conn",
+			ID: "env-id:conn-m",
+		},
+	}
+
+	err := generator.generateImportsTF(importBlocks)
+	require.NoError(t, err)
+
+	importsPath := filepath.Join(tmpDir, "ping-export-imports.tf")
+	content, err := os.ReadFile(importsPath)
+	require.NoError(t, err)
+	output := string(content)
+
+	// All three entries must appear.
+	assert.Contains(t, output, "module.davinci.pingone_davinci_connector_instance.m_conn")
+	assert.Contains(t, output, "module.davinci.pingone_davinci_flow.a_flow")
+	assert.Contains(t, output, "module.davinci.pingone_davinci_variable.z_var")
+
+	// Verify alphabetical ordering by To address.
+	idxConn := strings.Index(output, "module.davinci.pingone_davinci_connector_instance.m_conn")
+	idxFlow := strings.Index(output, "module.davinci.pingone_davinci_flow.a_flow")
+	idxVar := strings.Index(output, "module.davinci.pingone_davinci_variable.z_var")
+	assert.Less(t, idxConn, idxFlow, "connector_instance block should appear before flow block")
+	assert.Less(t, idxFlow, idxVar, "flow block should appear before variable block")
+}
+
 func TestFullModuleGeneration(t *testing.T) {
 	tmpDir := t.TempDir()
 

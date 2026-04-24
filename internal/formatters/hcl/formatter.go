@@ -164,6 +164,9 @@ func resolvedDependsOn(deps []core.RuntimeDependsOn) []core.RuntimeDependsOn {
 			out = append(out, d)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].ResourceType+"."+out[i].Label < out[j].ResourceType+"."+out[j].Label
+	})
 	return out
 }
 

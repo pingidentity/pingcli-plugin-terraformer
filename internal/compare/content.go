@@ -73,6 +73,12 @@ func ClassifyDiff(d Diff) DiffSeverity {
 	switch d.Kind {
 	case DiffExtraResource, DiffExtraAttribute:
 		return SeverityAcceptable
+	case DiffBlockMismatch:
+		switch d.Attribute {
+		case "graph_data", "required_providers":
+			return SeverityAcceptable
+		}
+		return SeverityBreaking
 	default:
 		return SeverityBreaking
 	}

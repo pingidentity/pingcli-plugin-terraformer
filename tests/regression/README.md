@@ -80,9 +80,47 @@ To add a new flag combination, add an entry to `matrix.json`.
 
 ## Running Locally
 
-### Using the Makefile target (recommended)
+### Using the shell script (recommended)
 
-The `make regression-local` target automates the full regression test:
+The `tests/regression/run-local.sh` script runs the full regression test matrix locally, comparing base branch vs current branch exports across all flag combinations defined in `matrix.json`.
+
+#### Prerequisites
+
+Before running the script, set the required environment variables:
+
+```bash
+export PINGCLI_PINGONE_ENVIRONMENT_ID="<environment-id>"
+export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID="<client-id>"
+export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="<client-secret>"
+
+# Optional:
+export PINGCLI_PINGONE_REGION_CODE="NA"                    # Default: NA
+export PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID="<export-env-id>"  # Default: uses PINGCLI_PINGONE_ENVIRONMENT_ID
+export REGRESSION_BASE="main"                              # Default: main
+```
+
+#### Running the test
+
+```bash
+./tests/regression/run-local.sh
+```
+
+This command:
+1. Validates prerequisites (required environment variables and `jq`)
+2. Creates a temporary `git worktree` for the base branch
+3. Builds a binary from the base branch
+4. Builds the current branch's binary
+5. Iterates through all matrix entries, exporting resources with both binaries
+6. Compares outputs using the regression-compare tool
+7. Prints a summary table showing pass/fail status for each matrix entry
+8. Copies JSON reports to `regression-reports/` directory
+9. Cleans up temporary files and worktree
+
+The script exits with code 0 if all comparisons pass (no breaking changes), or 1 if any breaking changes are detected.
+
+### Using the Makefile target
+
+The `make regression-local` target provides an alternative approach to automated local regression testing:
 
 ```bash
 make regression-local

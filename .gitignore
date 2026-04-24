@@ -47,3 +47,6 @@ dist/
 localsecrets
 
 pingcli-terraformer
+
+# Local regression test reports
+regression-reports/

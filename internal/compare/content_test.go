@@ -268,9 +268,21 @@ func TestClassifyDiff_MissingBlockIsBreaking(t *testing.T) {
 }
 
 func TestClassifyDiff_BlockMismatchIsBreaking(t *testing.T) {
-	d := Diff{Kind: DiffBlockMismatch}
+	d := Diff{Kind: DiffBlockMismatch, Attribute: "some_other_block"}
 	severity := ClassifyDiff(d)
 	assert.Equal(t, SeverityBreaking, severity)
+}
+
+func TestClassifyDiff_BlockMismatchGraphDataIsAcceptable(t *testing.T) {
+	d := Diff{Kind: DiffBlockMismatch, Attribute: "graph_data"}
+	severity := ClassifyDiff(d)
+	assert.Equal(t, SeverityAcceptable, severity)
+}
+
+func TestClassifyDiff_BlockMismatchRequiredProvidersIsAcceptable(t *testing.T) {
+	d := Diff{Kind: DiffBlockMismatch, Attribute: "required_providers"}
+	severity := ClassifyDiff(d)
+	assert.Equal(t, SeverityAcceptable, severity)
 }
 
 // ── Tests for Result.HasBreakingDiffs ──

@@ -788,6 +788,36 @@ func TestFormatter_Format_DependsOnAllUnresolved_NotRendered(t *testing.T) {
 	assert.NotContains(t, output, "depends_on")
 }
 
+// TestFormatter_Format_DependsOnSorted verifies that the depends_on block lists
+// entries in alphabetical order by "resource_type.label", regardless of the
+// order they appear in DependsOnResources.
+func TestFormatter_Format_DependsOnSorted(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := minimalVariableDef()
+	data := resourceData()
+	// Intentionally out of alphabetical order.
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-z", Label: "z_var"},
+		{ResourceType: "pingone_davinci_variable", ResourceID: "var-a", Label: "a_var"},
+		{ResourceType: "pingone_davinci_connector_instance", ResourceID: "conn-m", Label: "m_conn"},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	// All three entries must appear.
+	assert.Contains(t, output, "pingone_davinci_connector_instance.m_conn")
+	assert.Contains(t, output, "pingone_davinci_variable.a_var")
+	assert.Contains(t, output, "pingone_davinci_variable.z_var")
+
+	// Verify alphabetical ordering: connector_instance < variable.a < variable.z
+	idxConn := strings.Index(output, "pingone_davinci_connector_instance.m_conn")
+	idxAVar := strings.Index(output, "pingone_davinci_variable.a_var")
+	idxZVar := strings.Index(output, "pingone_davinci_variable.z_var")
+	assert.Less(t, idxConn, idxAVar, "connector_instance.m_conn should appear before variable.a_var")
+	assert.Less(t, idxAVar, idxZVar, "variable.a_var should appear before variable.z_var")
+}
+
 // Regression test: variable-eligible attributes must render as var.X references
 func TestFormatter_Format_ScalarVariableEligibleAttribute(t *testing.T) {
 	f := hclformatter.NewFormatter()

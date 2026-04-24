@@ -13,3 +13,19 @@ Updated `pingone-go-client` dependency from `v0.8.0` to `v0.10.1`
 ```release-note:note
 Updated target default `pingidentity/pingone` from `1.18.0` to `>= 1.19.1, < 2.0.0`
 ```
+
+```release-note:bug
+`resource/pingone_davinci_flow`: Fixed non-deterministic ordering of `depends_on` entries; entries are now sorted alphabetically for consistent output
+```
+
+```release-note:enhancement
+Import blocks are now sorted alphabetically by resource address for consistent output
+```
+
+```release-note:internal
+Added local regression test script (`tests/regression/run-local.sh`) that runs the full flag matrix against a PingOne environment
+```
+
+```release-note:internal
+Updated regression comparison tool to treat `graph_data` and `required_providers` block mismatches as acceptable changes
+```

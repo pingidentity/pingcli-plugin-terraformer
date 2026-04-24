@@ -443,6 +443,10 @@ func (g *Generator) generateImportsTF(importBlocks []ImportBlock) error {
 
 // generateImportsHCL creates HCL-format import blocks.
 func (g *Generator) generateImportsHCL(importBlocks []ImportBlock) error {
+	sort.Slice(importBlocks, func(i, j int) bool {
+		return importBlocks[i].To < importBlocks[j].To
+	})
+
 	var comments strings.Builder
 	var blocks strings.Builder
 
@@ -471,6 +475,10 @@ func (g *Generator) generateImportsHCL(importBlocks []ImportBlock) error {
 
 // generateImportsTFJSON creates JSON-format import blocks.
 func (g *Generator) generateImportsTFJSON(importBlocks []ImportBlock) error {
+	sort.Slice(importBlocks, func(i, j int) bool {
+		return importBlocks[i].To < importBlocks[j].To
+	})
+
 	type jsonImport struct {
 		To string `json:"to"`
 		ID string `json:"id"`
