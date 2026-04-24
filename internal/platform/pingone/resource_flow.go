@@ -156,7 +156,7 @@ func fetchFlowVariableDeps(ctx context.Context, c *Client, flowID string, versio
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := io.ReadAll(resp.Body)

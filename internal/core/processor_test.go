@@ -390,7 +390,7 @@ func tdbDef(skipConditions []schema.SkipCondition) *schema.ResourceDefinition {
 			Version:      "1.0",
 		},
 		API: schema.APIDefinition{
-			IDField:  "id",
+			IDField:   "id",
 			NameField: "name",
 		},
 		Attributes: []schema.AttributeDefinition{
@@ -1044,14 +1044,14 @@ func TestProcessorSliceToMapKeying(t *testing.T) {
 // ── Nested attribute transform tests ─────────────────────────
 
 type MockWithNestedTransform struct {
-	ID   string
-	Name string
+	ID    string
+	Name  string
 	Outer *MockOuterObj
 }
 
 type MockOuterObj struct {
-	Data     map[string]interface{}
-	Label    string
+	Data  map[string]interface{}
+	Label string
 }
 
 func TestProcessorNestedAttributeTransform(t *testing.T) {
@@ -1574,11 +1574,11 @@ func TestProcessorNilValueKeepEmpty(t *testing.T) {
 				Required:      true,
 			},
 			{
-				Name:           "Console.Href",
-				TerraformName:  "console_url",
-				Type:           "string",
-				SourcePath:     "Console.Href",
-				NilValue:       "keep_empty",  // NEW FIELD: emit empty string for nil
+				Name:          "Console.Href",
+				TerraformName: "console_url",
+				Type:          "string",
+				SourcePath:    "Console.Href",
+				NilValue:      "keep_empty", // NEW FIELD: emit empty string for nil
 			},
 		},
 	}
@@ -1595,7 +1595,7 @@ func TestProcessorNilValueKeepEmpty(t *testing.T) {
 	mockData := MockEnvironment{
 		ID:      "env123",
 		Name:    "test_env",
-		Console: &MockConsole{Href: nil},  // nil value that should emit empty string
+		Console: &MockConsole{Href: nil}, // nil value that should emit empty string
 	}
 
 	// Process the resource
@@ -1650,11 +1650,11 @@ func TestProcessorNilValueOmit(t *testing.T) {
 				Required:      true,
 			},
 			{
-				Name:           "Console.Href",
-				TerraformName:  "console_url",
-				Type:           "string",
-				SourcePath:     "Console.Href",
-				NilValue:       "omit",  // Explicitly omit nil values (current behavior)
+				Name:          "Console.Href",
+				TerraformName: "console_url",
+				Type:          "string",
+				SourcePath:    "Console.Href",
+				NilValue:      "omit", // Explicitly omit nil values (current behavior)
 			},
 		},
 	}
@@ -1671,7 +1671,7 @@ func TestProcessorNilValueOmit(t *testing.T) {
 	mockData := MockEnvironment{
 		ID:      "env456",
 		Name:    "test_env2",
-		Console: &MockConsole{Href: nil},  // nil value - should be omitted
+		Console: &MockConsole{Href: nil}, // nil value - should be omitted
 	}
 
 	// Process the resource

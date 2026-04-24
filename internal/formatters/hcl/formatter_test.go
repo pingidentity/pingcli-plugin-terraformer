@@ -183,10 +183,10 @@ func TestFormatter_Format_NilDef(t *testing.T) {
 func defWithValueAttr() *schema.ResourceDefinition {
 	def := minimalVariableDef()
 	def.Attributes = append(def.Attributes, schema.AttributeDefinition{
-		Name:          "Value",
-		TerraformName: "value",
-		Type:          "object",
-		Transform:     "custom",
+		Name:            "Value",
+		TerraformName:   "value",
+		Type:            "object",
+		Transform:       "custom",
 		CustomTransform: "handleVariableValue",
 	})
 	return def
@@ -835,8 +835,8 @@ func TestFormatter_Format_TypeDiscriminatedBlockVariableReference(t *testing.T) 
 				Type:          "type_discriminated_block",
 				TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
 					TypeKeyMap: map[string]string{
-						"string": "string",
-						"bool":   "bool",
+						"string":  "string",
+						"bool":    "bool",
 						"float32": "float32",
 					},
 				},

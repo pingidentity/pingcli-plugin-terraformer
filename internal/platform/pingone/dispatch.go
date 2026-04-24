@@ -101,15 +101,3 @@ func RegisteredHandlerNames() []string {
 func RegisteredTransformNames() []string {
 	return customHandlerQueue.TransformNames()
 }
-
-// ── Shared stub helpers ─────────────────────────────────────────
-
-// stubHandler delegates to core.StubHandler.
-func stubHandler(handlerName string) core.CustomHandlerFunc {
-	return core.StubHandler(handlerName)
-}
-
-// stubTransform delegates to core.StubTransform.
-func stubTransform() core.CustomTransformFunc {
-	return core.StubTransform()
-}

@@ -11,12 +11,12 @@ import (
 
 // Report is the JSON output structure for CI consumption.
 type Report struct {
-	BaseDir         string        `json:"base_dir"`
-	PRDir           string        `json:"pr_dir"`
-	HasBreaking     bool          `json:"has_breaking"`
-	AcceptableCount int           `json:"acceptable_count"`
-	BreakingCount   int           `json:"breaking_count"`
-	Files           []FileReport  `json:"files"`
+	BaseDir         string       `json:"base_dir"`
+	PRDir           string       `json:"pr_dir"`
+	HasBreaking     bool         `json:"has_breaking"`
+	AcceptableCount int          `json:"acceptable_count"`
+	BreakingCount   int          `json:"breaking_count"`
+	Files           []FileReport `json:"files"`
 }
 
 // FileReport summarizes the comparison result for a single file.

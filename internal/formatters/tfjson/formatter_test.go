@@ -27,7 +27,7 @@ func unmarshalResource(t *testing.T, output, resourceType, label string) map[str
 
 func baseDef(attrs ...schema.AttributeDefinition) *schema.ResourceDefinition {
 	return &schema.ResourceDefinition{
-		Metadata: schema.ResourceMetadata{ResourceType: "test_resource"},
+		Metadata:   schema.ResourceMetadata{ResourceType: "test_resource"},
 		Attributes: attrs,
 	}
 }
@@ -834,8 +834,8 @@ func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 		Type:          "type_discriminated_block",
 		TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
 			TypeKeyMap: map[string]string{
-				"string": "string",
-				"bool":   "bool",
+				"string":  "string",
+				"bool":    "bool",
 				"float32": "float32",
 			},
 		},
@@ -860,4 +860,3 @@ func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 	assert.Equal(t, "${var.davinci_variable_test_value}", value["string"],
 		"variable references inside type_discriminated_block must render as ${var.X}")
 }
-

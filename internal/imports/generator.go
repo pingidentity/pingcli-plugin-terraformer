@@ -161,4 +161,3 @@ func resourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) stri
 	}
 	return data.ID
 }
-

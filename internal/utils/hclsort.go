@@ -68,9 +68,10 @@ func SortAllResourceBlocks(hcl string) string {
 				if esc {
 					esc = false
 				} else {
-					if ch == '\\' {
+					switch ch {
+					case '\\':
 						esc = true
-					} else if ch == '"' {
+					case '"':
 						inString = false
 					}
 				}

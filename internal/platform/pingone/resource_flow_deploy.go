@@ -11,9 +11,10 @@ import (
 // but the SDK has CurrentVersion as a flat top-level *float32 field.
 //
 // Field names must match flow_deploy.yaml source_paths:
-//   FlowID              -> source_path: FlowID
-//   Name                -> source_path: Name
-//   DeployTriggerValues -> source_path: DeployTriggerValues
+//
+//	FlowID              -> source_path: FlowID
+//	Name                -> source_path: Name
+//	DeployTriggerValues -> source_path: DeployTriggerValues
 type flowDeployData struct {
 	FlowID              string
 	Name                string
@@ -25,7 +26,8 @@ type flowDeployData struct {
 // previously deployed version, causing Terraform to plan an update.
 //
 // Field names must match flow_deploy.yaml nested_attributes source_paths:
-//   DeployedVersion -> source_path: DeployedVersion
+//
+//	DeployedVersion -> source_path: DeployedVersion
 type deployTriggerValues struct {
 	DeployedVersion int
 }

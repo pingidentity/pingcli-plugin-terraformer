@@ -11,5 +11,5 @@ Updated `pingone-go-client` dependency from `v0.8.0` to `v0.10.1`
 ```
 
 ```release-note:note
-Updated target default `pingidentity/pingone` from `v1.18.0` to `>= 1.19.0, < 2.0.0`
+Updated target default `pingidentity/pingone` from `1.18.0` to `>= 1.19.1, < 2.0.0`
 ```

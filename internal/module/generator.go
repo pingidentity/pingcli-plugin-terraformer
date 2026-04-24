@@ -105,7 +105,7 @@ func (g *Generator) generateVersionsTF() error {
   required_providers {
     pingone = {
       source  = "pingidentity/pingone"
-      version = ">= 1.19.0, < 2.0.0"
+      version = ">= 1.19.1, < 2.0.0"
     }
   }
 }
@@ -483,10 +483,7 @@ func (g *Generator) generateImportsTFJSON(importBlocks []ImportBlock) error {
 	}
 
 	for _, ib := range importBlocks {
-		wrapper.Import = append(wrapper.Import, jsonImport{
-			To: ib.To,
-			ID: ib.ID,
-		})
+		wrapper.Import = append(wrapper.Import, jsonImport(ib))
 	}
 
 	data, err := json.MarshalIndent(wrapper, "", "  ")

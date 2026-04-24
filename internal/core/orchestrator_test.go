@@ -204,7 +204,7 @@ func TestExportOrchestrator_Export_APIError(t *testing.T) {
 
 	// Client that returns error for the resource type.
 	client := &mockAPIClient{
-		platform: "p",
+		platform:  "p",
 		resources: map[string][]interface{}{}, // no entry = error
 	}
 
@@ -1071,7 +1071,7 @@ func TestInjectEnvIDAttrs_MultipleAttributes(t *testing.T) {
 func TestInjectEnvIDAttrs_CustomTerraformName(t *testing.T) {
 	// Define an attribute with a custom TerraformName different from Name
 	envAttrDef := schema.AttributeDefinition{
-		Name:           "env_id", // API name
+		Name:           "env_id",         // API name
 		TerraformName:  "environment_id", // Terraform name
 		Type:           "string",
 		ReferencesType: "pingone_environment",
@@ -1523,9 +1523,9 @@ func TestCollectFallbackVars_Deduplicates(t *testing.T) {
 func TestCollectFallbackVars_NestedObject(t *testing.T) {
 	defs := []schema.AttributeDefinition{
 		{
-			Name:           "config",
-			TerraformName:  "config",
-			Type:           "object",
+			Name:          "config",
+			TerraformName: "config",
+			Type:          "object",
 			NestedAttributes: []schema.AttributeDefinition{
 				{
 					Name:           "flow_id",
@@ -1564,9 +1564,9 @@ func TestCollectFallbackVars_NestedObject(t *testing.T) {
 func TestCollectFallbackVars_NestedList(t *testing.T) {
 	defs := []schema.AttributeDefinition{
 		{
-			Name:           "connectors",
-			TerraformName:  "connectors",
-			Type:           "list",
+			Name:          "connectors",
+			TerraformName: "connectors",
+			Type:          "list",
 			NestedAttributes: []schema.AttributeDefinition{
 				{
 					Name:           "connector_id",
@@ -1722,31 +1722,32 @@ func TestExportOrchestrator_Export_IncludeUpstream_Basic(t *testing.T) {
 
 	o := NewExportOrchestrator(reg, proc, client)
 	result, err := o.Export(context.Background(), ExportOptions{
-		EnvironmentID:  "env-1",
-		ResourceFilter: filterObj,
+		EnvironmentID:   "env-1",
+		ResourceFilter:  filterObj,
 		IncludeUpstream: true,
 	})
 	require.NoError(t, err)
 
 	// Assert: both type_flow AND type_conn in result (upstream expansion)
 	require.Len(t, result.ResourcesByType, 2)
-	
+
 	// Find flow and conn resources
 	var flowTypeData, connTypeData *ExportedResourceData
 	for _, erd := range result.ResourcesByType {
-		if erd.ResourceType == "type_flow" {
+		switch erd.ResourceType {
+		case "type_flow":
 			flowTypeData = erd
-		} else if erd.ResourceType == "type_conn" {
+		case "type_conn":
 			connTypeData = erd
 		}
 	}
-	
+
 	require.NotNil(t, flowTypeData, "type_flow should be in result")
 	require.NotNil(t, connTypeData, "type_conn should be in result (upstream dep)")
-	
+
 	require.Len(t, flowTypeData.Resources, 1)
 	assert.Equal(t, "flow-1", flowTypeData.Resources[0].ID)
-	
+
 	require.Len(t, connTypeData.Resources, 1)
 	assert.Equal(t, "conn-1", connTypeData.Resources[0].ID)
 
@@ -1759,7 +1760,7 @@ func TestExportOrchestrator_Export_IncludeUpstream_Basic(t *testing.T) {
 	require.True(t, ok, "connection_id should resolve to ResolvedReference")
 	assert.False(t, connRef.IsVariable, "connection_id should NOT be a variable (resource in result)")
 	assert.Equal(t, "type_conn", connRef.ResourceType)
-	
+
 	// Assert: no fallback variables for type_conn
 	assert.Empty(t, result.FallbackVariables, "no fallback variables should exist")
 }
@@ -1798,8 +1799,8 @@ func TestExportOrchestrator_Export_IncludeUpstream_NoFilter(t *testing.T) {
 
 	o := NewExportOrchestrator(reg, proc, client)
 	result, err := o.Export(context.Background(), ExportOptions{
-		EnvironmentID:  "env-1",
-		ResourceFilter: nil, // No filter
+		EnvironmentID:   "env-1",
+		ResourceFilter:  nil, // No filter
 		IncludeUpstream: true,
 	})
 	require.NoError(t, err)
@@ -1871,7 +1872,7 @@ func TestExportOrchestrator_Export_IncludeUpstream_ExcludeWins(t *testing.T) {
 func TestExportOrchestrator_Export_IncludeUpstream_Transitive(t *testing.T) {
 	// Setup: type_a (no deps), type_b (depends on type_a), type_c (depends on type_b)
 	aDef := baseDef("type_a", "p", "A", "a")
-	
+
 	bDef := baseDef("type_b", "p", "B", "b")
 	bDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_a"}}
 	bDef.Attributes = append(bDef.Attributes,
@@ -1881,7 +1882,7 @@ func TestExportOrchestrator_Export_IncludeUpstream_Transitive(t *testing.T) {
 			ReferencesType: "type_a", ReferenceField: "id",
 		},
 	)
-	
+
 	cDef := baseDef("type_c", "p", "C", "c")
 	cDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_b"}}
 	cDef.Attributes = append(cDef.Attributes,
@@ -1924,16 +1925,16 @@ func TestExportOrchestrator_Export_IncludeUpstream_Transitive(t *testing.T) {
 
 	// Assert: all 3 types in result (transitive chain: c→b→a all pulled in)
 	require.Len(t, result.ResourcesByType, 3)
-	
+
 	typeMap := make(map[string]*ExportedResourceData)
 	for _, erd := range result.ResourcesByType {
 		typeMap[erd.ResourceType] = erd
 	}
-	
+
 	require.Contains(t, typeMap, "type_a", "type_a should be in result (upstream of upstream)")
 	require.Contains(t, typeMap, "type_b", "type_b should be in result (upstream)")
 	require.Contains(t, typeMap, "type_c", "type_c should be in result (seed)")
-	
+
 	assert.Len(t, typeMap["type_a"].Resources, 1)
 	assert.Len(t, typeMap["type_b"].Resources, 1)
 	assert.Len(t, typeMap["type_c"].Resources, 1)
@@ -2040,12 +2041,12 @@ func TestExportOrchestrator_Export_IncludeUpstream_ListOnly(t *testing.T) {
 
 	// Assert: both type_flow AND type_conn listed (upstream expansion applies before ListOnly)
 	require.Len(t, result.ResourcesByType, 2)
-	
+
 	typeMap := make(map[string]*ExportedResourceData)
 	for _, erd := range result.ResourcesByType {
 		typeMap[erd.ResourceType] = erd
 	}
-	
+
 	require.Contains(t, typeMap, "type_flow", "type_flow should be listed")
 	require.Contains(t, typeMap, "type_conn", "type_conn should be listed (upstream dep)")
 }

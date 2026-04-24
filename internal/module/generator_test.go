@@ -287,10 +287,10 @@ func TestGeneratorResourceFiles(t *testing.T) {
 
 	// Generate resource files
 	resources := ModuleResources{
-		"pingone_davinci_flow":                "resource \"pingone_davinci_flow\" \"test\" {}",
-		"pingone_davinci_connector_instance":  "resource \"pingone_davinci_connector_instance\" \"http\" {}",
-		"pingone_davinci_variable":            "resource \"pingone_davinci_variable\" \"company_name\" {}",
-		"pingone_davinci_application":         "resource \"pingone_davinci_application\" \"app\" {}",
+		"pingone_davinci_flow":               "resource \"pingone_davinci_flow\" \"test\" {}",
+		"pingone_davinci_connector_instance": "resource \"pingone_davinci_connector_instance\" \"http\" {}",
+		"pingone_davinci_variable":           "resource \"pingone_davinci_variable\" \"company_name\" {}",
+		"pingone_davinci_application":        "resource \"pingone_davinci_application\" \"app\" {}",
 	}
 
 	err = generator.generateResourceFiles(resources)
@@ -384,8 +384,8 @@ func TestFullModuleGeneration(t *testing.T) {
 			},
 		},
 		Resources: ModuleResources{
-		"pingone_davinci_flow":                "resource \"pingone_davinci_flow\" \"main\" {\n  environment_id = var.pingone_environment_id\n  name = var.davinci_flow_main_name\n}",
-		"pingone_davinci_connector_instance":  "resource \"pingone_davinci_connector_instance\" \"http\" {}",
+			"pingone_davinci_flow":               "resource \"pingone_davinci_flow\" \"main\" {\n  environment_id = var.pingone_environment_id\n  name = var.davinci_flow_main_name\n}",
+			"pingone_davinci_connector_instance": "resource \"pingone_davinci_connector_instance\" \"http\" {}",
 		},
 		ImportBlocks: []ImportBlock{
 			{
@@ -665,7 +665,7 @@ func TestGenerator_GenerateTFVarsTemplate_WithoutValues(t *testing.T) {
 		aIdx := strings.Index(section, "davinci_variable_company_name_value")
 		bIdx := strings.Index(section, "davinci_variable_enabled_value")
 		cIdx := strings.Index(section, "davinci_variable_port_value")
-		if !(aIdx >= 0 && bIdx >= 0 && cIdx >= 0 && aIdx < bIdx && bIdx < cIdx) {
+		if aIdx < 0 || bIdx < 0 || cIdx < 0 || aIdx >= bIdx || bIdx >= cIdx {
 			t.Errorf("expected alphabetical order within Variable group: company_name < enabled < port; got positions: %d, %d, %d", aIdx, bIdx, cIdx)
 		}
 	}
@@ -768,7 +768,7 @@ func TestGenerator_GenerateTFVarsTemplate_WithValues(t *testing.T) {
 		aIdx := strings.Index(section, "davinci_variable_company_name_value")
 		bIdx := strings.Index(section, "davinci_variable_enabled_value")
 		cIdx := strings.Index(section, "davinci_variable_port_value")
-		if !(aIdx >= 0 && bIdx >= 0 && cIdx >= 0 && aIdx < bIdx && bIdx < cIdx) {
+		if aIdx < 0 || bIdx < 0 || cIdx < 0 || aIdx >= bIdx || bIdx >= cIdx {
 			t.Errorf("expected alphabetical order within Variable group: company_name < enabled < port; got positions: %d, %d, %d", aIdx, bIdx, cIdx)
 		}
 	}
