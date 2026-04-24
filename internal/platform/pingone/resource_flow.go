@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
@@ -16,6 +17,11 @@ import (
 
 // errAccessDenied is returned by fetchFlowVariableDeps when the API returns 403.
 var errAccessDenied = errors.New("access denied")
+
+// jsLinksLegacyHint is appended to errors caused by the legacy jsLinks string format.
+const jsLinksLegacyHint = "one or more DaVinci flows contain a legacy jsLinks format (string[] instead of object[]) " +
+	"that the PingOne SDK cannot parse. To resolve this, update the affected flow's jsLinks via the DaVinci UI or API. " +
+	"See https://github.com/pingidentity/pingcli-plugin-terraformer/issues/10"
 
 // flowVariableDeps caches variable dependency info per flow ID.
 // Populated by listFlows/getFlow, consumed by the custom handler.
@@ -63,6 +69,9 @@ func init() {
 func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) {
 	resp, _, err := c.apiClient.DaVinciFlowsApi.GetFlows(ctx, c.environmentID).Execute()
 	if err != nil {
+		if strings.Contains(err.Error(), "jsLinks") {
+			return nil, fmt.Errorf("list flows: %s", jsLinksLegacyHint)
+		}
 		return nil, fmt.Errorf("list flows: %w", err)
 	}
 	embedded := resp.GetEmbedded()
@@ -75,14 +84,14 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 		}
 		// Fetch version details for variable dependencies.
 		if err := fetchFlowVariableDeps(ctx, c, flow.GetId(), fmt.Sprintf("%g", flow.GetCurrentVersion())); err != nil {
-			if errors.Is(err, errAccessDenied) {
-				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
-					"The flow versions endpoint requires a role with higher privileges than Read Only. "+
-					"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
-			} else {
-				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
-					"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
-			}
+			// if errors.Is(err, errAccessDenied) {
+			// 	c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
+			// 		"The flow versions endpoint requires a role with higher privileges than Read Only. "+
+			// 		"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
+			// } else {
+			c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
+				"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
+			// }
 		}
 
 		result = append(result, detail)
@@ -93,20 +102,23 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (interface{}, error) {
 	detail, _, err := c.apiClient.DaVinciFlowsApi.GetFlowById(ctx, c.environmentID, resourceID).Execute()
 	if err != nil {
+		if strings.Contains(err.Error(), "jsLinks") {
+			return nil, fmt.Errorf("get flow: %s", jsLinksLegacyHint)
+		}
 		return nil, fmt.Errorf("get flow: %w", err)
 	}
 
 	// Fetch version details for variable dependencies.
 	if cv, ok := detail.GetCurrentVersionOk(); ok && cv != nil {
 		if err := fetchFlowVariableDeps(ctx, c, detail.GetId(), fmt.Sprintf("%g", *cv)); err != nil {
-			if errors.Is(err, errAccessDenied) {
-				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
-					"The flow versions endpoint requires a role with higher privileges than Read Only. "+
-					"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
-			} else {
-				c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
-					"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
-			}
+			// if errors.Is(err, errAccessDenied) {
+			// 	c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
+			// 		"The flow versions endpoint requires a role with higher privileges than Read Only. "+
+			// 		"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
+			// } else {
+			c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
+				"Flow will be exported without depends_on references to DaVinci variables.", detail.GetId(), err))
+			// }
 		}
 	}
 
