@@ -460,3 +460,68 @@ func TestSDK_BigFloatNumberConversion(t *testing.T) {
 	_, hasMin := result2.Attributes["min_zoom"]
 	assert.False(t, hasMin, "nil *BigFloatWrapper should produce no attribute")
 }
+
+// TestSDK_ChoiceWrapperEmptyObjectToString verifies that when a choice wrapper
+// struct resolves to its Object variant (e.g., API returns {}), and the schema
+// expects a string, the value is JSON-encoded to "{}" rather than Go's "map[]".
+func TestSDK_ChoiceWrapperEmptyObjectToString(t *testing.T) {
+	type ChoiceWrapper struct {
+		String *string
+		Object *map[string]interface{}
+	}
+	type mockSettings struct {
+		IntermediateLoadingScreenCSS *ChoiceWrapper
+	}
+	type mockResource struct {
+		Id       string
+		Name     string
+		Settings *mockSettings
+	}
+
+	def := sdkTestDef("test_choice_empty_obj", []schema.AttributeDefinition{
+		{Name: "Id", TerraformName: "id", Type: "string", SourcePath: "Id"},
+		{Name: "Name", TerraformName: "name", Type: "string", SourcePath: "Name"},
+		{
+			Name: "Settings", TerraformName: "settings", Type: "object", SourcePath: "Settings",
+			NestedAttributes: []schema.AttributeDefinition{
+				{Name: "IntermediateLoadingScreenCSS", TerraformName: "intermediate_loading_screen_css", Type: "string", SourcePath: "IntermediateLoadingScreenCSS"},
+			},
+		},
+	})
+
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	// Empty object variant: API returns {}
+	emptyMap := map[string]interface{}{}
+	mock := &mockResource{
+		Id:   "r1",
+		Name: "test",
+		Settings: &mockSettings{
+			IntermediateLoadingScreenCSS: &ChoiceWrapper{Object: &emptyMap},
+		},
+	}
+	result, err := p.ProcessResource("test_choice_empty_obj", mock)
+	require.NoError(t, err)
+	settings, ok := result.Attributes["settings"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "{}", settings["intermediate_loading_screen_css"],
+		"empty object choice wrapper should JSON-encode to \"{}\"")
+
+	// String variant still works as expected
+	css := "body { color: red; }"
+	mock2 := &mockResource{
+		Id:   "r2",
+		Name: "test2",
+		Settings: &mockSettings{
+			IntermediateLoadingScreenCSS: &ChoiceWrapper{String: &css},
+		},
+	}
+	result2, err := p.ProcessResource("test_choice_empty_obj", mock2)
+	require.NoError(t, err)
+	settings2, ok := result2.Attributes["settings"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "body { color: red; }", settings2["intermediate_loading_screen_css"],
+		"string choice wrapper should pass through as-is")
+}

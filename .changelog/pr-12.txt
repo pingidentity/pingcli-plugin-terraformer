@@ -2,6 +2,10 @@
 `resource/pingone_davinci_flow`: Added support for new flow attributes: `multi_value_source_id` (edge data), `capability_class` (node data), `subtype` (trigger), and `preview_form_rendering_updates` (settings)
 ```
 
+```release-note:bug
+`resource/pingone_davinci_flow`: Fixed `intermediate_loading_screen_css` and `intermediate_loading_screen_html` settings rendering as `map[]` when the API returns an empty object `{}`; values are now correctly JSON-encoded to `"{}"`
+```
+
 ```release-note:note
 Updated `pingone-go-client` dependency from `v0.8.0` to `v0.10.1`
 ```
