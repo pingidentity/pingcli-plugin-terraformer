@@ -90,6 +90,8 @@ func getRegionDomain(region string) string {
 		return "asia"
 	case "CA":
 		return "ca"
+	case "AU":
+		return "com.au"
 	default:
 		return "com"
 	}
@@ -97,7 +99,7 @@ func getRegionDomain(region string) string {
 
 // ValidRegions returns the list of valid PingOne region codes
 func ValidRegions() []string {
-	return []string{"NA", "EU", "AP", "CA"}
+	return []string{"NA", "EU", "AP", "CA", "AU"}
 }
 
 // IsValidRegion checks if the given region code is valid
