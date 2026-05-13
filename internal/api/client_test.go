@@ -120,6 +120,7 @@ func TestIsValidRegion(t *testing.T) {
 		{"AP", true},
 		{"CA", true},
 		{"AU", true},
+		{"SG", true},
 		{"US", false},
 		{"", false},
 		{"INVALID", false},
@@ -134,12 +135,13 @@ func TestIsValidRegion(t *testing.T) {
 
 func TestValidRegions(t *testing.T) {
 	regions := ValidRegions()
-	assert.Len(t, regions, 5)
+	assert.Len(t, regions, 6)
 	assert.Contains(t, regions, "NA")
 	assert.Contains(t, regions, "EU")
 	assert.Contains(t, regions, "AP")
 	assert.Contains(t, regions, "CA")
 	assert.Contains(t, regions, "AU")
+	assert.Contains(t, regions, "SG")
 }
 
 func TestNewClientSingleEnvironment(t *testing.T) {
