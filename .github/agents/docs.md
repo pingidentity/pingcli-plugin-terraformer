@@ -8,6 +8,8 @@ tools: ['read', 'search', 'edit']
 
 # Documentation Agent — Ping CLI Terraform Exporter
 
+> **Tooling**: This agent is configured for **GitHub Copilot Chat**. For Claude Code, documentation updates are handled by `@polaris:engineer` guided by the skills in `.claude/skills/`.
+
 ## Role
 
 You update documentation to reflect implementation changes. You do NOT write production code. You create and modify markdown files, README files, changelog entries, and architecture documents.
@@ -67,4 +69,4 @@ After updating documentation:
 |---------|------|
 | Project README | `README.md` |
 | Architecture overview | `contributing/ARCHITECTURE.md` |
-| Developer guide | `contributing/DEVELOPER_GUIDE.md` |
+| Developer guide | `contributing/DEVELOPER_HANDBOOK.md` |

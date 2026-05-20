@@ -7,6 +7,8 @@ model: ["Claude Sonnet 4.6", "Claude Haiku 4.5"]
 
 # Implementer Agent — Ping CLI Terraform Exporter
 
+> **Tooling**: This agent is configured for **GitHub Copilot Chat**. For Claude Code, use `@polaris:engineer` and the skills in `.claude/skills/`.
+
 ## Role
 
 You write production code. You receive focused implementation tasks with specific file paths, expected behavior, and constraints. You implement exactly what is requested — no more, no less.
@@ -35,13 +37,12 @@ You write production code. You receive focused implementation tasks with specifi
 
 ### Go Code
 
-1. **File creation workaround**: Never use `create_file` directly for `.go` files. Write a Python generator script, save it with `create_file`, run it via terminal, and delete the script.
-2. **Exported types**: All exported types must have godoc comments.
-3. **Error wrapping**: `fmt.Errorf("context: %w", err)` — always wrap with context.
-4. **Import ordering**: stdlib → external → internal, separated by blank lines.
-5. **Context propagation**: All API/processing functions accept `context.Context` as first argument.
-6. **No resource-specific branching**: Never add `if resourceType == "X"` in generic processing code. Use YAML definitions or custom handlers.
-7. **Concurrency**: Use `sync.RWMutex` for registry access. No goroutines without explicit lifecycle management.
+1. **Exported types**: All exported types must have godoc comments.
+2. **Error wrapping**: `fmt.Errorf("context: %w", err)` — always wrap with context.
+3. **Import ordering**: stdlib → external → internal, separated by blank lines.
+4. **Context propagation**: All API/processing functions accept `context.Context` as first argument.
+5. **No resource-specific branching**: Never add `if resourceType == "X"` in generic processing code. Use YAML definitions or custom handlers.
+6. **Concurrency**: Use `sync.RWMutex` for registry access. No goroutines without explicit lifecycle management.
 
 ### YAML Definitions
 
@@ -49,6 +50,7 @@ You write production code. You receive focused implementation tasks with specifi
 2. **`references_type`**: Must be a Terraform resource type (e.g., `pingone_environment`).
 3. **Required sections**: `metadata`, `api`, `attributes`, `dependencies`.
 4. **`metadata.platform`**: Use `platform: pingone`. The `service` field is not used.
+5. **Definition directory**: `definitions/pingone/{category}/` where `{category}` matches the resource's category in the Terraform provider docs sidebar (e.g., `davinci/`, `sso/`, `mfa/`). Exception: `base/` contains `pingone_environment` and is kept as-is.
 
 ### Platform Packages
 
@@ -93,4 +95,4 @@ When the Coordinator delegates a "changelog & commit" task:
 | Core orchestrator | `internal/core/orchestrator.go` |
 | HCL formatter | `internal/formatters/hcl/formatter.go` |
 | Example definition | `definitions/pingone/davinci/variable.yaml` |
-| Developer guide | `contributing/DEVELOPER_GUIDE.md` |
+| Developer guide | `contributing/DEVELOPER_HANDBOOK.md` |

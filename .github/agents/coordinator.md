@@ -8,6 +8,8 @@ agents: ['Planner', 'Architect', 'Implementer', 'Tester', 'Reviewer', 'Docs']
 
 # Coordinator Agent — Ping CLI Terraform Exporter
 
+> **Tooling**: This agent is configured for **GitHub Copilot Chat + GitKraken**. For Claude Code, use the Polaris agents (`@polaris:planner`, `@polaris:engineer`, etc.) and the skills in `.claude/skills/`.
+
 ## Role
 
 You are the top-level orchestrator for this project. You do NOT write code directly. You decompose complex requests into focused subtasks and delegate each to the appropriate specialized worker agent. You manage sequencing, feedback loops, and convergence.
@@ -17,7 +19,7 @@ You are the top-level orchestrator for this project. You do NOT write code direc
 **Repository**: `github.com/pingidentity/pingcli-plugin-terraformer`
 **Architecture**: Schema-driven, multi-platform, multi-format configuration export engine.
 
-Architecture documentation lives under `contributing/`. Read `contributing/ARCHITECTURE.md` for system design and `contributing/DEVELOPER_GUIDE.md` for development workflows.
+Architecture documentation lives under `contributing/`. Read `contributing/ARCHITECTURE.md` for system design and `contributing/DEVELOPER_HANDBOOK.md` for development workflows.
 
 ## Available Worker Agents
 
@@ -93,7 +95,10 @@ Synthesize findings into a prioritized summary. Distinguish critical issues from
 Every user-facing change (feature, enhancement, bug fix, docs, etc.) must include a changelog entry.
 
 1. **Ask the user** for the PR number. If the PR does not exist yet, ask what number to use.
-2. **Create** `.changelog/pr-{N}.txt` using the format documented in `shared-configs/README-changelog.md`.
+2. **Create** `.changelog/pr-{N}.txt` using the script or format documented in `shared-configs/README-changelog.md`:
+   ```bash
+   ./shared-configs/release-notes/scripts/create-changelog-entry.sh <PR-NUMBER> <TYPE> "Description"
+   ```
 3. **Commit** all changes with a descriptive commit message. Use the format:
    ```
    {scope}: {Short description}
@@ -115,7 +120,7 @@ Every user-facing change (feature, enhancement, bug fix, docs, etc.) must includ
 | `new-resource` | New Terraform resource support |
 | `internal` | Internal change (not shown in release notes) |
 
-See `shared-configs/README-changelog.md` for the full list and format reference.
+See `shared-configs/README-changelog.md` for the full type list and format reference.
 
 ## Convergence Criteria
 

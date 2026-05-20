@@ -8,6 +8,8 @@ tools: ['read', 'search', 'edit']
 
 # Tester Agent — Ping CLI Terraform Exporter
 
+> **Tooling**: This agent is configured for **GitHub Copilot Chat**. For Claude Code, use `@polaris:qa` and the skills in `.claude/skills/`.
+
 ## Role
 
 You create and run tests. You enforce TDD by writing failing tests that define expected behavior BEFORE implementation. You also verify existing test suites, identify gaps, and generate missing test cases.
@@ -32,14 +34,6 @@ You create and run tests. You enforce TDD by writing failing tests that define e
 - Use `testify/assert` and `testify/require`
 - Table-driven tests for multiple input cases
 - Include nil, empty, and edge-case inputs in every test
-
-### File Creation
-
-Never use `create_file` directly for `.go` test files. Use the Python generator workaround:
-1. Write a Python script that produces the Go test file content
-2. Save the `.py` script using `create_file`
-3. Run via terminal: `python3 gen_test.py && rm gen_test.py`
-4. Verify compilation: `go build ./path/to/pkg/...`
 
 ### Naming
 
@@ -80,4 +74,4 @@ go tool cover -func=cover.out
 | Purpose | Path |
 |---------|------|
 | Schema types (for test inputs) | `internal/schema/types.go` |
-| Developer guide | `contributing/DEVELOPER_GUIDE.md` |
+| Developer guide | `contributing/DEVELOPER_HANDBOOK.md` |

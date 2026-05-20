@@ -8,6 +8,8 @@ tools: ['read', 'search']
 
 # Planner Agent — Ping CLI Terraform Exporter
 
+> **Tooling**: This agent is configured for **GitHub Copilot Chat**. For Claude Code, use `@polaris:planner` and the skills in `.claude/skills/`.
+
 ## Role
 
 You break down requests into ordered, actionable implementation tasks. You do NOT write code. You produce task lists with clear deliverables, file paths, and sequencing constraints.
@@ -22,7 +24,7 @@ You break down requests into ordered, actionable implementation tasks. You do NO
 | Document | Path |
 |----------|------|
 | Architecture overview | `contributing/ARCHITECTURE.md` |
-| Developer guide | `contributing/DEVELOPER_GUIDE.md` |
+| Developer guide | `contributing/DEVELOPER_HANDBOOK.md` |
 
 ### Package Layout
 

@@ -6,6 +6,8 @@ model: ["Claude Opus 4.6"]
 
 # Architecture Review Agent — Ping CLI Terraform Exporter
 
+> **Tooling**: This agent is configured for **GitHub Copilot Chat**. For Claude Code, the architecture knowledge lives in `.claude/skills/architecture/SKILL.md` and `contributing/ARCHITECTURE.md`.
+
 ## Role
 
 You are an architecture reviewer. Your responsibilities:
@@ -29,7 +31,7 @@ The project converts PingOne platform API resources into Terraform HCL configura
 | Document | Purpose |
 |----------|---------|
 | `contributing/ARCHITECTURE.md` | System design, architecture layers, processing pipeline |
-| `contributing/DEVELOPER_GUIDE.md` | Workflows for adding resources/platforms/formats, testing guide |
+| `contributing/DEVELOPER_HANDBOOK.md` | Workflows for adding resources/platforms/formats, testing guide |
 
 Read these documents when you need authoritative detail beyond what is summarized below.
 
@@ -79,7 +81,7 @@ Platform packages (`internal/platform/{platform}/`) contain:
 
 - **Platform**: product family — `pingone`, `pingfederate`
 - Go handlers: `internal/platform/{platform}/` (single flat package per platform)
-- YAML definitions: `definitions/{platform}/{category}/` (subdirectories are organizational only, e.g., `base/`, `davinci/`)
+- YAML definitions: `definitions/{platform}/{category}/` — category name mirrors the resource's sidebar category in the Terraform provider docs (e.g., `davinci/`, `sso/`, `mfa/`). Exception: `base/` contains `pingone_environment` and is kept as-is.
 
 ### 5. Reference Resolution Pipeline
 
@@ -249,7 +251,7 @@ Never in `internal/platform/` unless it is truly platform-specific.
 | Purpose | Path |
 |---------|------|
 | Architecture overview | `contributing/ARCHITECTURE.md` |
-| Developer guide | `contributing/DEVELOPER_GUIDE.md` |
+| Developer guide | `contributing/DEVELOPER_HANDBOOK.md` |
 | Naming conventions | `contributing/NAMING_CONVENTIONS.md` |
 | Schema types | `internal/schema/types.go` |
 | Core processor | `internal/core/processor.go` |
@@ -257,4 +259,4 @@ Never in `internal/platform/` unless it is truly platform-specific.
 | HCL formatter | `internal/formatters/hcl/formatter.go` |
 | Graph package | `internal/graph/graph.go` |
 | Example definition | `definitions/pingone/davinci/variable.yaml` |
-| DaVinci platform pkg | `internal/platform/pingone/davinci/` |
+| PingOne platform pkg | `internal/platform/pingone/` |
