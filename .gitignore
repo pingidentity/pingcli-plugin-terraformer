@@ -51,3 +51,4 @@ pingcli-terraformer
 # Local regression test reports
 regression-reports/
 .scratch/
+.polaris/
