@@ -50,3 +50,9 @@ pingcli-terraformer
 
 # Local regression test reports
 regression-reports/
+.scratch/
+.polaris/
+.claude/
+.github/agents/
+CLAUDE.md
+AGENT.md

@@ -63,34 +63,104 @@ func init() {
 	})
 }
 
-// listFlows implements list-then-get: lists all flows to collect IDs,
-// then calls get for each to retrieve full details including graph data,
-// settings, input schema, etc. (which the list endpoint may omit).
-func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) {
-	resp, _, err := c.apiClient.DaVinciFlowsApi.GetFlows(ctx, c.environmentID).Execute()
+// listFlowIDs fetches only flow IDs and names from the list endpoint via raw HTTP
+// with ?attributes=id,name.
+//
+// WORKAROUND: The SDK's GetFlows() unmarshals into DaVinciFlowResponse /
+// DaVinciFlowResponseLinks, both of which enforce required-field validation in
+// UnmarshalJSON. The list endpoint omits several fields that the SDK requires
+// (e.g. the "version" link in _links) regardless of what ?attributes= is passed,
+// causing an unmarshal error. Additionally, without ?attributes= the list response
+// includes full flow graph data, which can exceed the 10 MB AWS API Gateway limit
+// and return HTTP 500 for environments with many or large flows.
+//
+// Raw HTTP with ?attributes=id,name returns ~120 KB for 100 flows and avoids both
+// the size limit and the unmarshal validation.
+//
+// TODO: Revert to SDK's GetFlows() once it either omits required-field validation
+// for sparse responses or the list endpoint returns all SDK-required fields.
+type flowID struct{ ID, Name string }
+
+func listFlowIDs(ctx context.Context, c *Client) ([]flowID, error) {
+	cfg := c.apiClient.GetConfig()
+	scheme := cfg.Scheme
+	if scheme == "" {
+		scheme = "https"
+	}
+	return fetchFlowIDs(ctx, scheme, cfg.Host, c.environmentID.String(), cfg.HTTPClient)
+}
+
+// fetchFlowIDs is the testable core of listFlowIDs: it takes explicit connection
+// parameters so tests can point it at an httptest.Server without needing a real
+// SDK client.
+func fetchFlowIDs(ctx context.Context, scheme, host, environmentID string, httpClient *http.Client) ([]flowID, error) {
+	reqURL := fmt.Sprintf("%s://%s/v1/environments/%s/flows?attributes=id,name",
+		scheme, host, environmentID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "jsLinks") {
-			return nil, fmt.Errorf("list flows: %s", jsLinksLegacyHint)
+		return nil, fmt.Errorf("create list request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("execute list request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read list response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("parse list response: %w", err)
+	}
+
+	var out []flowID
+	if embedded, ok := raw["_embedded"].(map[string]interface{}); ok {
+		if items, ok := embedded["flows"].([]interface{}); ok {
+			for _, item := range items {
+				if m, ok := item.(map[string]interface{}); ok {
+					id, _ := m["id"].(string)
+					name, _ := m["name"].(string)
+					if id != "" {
+						out = append(out, flowID{ID: id, Name: name})
+					}
+				}
+			}
 		}
+	}
+	return out, nil
+}
+
+// listFlows implements list-then-get: fetches flow IDs via a minimal raw HTTP
+// request, then calls GetFlowById for each to retrieve full details.
+func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) {
+	stubs, err := listFlowIDs(ctx, c)
+	if err != nil {
 		return nil, fmt.Errorf("list flows: %w", err)
 	}
-	embedded := resp.GetEmbedded()
-	flows := embedded.GetFlows()
-	result := make([]interface{}, 0, len(flows))
-	for _, flow := range flows {
-		detail, _, err := c.apiClient.DaVinciFlowsApi.GetFlowById(ctx, c.environmentID, flow.GetId()).Execute()
+	result := make([]interface{}, 0, len(stubs))
+	for _, stub := range stubs {
+		detail, _, err := c.apiClient.DaVinciFlowsApi.GetFlowById(ctx, c.environmentID, stub.ID).Execute()
 		if err != nil {
-			return nil, fmt.Errorf("get flow %s: %w", flow.GetId(), err)
+			return nil, fmt.Errorf("get flow id=%s name=%q: %w", stub.ID, stub.Name, err)
 		}
 		// Fetch version details for variable dependencies.
-		if err := fetchFlowVariableDeps(ctx, c, flow.GetId(), fmt.Sprintf("%g", flow.GetCurrentVersion())); err != nil {
+		if err := fetchFlowVariableDeps(ctx, c, stub.ID, fmt.Sprintf("%g", detail.GetCurrentVersion())); err != nil {
 			// if errors.Is(err, errAccessDenied) {
 			// 	c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
 			// 		"The flow versions endpoint requires a role with higher privileges than Read Only. "+
-			// 		"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
+			// 		"Flow will be exported without depends_on references to DaVinci variables.", stub.ID, err))
 			// } else {
 			c.AddWarning(fmt.Sprintf("Unable to fetch flow variable dependencies for flow %s: %v. "+
-				"Flow will be exported without depends_on references to DaVinci variables.", flow.GetId(), err))
+				"Flow will be exported without depends_on references to DaVinci variables.", stub.ID, err))
 			// }
 		}
 
