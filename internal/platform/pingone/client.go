@@ -101,7 +101,7 @@ func NewFromCredentials(ctx context.Context, workerEnvID, exportEnvID, region, c
 		WithStorageType(config.StorageTypeNone)
 
 	cfg := pingone.NewConfiguration(serviceCfg)
-	apiClient, err := pingone.NewAPIClient(cfg)
+	apiClient, err := pingone.NewAPIClient(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize API client: %w", err)
 	}
