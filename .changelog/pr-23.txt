@@ -1,0 +1,3 @@
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Use SDK `DaVinciExportFlowVersionResponse` type for flow variable dependency extraction; bump SDK to v0.11.0
+```

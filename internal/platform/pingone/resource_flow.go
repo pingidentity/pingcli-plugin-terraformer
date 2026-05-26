@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	pingone "github.com/pingidentity/pingone-go-client/pingone"
+
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 )
@@ -195,12 +197,18 @@ func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (inter
 	return detail, nil
 }
 
-// fetchFlowVariableDeps calls the flow version export endpoint via raw HTTP POST
-// and caches variable dependency info for the given flow.
+// fetchFlowVariableDeps calls the flow version export endpoint and caches
+// variable dependency info for the given flow.
+//
 // The export endpoint (POST with Content-Type application/vnd.pingidentity.flowversion.export+json)
 // returns the "variables" array that the standard GET endpoint omits.
 // Endpoint: POST /environments/{envID}/flows/{flowID}/versions/{versionID}
-// Returns an error on any failure; callers log a warning and continue.
+//
+// The SDK's DaVinciFlowVersionsApiService does not expose this endpoint as a
+// method (the export POST uses a vendor content-type that is outside the SDK's
+// generated paths), so we use the SDK's configured HTTP client directly to
+// ensure the correct regional host and OAuth2 transport are used. The response
+// is decoded into the SDK's DaVinciExportFlowVersionResponse type.
 func fetchFlowVariableDeps(ctx context.Context, c *Client, flowID string, versionID string) error {
 	cfg := c.apiClient.GetConfig()
 
@@ -210,44 +218,13 @@ func fetchFlowVariableDeps(ctx context.Context, c *Client, flowID string, versio
 	if scheme == "" {
 		scheme = "https"
 	}
-	reqURL := fmt.Sprintf("%s://%s/v1/environments/%s/flows/%s/versions/%s",
-		scheme, cfg.Host, c.environmentID.String(), flowID, versionID)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
+	variables, err := exportFlowVersion(ctx, scheme, cfg.Host, c.environmentID.String(), flowID, versionID, cfg.HTTPClient)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/vnd.pingidentity.flowversion.export+json")
-	req.Header.Set("Accept", "application/json")
-
-	// Use the SDK's configured HTTP client, which includes the OAuth2 transport
-	// for automatic token injection.
-	resp, err := cfg.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("execute request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusForbidden {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%w: status %d: %s", errAccessDenied, resp.StatusCode, string(body))
-	}
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+		return err
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read response body: %w", err)
-	}
-
-	var parsed map[string]interface{}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return fmt.Errorf("parse response JSON: %w", err)
-	}
-
-	deps := extractVariableDeps(parsed)
+	deps := extractVariableDeps(variables)
 	if len(deps) > 0 {
 		flowVariableDeps.Store(flowID, deps)
 	}
@@ -255,29 +232,50 @@ func fetchFlowVariableDeps(ctx context.Context, c *Client, flowID string, versio
 	return nil
 }
 
-// extractVariableDeps parses the "variables" array from the flow version
-// response's AdditionalProperties and returns RuntimeDependsOn entries for
-// variables with context "company" or "flowInstance".
-func extractVariableDeps(additionalProps map[string]interface{}) []core.RuntimeDependsOn {
-	rawVars, ok := additionalProps["variables"]
-	if !ok || rawVars == nil {
-		return nil
+// exportFlowVersion is the testable core of fetchFlowVariableDeps. It POSTs to
+// the flow version export endpoint and returns the variables array from the
+// SDK's DaVinciExportFlowVersionResponse.
+func exportFlowVersion(ctx context.Context, scheme, host, environmentID, flowID, versionID string, httpClient *http.Client) ([]map[string]interface{}, error) {
+	reqURL := fmt.Sprintf("%s://%s/v1/environments/%s/flows/%s/versions/%s",
+		scheme, host, environmentID, flowID, versionID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/vnd.pingidentity.flowversion.export+json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("execute request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, fmt.Errorf("%w: status %d: %s", errAccessDenied, resp.StatusCode, string(body))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 	}
 
-	varSlice, ok := rawVars.([]interface{})
-	if !ok {
-		return nil
+	var exportResp pingone.DaVinciExportFlowVersionResponse
+	if err := json.Unmarshal(body, &exportResp); err != nil {
+		return nil, fmt.Errorf("parse response JSON: %w", err)
 	}
 
+	return exportResp.GetVariables(), nil
+}
+
+// extractVariableDeps returns RuntimeDependsOn entries for the variables in the
+// export response that have context "company" or "flowInstance".
+func extractVariableDeps(variables []map[string]interface{}) []core.RuntimeDependsOn {
 	var deps []core.RuntimeDependsOn
 	seen := make(map[string]bool)
 
-	for _, item := range varSlice {
-		varMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
+	for _, varMap := range variables {
 		ctx, _ := varMap["context"].(string)
 		if ctx != "company" && ctx != "flowInstance" {
 			continue
