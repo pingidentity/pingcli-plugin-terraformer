@@ -26,7 +26,7 @@ Configure your worker application credentials that will be used by the `pingcli-
 export PINGCLI_PINGONE_ENVIRONMENT_ID="your-environment-id"
 export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID="your-client-id"
 export PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET="your-client-secret"
-export PINGCLI_PINGONE_REGION_CODE="NA"  # or EU, AP, CA, AU
+export PINGCLI_PINGONE_REGION_CODE="NA"  # or EU, AP, CA, AU, SG
 ```
 
 ## Step 2: Export Terraform Configuration

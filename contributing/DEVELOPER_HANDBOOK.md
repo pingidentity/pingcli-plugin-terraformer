@@ -841,7 +841,7 @@ go tool pprof mem.prof
 |------|------|---------|-------------|
 | `--pingone-worker-environment-id` | `string` | | Environment ID containing worker app |
 | `--pingone-export-environment-id` | `string` | | Target environment to export |
-| `--pingone-region-code` | `string` | | Region: `NA`, `EU`, `AP`, `CA`, `AU` |
+| `--pingone-region-code` | `string` | | Region: `NA`, `EU`, `AP`, `CA`, `AU`, `SG` |
 | `--pingone-worker-client-id` | `string` | | OAuth worker app client ID |
 | `--pingone-worker-client-secret` | `string` | | OAuth worker app client secret |
 | `--out`, `-o` | `string` | | Output directory path |

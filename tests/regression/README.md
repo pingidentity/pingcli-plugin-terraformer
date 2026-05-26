@@ -50,7 +50,7 @@ The following secrets must be configured in the repository under a GitHub Enviro
 | `PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID` | Target environment ID to export (the static regression env) |
 | `PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID` | Worker application client ID |
 | `PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET` | Worker application client secret |
-| `PINGCLI_PINGONE_REGION_CODE` | PingOne region code (NA, EU, AP, CA, AU) |
+| `PINGCLI_PINGONE_REGION_CODE` | PingOne region code (NA, EU, AP, CA, AU, SG) |
 
 ### GitHub Environment Protection
 

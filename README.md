@@ -80,7 +80,7 @@ make build
 | `PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID` | Target environment to export (optional, defaults to worker env) |
 | `PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID` | OAuth2 client ID |
 | `PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET` | OAuth2 client secret |
-| `PINGCLI_PINGONE_REGION_CODE` | Region code: NA, EU, AP, CA, AU |
+| `PINGCLI_PINGONE_REGION_CODE` | Region code: NA, EU, AP, CA, AU, SG |
 
 ### Two-Environment Model
 
@@ -138,7 +138,7 @@ pingcli-terraformer export --out ./output
 | `--pingone-export-environment-id` | Worker env | Target environment ID |
 | `--pingone-worker-client-id` | - | OAuth2 client ID |
 | `--pingone-worker-client-secret` | - | OAuth2 client secret |
-| `--pingone-region-code` | `NA` | Region: NA, EU, AP, CA, AU |
+| `--pingone-region-code` | `NA` | Region: NA, EU, AP, CA, AU, SG |
 | `--out` / `-o` | stdout | Output directory path |
 | `--output-format` | `hcl` | Output format: `hcl` or `tfjson` |
 | `--module-name` | `ping-export` | Module name prefix |
