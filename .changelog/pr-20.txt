@@ -1,0 +1,3 @@
+```release-note:internal
+`internal/api`: Remove legacy DaVinci HTTP client package; SDK initialization moved to `pingoneplatform.NewFromCredentials`.
+```
