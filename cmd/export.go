@@ -90,7 +90,7 @@ Authentication can be provided via flags or environment variables:
   PINGCLI_PINGONE_ENVIRONMENT_ID                    - Environment containing the worker app
   PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID      - Worker app client ID
   PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET   - Worker app client secret
-  PINGCLI_PINGONE_REGION_CODE                       - Region code (AP, AU, CA, EU, NA)
+  PINGCLI_PINGONE_REGION_CODE                       - Region code (AP, AU, CA, EU, NA, SG)
   PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID  - Target environment to export (optional, defaults to worker environment)
 
 Resource Filtering:
@@ -140,7 +140,7 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	// Define API export flags matching Ping CLI standards
 	workerEnvironmentID := flags.String("pingone-worker-environment-id", "", "PingOne environment ID containing the worker app")
 	exportEnvironmentID := flags.String("pingone-export-environment-id", "", "PingOne environment ID to export resources from (defaults to worker environment)")
-	regionCode := flags.String("pingone-region-code", "", "PingOne region code (NA, EU, AP, CA, AU)")
+	regionCode := flags.String("pingone-region-code", "", "PingOne region code (NA, EU, AP, CA, AU, SG)")
 	clientID := flags.String("pingone-worker-client-id", "", "OAuth worker app client ID")
 	clientSecret := flags.String("pingone-worker-client-secret", "", "OAuth worker app client secret")
 	out := flags.StringP("out", "o", "", "Output file path (default: stdout)")

@@ -116,7 +116,7 @@ func NewFromCredentials(ctx context.Context, workerEnvID, exportEnvID, region, c
 
 // ValidRegions returns the list of valid PingOne region codes.
 func ValidRegions() []string {
-	return []string{"NA", "EU", "AP", "CA"}
+	return []string{"NA", "EU", "AP", "CA", "AU", "SG"}
 }
 
 // IsValidRegion reports whether the given region code is valid.
@@ -140,6 +140,10 @@ func getRegionDomain(region string) string {
 		return "asia"
 	case "CA":
 		return "ca"
+	case "AU":
+		return "com.au"
+	case "SG":
+		return "sg"
 	default:
 		return "com"
 	}

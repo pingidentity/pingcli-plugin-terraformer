@@ -77,11 +77,11 @@ func TestNewFromCredentials(t *testing.T) {
 			name:          "invalid region",
 			workerEnvID:   "auth-env-123",
 			exportEnvID:   validExportEnvID,
-			region:        "AU",
+			region:        "XX",
 			clientID:      "client-123",
 			clientSecret:  "secret-123",
 			expectError:   true,
-			errorContains: "invalid region: AU",
+			errorContains: "invalid region: XX",
 		},
 		{
 			name:          "missing client ID",
@@ -122,6 +122,24 @@ func TestNewFromCredentials(t *testing.T) {
 			clientSecret: "secret-123",
 			expectError:  false,
 		},
+		{
+			name:         "valid credentials AU region",
+			workerEnvID:  "auth-env-123",
+			exportEnvID:  "00000000-0000-0000-0000-000000000002",
+			region:       "AU",
+			clientID:     "client-123",
+			clientSecret: "secret-123",
+			expectError:  false,
+		},
+		{
+			name:         "valid credentials SG region",
+			workerEnvID:  "auth-env-123",
+			exportEnvID:  "00000000-0000-0000-0000-000000000003",
+			region:       "SG",
+			clientID:     "client-123",
+			clientSecret: "secret-123",
+			expectError:  false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -152,7 +170,8 @@ func TestIsValidRegion(t *testing.T) {
 		{"EU", true},
 		{"AP", true},
 		{"CA", true},
-		{"AU", false},
+		{"AU", true},
+		{"SG", true},
 		{"US", false},
 		{"", false},
 		{"INVALID", false},
@@ -167,9 +186,11 @@ func TestIsValidRegion(t *testing.T) {
 
 func TestValidRegions(t *testing.T) {
 	regions := ValidRegions()
-	require.Len(t, regions, 4)
+	require.Len(t, regions, 6)
 	assert.Contains(t, regions, "NA")
 	assert.Contains(t, regions, "EU")
 	assert.Contains(t, regions, "AP")
 	assert.Contains(t, regions, "CA")
+	assert.Contains(t, regions, "AU")
+	assert.Contains(t, regions, "SG")
 }
