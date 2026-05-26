@@ -9,9 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/pingidentity/pingcli-plugin-terraformer/definitions"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/api"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/filter"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/formatters"
@@ -225,9 +223,9 @@ func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, expor
 	}
 
 	// Create API client
-	// Use NewClient to support two-environment model: worker environment for auth, export environment for resources
+	// Use NewFromCredentials to support two-environment model: worker environment for auth, export environment for resources
 	ctx := context.Background()
-	client, err := api.NewClient(ctx, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret)
+	client, err := pingoneplatform.NewFromCredentials(ctx, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret)
 	if err != nil {
 		if logErr := logger.PluginError("Failed to create API client", map[string]string{
 			"worker_environment_id": workerEnvironmentID,
@@ -245,7 +243,7 @@ func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, expor
 
 // exportAsModule uses the schema-driven orchestrator pipeline to export
 // resources and generate a Terraform module.
-func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
+func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatform.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
 	outputDir := out
 	if outputDir == "" {
 		outputDir = "."
@@ -268,12 +266,8 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *api.Client, 
 	// 3. Create processor.
 	proc := core.NewProcessor(registry, core.WithCustomHandlers(customReg))
 
-	// 4. Create API client adapter.
-	envUUID, err := uuid.Parse(environmentID)
-	if err != nil {
-		return fmt.Errorf("invalid environment ID format: %w", err)
-	}
-	apiClient := pingoneplatform.New(client.APIClient(), envUUID)
+	// 4. Use client directly.
+	apiClient := client
 
 	// Build resource filter from include/exclude patterns.
 	var resourceFilter *filter.ResourceFilter
