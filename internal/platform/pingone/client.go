@@ -72,7 +72,9 @@ func (c *Client) Warnings() []string {
 // NewFromCredentials creates a fully initialized Client from OAuth credentials.
 // workerEnvID is the environment where the OAuth client lives (used for token acquisition).
 // exportEnvID is the target environment whose resources will be exported.
-func NewFromCredentials(ctx context.Context, workerEnvID, exportEnvID, region, clientID, clientSecret string) (*Client, error) {
+// version is the tool version string (e.g. "dev" or "v1.2.3") appended to the SDK
+// User-Agent header as "pingcli-plugin-terraformer/<version>".
+func NewFromCredentials(ctx context.Context, workerEnvID, exportEnvID, region, clientID, clientSecret, version string) (*Client, error) {
 	if workerEnvID == "" {
 		return nil, fmt.Errorf("auth environment ID is required")
 	}
@@ -101,6 +103,7 @@ func NewFromCredentials(ctx context.Context, workerEnvID, exportEnvID, region, c
 		WithStorageType(config.StorageTypeNone)
 
 	cfg := pingone.NewConfiguration(serviceCfg)
+	cfg.AppendUserAgent(fmt.Sprintf("pingcli-plugin-terraformer/%s", version))
 	apiClient, err := pingone.NewAPIClient(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize API client: %w", err)
