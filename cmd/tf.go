@@ -28,7 +28,15 @@ Available subcommands:
 )
 
 // TfCommand is the parent command that routes to subcommands
-type TfCommand struct{}
+type TfCommand struct {
+	version string
+}
+
+// SetVersion stores the version string to be threaded into subcommands.
+// It must be called from main before Run to ensure release builds report the correct version.
+func (c *TfCommand) SetVersion(v string) {
+	c.version = v
+}
 
 // Ensure TfCommand implements grpc.PingCliCommand
 var _ grpc.PingCliCommand = (*TfCommand)(nil)
@@ -60,7 +68,7 @@ func (c *TfCommand) Run(args []string, logger grpc.Logger) error {
 	// 	return cmd.Run(subArgs, logger)
 
 	case "export":
-		cmd := &ExportCommand{}
+		cmd := &ExportCommand{version: c.version}
 		return cmd.Run(subArgs, logger)
 
 	case "--help", "-h", "help":
