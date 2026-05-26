@@ -9,20 +9,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/api"
+	pingoneplatform "github.com/pingidentity/pingcli-plugin-terraformer/internal/platform/pingone"
 	"github.com/stretchr/testify/require"
 )
 
 // createTestClient creates an API client using environment variables
 // Supports separate auth and target environments
-func createTestClient(t *testing.T) *api.Client {
+func createTestClient(t *testing.T) *pingoneplatform.Client {
 	clientID := requireEnv(t, "PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID")
 	clientSecret := requireEnv(t, "PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET")
 	authEnvID := requireEnv(t, "PINGCLI_PINGONE_ENVIRONMENT_ID")
 	targetEnvID := getEnvOrDefault("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID", authEnvID) // Default to auth env
 	region := getEnvOrDefault("PINGONE_REGION", "NA")
 
-	client, err := api.NewClient(context.Background(), authEnvID, targetEnvID, region, clientID, clientSecret)
+	client, err := pingoneplatform.NewFromCredentials(context.Background(), authEnvID, targetEnvID, region, clientID, clientSecret)
 	require.NoError(t, err, "Failed to create API client")
 	return client
 }
