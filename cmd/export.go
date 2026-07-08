@@ -112,7 +112,9 @@ Resource Filtering:
 
 // ExportCommand is the implementation of the export subcommand.
 // It encapsulates the logic for exporting PingOne environments to Terraform.
-type ExportCommand struct{}
+type ExportCommand struct {
+	version string
+}
 
 // A compile-time check to ensure ExportCommand correctly implements the
 // grpc.PingCliCommand interface.
@@ -174,12 +176,12 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	}
 
 	// Execute export
-	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources, *includeUpstream)
+	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources, *includeUpstream, c.version)
 }
 
 // runExport handles API export of all resources from an environment
 // All exports now generate Terraform module structure
-func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
+func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool, version string) error {
 	// Get credentials from environment variables if not provided via flags
 	if workerEnvironmentID == "" {
 		workerEnvironmentID = os.Getenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
@@ -225,7 +227,7 @@ func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, expor
 	// Create API client
 	// Use NewFromCredentials to support two-environment model: worker environment for auth, export environment for resources
 	ctx := context.Background()
-	client, err := pingoneplatform.NewFromCredentials(ctx, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret)
+	client, err := pingoneplatform.NewFromCredentials(ctx, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, version)
 	if err != nil {
 		if logErr := logger.PluginError("Failed to create API client", map[string]string{
 			"worker_environment_id": workerEnvironmentID,

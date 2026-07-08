@@ -96,11 +96,13 @@ func main() {
 
 // runAsPlugin starts the gRPC plugin server for pingcli integration
 func runAsPlugin() {
+	tfCmd := &cmd.TfCommand{}
+	tfCmd.SetVersion(version)
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: grpc.HandshakeConfig,
 		Plugins: map[string]plugin.Plugin{
 			grpc.ENUM_PINGCLI_COMMAND_GRPC: &grpc.PingCliCommandGrpcPlugin{
-				Impl: &cmd.TfCommand{},
+				Impl: tfCmd,
 			},
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
@@ -134,6 +136,7 @@ func runAsStandalone() {
 	logger := &simpleLogger{}
 
 	tfCmd := &cmd.TfCommand{}
+	tfCmd.SetVersion(version)
 
 	// Pass subcommand as first arg
 	if err := tfCmd.Run(append([]string{subcommand}, args...), logger); err != nil {

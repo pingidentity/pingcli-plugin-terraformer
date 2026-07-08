@@ -22,7 +22,7 @@ func createTestClient(t *testing.T) *pingoneplatform.Client {
 	targetEnvID := getEnvOrDefault("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID", authEnvID) // Default to auth env
 	region := getEnvOrDefault("PINGONE_REGION", "NA")
 
-	client, err := pingoneplatform.NewFromCredentials(context.Background(), authEnvID, targetEnvID, region, clientID, clientSecret)
+	client, err := pingoneplatform.NewFromCredentials(context.Background(), authEnvID, targetEnvID, region, clientID, clientSecret, "dev")
 	require.NoError(t, err, "Failed to create API client")
 	return client
 }

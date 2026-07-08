@@ -144,7 +144,7 @@ func TestNewFromCredentials(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := NewFromCredentials(ctx, tt.workerEnvID, tt.exportEnvID, tt.region, tt.clientID, tt.clientSecret)
+			client, err := NewFromCredentials(ctx, tt.workerEnvID, tt.exportEnvID, tt.region, tt.clientID, tt.clientSecret, "dev")
 
 			if tt.expectError {
 				require.Error(t, err)

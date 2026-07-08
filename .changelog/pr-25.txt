@@ -1,0 +1,3 @@
+```release-note:enhancement
+PingOne SDK client requests now include a `User-Agent` suffix of `pingcli-plugin-terraformer/<version>` to identify the tool in PingOne server logs. Release builds report the real version tag; development builds report `dev`.
+```
