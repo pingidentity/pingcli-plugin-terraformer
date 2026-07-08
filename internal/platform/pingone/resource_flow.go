@@ -141,6 +141,26 @@ func fetchFlowIDs(ctx context.Context, scheme, host, environmentID string, httpC
 	return out, nil
 }
 
+// clearInputSchemaIfAuthentication zeroes the InputSchema field on detail if
+// the flow's trigger type is AUTHENTICATION. The Terraform provider rejects
+// input_schema blocks on AUTHENTICATION flows, so this suppresses the attribute
+// before the struct enters the processing pipeline.
+//
+// The function is a no-op when detail is nil, when no Trigger is set, or when
+// the trigger type is anything other than AUTHENTICATION.
+func clearInputSchemaIfAuthentication(detail *pingone.DaVinciFlowResponse) {
+	if detail == nil {
+		return
+	}
+	trigger, ok := detail.GetTriggerOk()
+	if !ok || trigger == nil {
+		return
+	}
+	if trigger.GetType() == pingone.DAVINCIFLOWTRIGGERRESPONSETYPE_AUTHENTICATION {
+		detail.InputSchema = nil
+	}
+}
+
 // listFlows implements list-then-get: fetches flow IDs via a minimal raw HTTP
 // request, then calls GetFlowById for each to retrieve full details.
 func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) {
@@ -154,6 +174,7 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 		if err != nil {
 			return nil, fmt.Errorf("get flow id=%s name=%q: %w", stub.ID, stub.Name, err)
 		}
+		clearInputSchemaIfAuthentication(detail)
 		// Fetch version details for variable dependencies.
 		if err := fetchFlowVariableDeps(ctx, c, stub.ID, fmt.Sprintf("%g", detail.GetCurrentVersion())); err != nil {
 			// if errors.Is(err, errAccessDenied) {
@@ -179,6 +200,7 @@ func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (inter
 		}
 		return nil, fmt.Errorf("get flow: %w", err)
 	}
+	clearInputSchemaIfAuthentication(detail)
 
 	// Fetch version details for variable dependencies.
 	if cv, ok := detail.GetCurrentVersionOk(); ok && cv != nil {
