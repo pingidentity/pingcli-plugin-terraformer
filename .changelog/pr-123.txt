@@ -1,0 +1,3 @@
+```release-note:bug
+`resource/pingone_davinci_flow`: Fixed export failure when `trigger.type` is `AUTHENTICATION` — the exported `input_schema` block is now suppressed, resolving the Terraform provider error "input_schema must not be configured when trigger.type is set to AUTHENTICATION"
+```

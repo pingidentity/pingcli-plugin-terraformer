@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	pingone "github.com/pingidentity/pingone-go-client/pingone"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -199,6 +200,74 @@ func TestFlowResourceHandlerFunctions(t *testing.T) {
 
 // TestFetchFlowIDs verifies that fetchFlowIDs parses id and name from the
 // ?attributes=id,name list response and returns one stub per flow.
+// TestClearInputSchemaIfAuthentication verifies that clearInputSchemaIfAuthentication
+// zeroes InputSchema when trigger type is AUTHENTICATION, and is otherwise a no-op.
+func TestClearInputSchemaIfAuthentication(t *testing.T) {
+	// A non-empty InputSchema slice used to confirm preservation in non-AUTHENTICATION cases.
+	someSchema := []pingone.DaVinciFlowInputSchemaResponseItem{
+		*pingone.NewDaVinciFlowInputSchemaResponseItem(
+			"textField",
+			pingone.DAVINCIFLOWINPUTSCHEMARESPONSEITEMPREFERREDDATATYPE_STRING,
+			"username",
+		),
+	}
+
+	tests := []struct {
+		name            string
+		detail          *pingone.DaVinciFlowResponse
+		wantInputSchema []pingone.DaVinciFlowInputSchemaResponseItem
+	}{
+		{
+			name: "AUTHENTICATION trigger clears InputSchema",
+			detail: func() *pingone.DaVinciFlowResponse {
+				d := pingone.NewDaVinciFlowResponseWithDefaults()
+				trigger := pingone.NewDaVinciFlowTriggerResponse(pingone.DAVINCIFLOWTRIGGERRESPONSETYPE_AUTHENTICATION)
+				d.SetTrigger(*trigger)
+				d.SetInputSchema(someSchema)
+				return d
+			}(),
+			wantInputSchema: nil,
+		},
+		{
+			name: "SCHEDULE trigger leaves InputSchema unchanged",
+			detail: func() *pingone.DaVinciFlowResponse {
+				d := pingone.NewDaVinciFlowResponseWithDefaults()
+				trigger := pingone.NewDaVinciFlowTriggerResponse(pingone.DAVINCIFLOWTRIGGERRESPONSETYPE_SCHEDULE)
+				d.SetTrigger(*trigger)
+				d.SetInputSchema(someSchema)
+				return d
+			}(),
+			wantInputSchema: someSchema,
+		},
+		{
+			name: "nil trigger leaves InputSchema unchanged",
+			detail: func() *pingone.DaVinciFlowResponse {
+				d := pingone.NewDaVinciFlowResponseWithDefaults()
+				d.SetInputSchema(someSchema)
+				// No trigger set — GetTriggerOk returns (nil, false).
+				return d
+			}(),
+			wantInputSchema: someSchema,
+		},
+		{
+			name:            "nil detail does not panic",
+			detail:          nil,
+			wantInputSchema: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearInputSchemaIfAuthentication(tt.detail)
+			if tt.detail == nil {
+				// Nothing to assert — just confirming no panic above.
+				return
+			}
+			assert.Equal(t, tt.wantInputSchema, tt.detail.InputSchema)
+		})
+	}
+}
+
 func TestFetchFlowIDs(t *testing.T) {
 	tests := []struct {
 		name          string
