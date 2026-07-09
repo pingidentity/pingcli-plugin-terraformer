@@ -381,6 +381,11 @@ func nestedObjectTokens(indent, closingIndent string, nested []schema.AttributeD
 	var tokens hclwrite.Tokens
 
 	for _, attr := range nested {
+		// Skip computed-only nested attributes (same rule as top-level).
+		if attr.Computed && !attr.Required && attr.ReferencesType == "" {
+			continue
+		}
+
 		nName := terraformName(attr)
 		nVal, nOk := valMap[nName]
 		if !nOk || nVal == nil {
