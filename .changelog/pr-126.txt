@@ -1,0 +1,11 @@
+```release-note:feature
+`cmd/list-outputs`: New `list-outputs` subcommand that enumerates all possible output attribute paths (`resource_type.label.attr`) for exported resources. Supports `--depth` (default 1), `--include-resources`, `--exclude-resources`, and `--include-upstream`. Output is newline-delimited on stdout and pipeable directly to `--output-attribute-file`.
+```
+
+```release-note:feature
+`cmd/export`: New `--output-attribute` (repeatable, glob `*` supported in label position) and `--output-attribute-file` flags that populate `outputs.tf` with Terraform output blocks for specified resource attribute paths.
+```
+
+```release-note:enhancement
+`resource/pingone_davinci_application`: Added missing `api_key.value` computed attribute to schema definition.
+```

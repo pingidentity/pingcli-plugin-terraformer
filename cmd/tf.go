@@ -11,16 +11,21 @@ var (
 	TfExample = `  # Export PingOne resources to Terraform HCL
   pingcli tf export --out ./environment.tf
 
+  # List all possible output attribute paths
+  pingcli tf list-outputs
+
   # Get help for subcommands
-  pingcli tf export --help`
+  pingcli tf export --help
+  pingcli tf list-outputs --help`
 
 	TfLong = `Terraform utilities for Ping Identity resources.
 
-Provides tools to export resources to Terraform HCL format 
+Provides tools to export resources to Terraform HCL format
 compatible with the PingOne Terraform Provider.
 
 Available subcommands:
-  export - Export PingOne resources from live environments to Terraform configuration`
+  export       - Export PingOne resources from live environments to Terraform configuration
+  list-outputs - List all possible output attribute paths for exported resources`
 
 	TfShort = "Terraform utilities for Ping Identity"
 
@@ -61,6 +66,10 @@ func (c *TfCommand) Run(args []string, logger grpc.Logger) error {
 
 	case "export":
 		cmd := &ExportCommand{}
+		return cmd.Run(subArgs, logger)
+
+	case "list-outputs":
+		cmd := &ListOutputsCommand{}
 		return cmd.Run(subArgs, logger)
 
 	case "--help", "-h", "help":
