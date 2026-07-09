@@ -9,3 +9,7 @@
 ```release-note:enhancement
 `resource/pingone_davinci_application`: Added missing `api_key.value` computed attribute to schema definition.
 ```
+
+```release-note:bug
+`formatters/hcl`, `formatters/tfjson`: Computed-only attributes inside nested object blocks (e.g. `api_key.value`) were incorrectly written into resource configuration. The computed skip guard now applies at all nesting levels.
+```
