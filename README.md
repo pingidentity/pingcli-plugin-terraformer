@@ -298,9 +298,7 @@ When the exported module is used as a child module in a root Terraform configura
 ```bash
 pingcli-terraformer list-outputs \
   --include-resources "pingone_davinci_flow.*" \
-  --pingone-worker-environment-id <uuid> \
-  --pingone-worker-client-id <client-id> \
-  --pingone-worker-client-secret <secret>
+  --pingone-export-environment-id <uuid>
 ```
 
 Use `--depth 2` to include nested attributes (e.g. `api_key.value`):
