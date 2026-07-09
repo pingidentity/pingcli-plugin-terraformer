@@ -51,6 +51,11 @@ attributes:
         terraform_name: enabled
         type: bool
         source_path: Enabled
+      - name: Value
+        terraform_name: value
+        type: string
+        source_path: Value
+        computed: true
 
   # OAuth - optional object block
   - name: OAuth

@@ -153,12 +153,16 @@ Usage:
 
 Available subcommands:
   export         - Export Ping Identity resources to Terraform configuration
+  list-outputs   - List all possible output attribute paths for exported resources
   help           - Show this help message
 
 Examples:
 
   # Export PingOne resources to Terraform
   pingcli-terraformer export --out ./environment.tf
+
+  # List all possible output attribute paths
+  pingcli-terraformer list-outputs
 
 Global Flags:
   -h, --help      Show help message

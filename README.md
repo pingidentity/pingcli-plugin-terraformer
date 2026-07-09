@@ -9,6 +9,7 @@ Export PingOne resources to Terraform configuration with automatic dependency re
 - **Automatic Dependency Resolution**: Generates Terraform references between resources
 - **Import Block Generation**: Terraform import blocks to manage existing resources (Terraform 1.5+)
 - **Module Structure**: Generates reusable Terraform modules with proper variable scaffolding
+- **Output Generation**: Populate `outputs.tf` so parent modules can reference child module resources
 - **Dual Mode Operation**: Works as standalone CLI or Ping CLI plugin
 - **Two-Environment Authentication**: Isolate credentials from exported resources
 
@@ -151,6 +152,24 @@ pingcli-terraformer export --out ./output
 | `--exclude-resources` | - | Exclude resources matching glob/regex pattern (repeatable) |
 | `--include-upstream` | `false` | Include upstream dependencies of filtered resources |
 | `--list-resources` | `false` | List resource addresses and exit |
+| `--output-attribute` | - | Add an output block for `resource_type.label.attr` (repeatable; glob `*` supported in label position) |
+| `--output-attribute-file` | - | File with one `resource_type.label.attr` path per line (same format as `--output-attribute`) |
+
+### List Outputs Command
+
+Enumerates all possible output attribute paths for exported resources without writing any files. Output is newline-delimited on stdout, suitable for piping or redirecting to a file for use with `--output-attribute-file`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--pingone-worker-environment-id` | - | Worker environment ID |
+| `--pingone-export-environment-id` | Worker env | Target environment ID |
+| `--pingone-worker-client-id` | - | OAuth2 client ID |
+| `--pingone-worker-client-secret` | - | OAuth2 client secret |
+| `--pingone-region-code` | `NA` | Region: NA, EU, AP, CA, AU, SG |
+| `--depth` | `1` | Attribute enumeration depth (1 = top-level only; 2 = one level of nesting) |
+| `--include-resources` | - | Include resources matching glob/regex pattern (repeatable) |
+| `--exclude-resources` | - | Exclude resources matching glob/regex pattern (repeatable) |
+| `--include-upstream` | `false` | Include upstream dependencies of filtered resources |
 
 ### Output Formats
 
@@ -269,6 +288,60 @@ pingcli-terraformer export \
   --exclude-resources "pingone_davinci_connector_instance.pingcli__Http" \
   --out ./output
 ```
+
+## Generating Module Outputs
+
+When the exported module is used as a child module in a root Terraform configuration, the root module may need to reference resource attributes (e.g. a flow ID) via output blocks. Use `list-outputs` to discover available paths and `--output-attribute` / `--output-attribute-file` to populate `outputs.tf`.
+
+### Discover available output paths
+
+```bash
+pingcli-terraformer list-outputs \
+  --include-resources "pingone_davinci_flow.*" \
+  --pingone-export-environment-id <uuid>
+```
+
+Use `--depth 2` to include nested attributes (e.g. `api_key.value`):
+
+```bash
+pingcli-terraformer list-outputs --depth 2 ...
+```
+
+### Export with specific output attributes
+
+Using `--output-attribute` directly, with glob support in the label position:
+
+```bash
+pingcli-terraformer export \
+  --output-attribute "pingone_davinci_flow.*.id" \
+  --output-attribute "pingone_davinci_flow.*.name" \
+  --out ./output ...
+```
+
+### Pipe list-outputs into export
+
+```bash
+# Capture all flow output paths, filter to just IDs
+pingcli-terraformer list-outputs \
+  --include-resources "pingone_davinci_flow.*" ... \
+  | grep '\.id$' > flow-outputs.txt
+
+# Edit flow-outputs.txt as needed, then export
+pingcli-terraformer export \
+  --output-attribute-file flow-outputs.txt \
+  --out ./output ...
+```
+
+The generated `outputs.tf` in the child module will contain one `output` block per path:
+
+```hcl
+output "pingone_davinci_flow__pingcli__My-0020-Flow__id" {
+  description = "The id of pingone_davinci_flow pingcli__My-0020-Flow"
+  value       = pingone_davinci_flow.pingcli__My-0020-Flow.id
+}
+```
+
+The root module can then reference it as `module.<module_name>.pingone_davinci_flow__pingcli__My-0020-Flow__id`.
 
 ## Contributing
 

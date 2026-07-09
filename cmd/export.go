@@ -4,9 +4,12 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/definitions"
@@ -160,6 +163,10 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	listResources := flags.Bool("list-resources", false, "List all resource addresses (resource_type.terraform_label) and exit")
 	includeUpstream := flags.Bool("include-upstream", false, "Automatically include upstream dependencies of filtered resources")
 
+	// Output attribute flags
+	outputAttributes := flags.StringSlice("output-attribute", []string{}, "Add an output block for resource_type.label.attr (repeatable; glob * supported in label position)")
+	outputAttributeFile := flags.String("output-attribute-file", "", "File with one resource_type.label.attr path per line (same format as --output-attribute)")
+
 	// Parse the provided arguments
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -174,12 +181,12 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	}
 
 	// Execute export
-	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources, *includeUpstream)
+	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources, *includeUpstream, *outputAttributes, *outputAttributeFile)
 }
 
 // runExport handles API export of all resources from an environment
 // All exports now generate Terraform module structure
-func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
+func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool, outputAttributes []string, outputAttributeFile string) error {
 	// Get credentials from environment variables if not provided via flags
 	if workerEnvironmentID == "" {
 		workerEnvironmentID = os.Getenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
@@ -238,12 +245,12 @@ func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, expor
 		return fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return c.exportAsModule(ctx, client, logger, skipDeps, includeImports, includeValues, moduleDir, moduleName, out, exportEnvironmentID, outputFormat, includeResources, excludeResources, listResources, includeUpstream)
+	return c.exportAsModule(ctx, client, logger, skipDeps, includeImports, includeValues, moduleDir, moduleName, out, exportEnvironmentID, outputFormat, includeResources, excludeResources, listResources, includeUpstream, outputAttributes, outputAttributeFile)
 }
 
 // exportAsModule uses the schema-driven orchestrator pipeline to export
 // resources and generate a Terraform module.
-func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatform.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool) error {
+func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatform.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool, outputAttributes []string, outputAttributeFile string) error {
 	outputDir := out
 	if outputDir == "" {
 		outputDir = "."
@@ -422,7 +429,17 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatf
 		})
 	}
 
-	// 7. Build module structure.
+	// 7. Resolve --output-attribute / --output-attribute-file paths into output blocks.
+	outputPaths, pathErr := collectOutputPaths(outputAttributes, outputAttributeFile)
+	if pathErr != nil {
+		return pathErr
+	}
+	var allOutputs []module.Output
+	if len(outputPaths) > 0 {
+		allOutputs = buildOutputs(outputPaths, result, logger)
+	}
+
+	// 8. Build module structure.
 	moduleConfig := module.ModuleConfig{
 		OutputDir:      outputDir,
 		ModuleDirName:  moduleDir,
@@ -439,6 +456,7 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatf
 	structure := &module.ModuleStructure{
 		Config:       moduleConfig,
 		Variables:    allVariables,
+		Outputs:      allOutputs,
 		Resources:    resources,
 		ImportBlocks: allImportBlocks,
 	}
@@ -496,6 +514,107 @@ func importResourceLabel(data *core.ResourceData, def *schema.ResourceDefinition
 		return utils.SanitizeResourceName(data.Name)
 	}
 	return data.ID
+}
+
+// outputAttrPath holds a parsed --output-attribute path.
+type outputAttrPath struct {
+	resourceType string
+	labelPattern string
+	attrPath     string // dot-notation, e.g. "id" or "settings.csp"
+}
+
+// parseOutputPath splits "resource_type.label_or_glob.attr" or
+// "resource_type.label_or_glob.nested.attr" into its three logical parts.
+// The first dot-segment is resource_type, the second is label, and everything
+// after the second dot is the attribute path.
+func parseOutputPath(raw string) (outputAttrPath, bool) {
+	parts := strings.SplitN(raw, ".", 3)
+	if len(parts) < 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return outputAttrPath{}, false
+	}
+	return outputAttrPath{
+		resourceType: parts[0],
+		labelPattern: parts[1],
+		attrPath:     parts[2],
+	}, true
+}
+
+// collectOutputPaths merges --output-attribute values with lines read from
+// --output-attribute-file, deduplicates, and returns the combined slice.
+func collectOutputPaths(flags []string, filePath string) ([]string, error) {
+	seen := make(map[string]struct{})
+	var paths []string
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" || strings.HasPrefix(p, "#") {
+			return
+		}
+		if _, ok := seen[p]; !ok {
+			seen[p] = struct{}{}
+			paths = append(paths, p)
+		}
+	}
+	for _, f := range flags {
+		add(f)
+	}
+	if filePath != "" {
+		f, err := os.Open(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("cannot open --output-attribute-file %q: %w", filePath, err)
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			add(scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("reading --output-attribute-file: %w", err)
+		}
+	}
+	return paths, nil
+}
+
+// buildOutputs converts collected path strings into module.Output values by
+// matching each (resourceType, labelPattern, attrPath) against exported results.
+func buildOutputs(paths []string, result *core.ExportResult, logger grpc.Logger) []module.Output {
+	// Index results by resource type for O(1) lookup.
+	byType := make(map[string]*core.ExportedResourceData, len(result.ResourcesByType))
+	for _, erd := range result.ResourcesByType {
+		byType[erd.ResourceType] = erd
+	}
+
+	var outputs []module.Output
+	for _, raw := range paths {
+		p, ok := parseOutputPath(raw)
+		if !ok {
+			_ = logger.Warn(fmt.Sprintf("skipping malformed --output-attribute path %q: expected resource_type.label.attr", raw), nil)
+			continue
+		}
+		erd, found := byType[p.resourceType]
+		if !found {
+			_ = logger.Warn(fmt.Sprintf("--output-attribute: resource type %q not found in export results", p.resourceType), nil)
+			continue
+		}
+		matched := 0
+		for _, rd := range erd.Resources {
+			ok, err := filepath.Match(strings.ToLower(p.labelPattern), strings.ToLower(rd.Label))
+			if err != nil || !ok {
+				continue
+			}
+			matched++
+			name := p.resourceType + "__" + rd.Label + "__" + strings.ReplaceAll(p.attrPath, ".", "__")
+			outputs = append(outputs, module.Output{
+				Name:        name,
+				Description: "The " + p.attrPath + " of " + p.resourceType + " " + rd.Label,
+				Value:       p.resourceType + "." + rd.Label + "." + p.attrPath,
+			})
+		}
+		if matched == 0 {
+			_ = logger.Warn(fmt.Sprintf("--output-attribute: pattern %q matched no %s resources", p.labelPattern, p.resourceType), nil)
+		}
+	}
+	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
+	return outputs
 }
 
 // buildImportID expands the definition's import ID format for a single resource.
