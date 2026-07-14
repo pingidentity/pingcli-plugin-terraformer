@@ -1,0 +1,3 @@
+```release-note:internal
+resource/pingone_davinci_flow: Added `outcomes` attribute to node data schema (inert until terraform-provider-pingone adds provider-side support for multi-outcome node routing)
+```

@@ -381,6 +381,34 @@ attributes:
                     source_path: Properties
                     transform: jsonencode_raw
 
+                  # Outcomes: multi-outcome node routing (e.g. pingOneFormsConnector
+                  # showForm "Save"/"Resend" exit paths). Not present on the SDK's
+                  # DaVinciFlowGraphDataResponseElementsNodeData struct as a named
+                  # field yet -- it lands in AdditionalProperties["outcomes"], and
+                  # is resolved via the generic AdditionalProperties fallback in
+                  # findFieldByPath (internal/core/processor.go). Only present on
+                  # nodes whose connector/capability defines named exit paths;
+                  # absent otherwise -- no attribute is emitted in that case.
+                  - name: Outcomes
+                    terraform_name: outcomes
+                    type: list
+                    source_path: Outcomes
+                    nested_attributes:
+                      - name: Id
+                        terraform_name: id
+                        type: string
+                        source_path: Id
+
+                      - name: Result
+                        terraform_name: result
+                        type: string
+                        source_path: Result
+
+                      - name: Label
+                        terraform_name: label
+                        type: string
+                        source_path: Label
+
               - name: Position
                 terraform_name: position
                 type: object
