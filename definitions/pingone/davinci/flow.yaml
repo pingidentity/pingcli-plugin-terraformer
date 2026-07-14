@@ -389,6 +389,11 @@ attributes:
                   # findFieldByPath (internal/core/processor.go). Only present on
                   # nodes whose connector/capability defines named exit paths;
                   # absent otherwise -- no attribute is emitted in that case.
+                  #
+                  # Inert until terraform-provider-pingone accepts this attribute
+                  # (see PR #127 description for what to re-verify once the
+                  # upstream SDK/provider fix ships: field naming/casing, list vs
+                  # set, and terraform_name).
                   - name: Outcomes
                     terraform_name: outcomes
                     type: list
