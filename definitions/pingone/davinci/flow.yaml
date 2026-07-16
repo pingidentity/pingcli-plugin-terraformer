@@ -382,18 +382,22 @@ attributes:
                     transform: jsonencode_raw
 
                   # Outcomes: multi-outcome node routing (e.g. pingOneFormsConnector
-                  # showForm "Save"/"Resend" exit paths). Not present on the SDK's
-                  # DaVinciFlowGraphDataResponseElementsNodeData struct as a named
-                  # field yet -- it lands in AdditionalProperties["outcomes"], and
-                  # is resolved via the generic AdditionalProperties fallback in
-                  # findFieldByPath (internal/core/processor.go). Only present on
-                  # nodes whose connector/capability defines named exit paths;
-                  # absent otherwise -- no attribute is emitted in that case.
+                  # showForm "Save"/"Resend" exit paths). Only present on nodes whose
+                  # connector/capability defines named exit paths; absent otherwise --
+                  # no attribute is emitted in that case.
                   #
-                  # Inert until terraform-provider-pingone accepts this attribute
-                  # (see PR #127 description for what to re-verify once the
-                  # upstream SDK/provider fix ships: field naming/casing, list vs
-                  # set, and terraform_name).
+                  # pingone-go-client v0.12.0+ has a typed Outcomes field on
+                  # DaVinciFlowGraphDataResponseElementsNodeData, so this resolves via
+                  # the normal named-field path in findFieldByPath. Older SDK versions
+                  # (no typed field) fall back to AdditionalProperties["outcomes"] via
+                  # the generic fallback in internal/core/processor.go -- see PR #127
+                  # for the full history.
+                  #
+                  # terraform-provider-pingone#1342 / PR #1345 added provider-side
+                  # support for this attribute (merged to main, not yet in a tagged
+                  # release as of PR #127 -- see that PR's description for the release
+                  # status). Applying HCL with an outcomes block will fail against
+                  # provider releases predating that fix.
                   - name: Outcomes
                     terraform_name: outcomes
                     type: list
