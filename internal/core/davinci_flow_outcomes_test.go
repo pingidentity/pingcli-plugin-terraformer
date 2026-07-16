@@ -26,12 +26,20 @@ func davinciFlowRegistry(t *testing.T) *schema.Registry {
 }
 
 // buildFlowResponse constructs a minimal but valid *pingone.DaVinciFlowResponse
-// with two nodes in GraphData.Elements.Nodes: one whose Data carries
-// AdditionalProperties["outcomes"] (mirroring the sample flow's esqd1w6k6h
-// node, requirements.md "Sample flow evidence"), and one without any
-// outcomes key (mirroring frbglr02tp), so a single processed resource proves
-// both the presence and absence cases end-to-end through the real
-// definition.
+// with two nodes in GraphData.Elements.Nodes: one whose Data carries a typed
+// Outcomes slice (mirroring the sample flow's esqd1w6k6h node, requirements.md
+// "Sample flow evidence"), and one without any outcomes (mirroring
+// frbglr02tp), so a single processed resource proves both the presence and
+// absence cases end-to-end through the real definition.
+//
+// pingone-go-client v0.12.0 added a typed Outcomes field to
+// DaVinciFlowGraphDataResponseElementsNodeData (terraform-provider-pingone#1342,
+// pingone-go-client#86, CDI-1370 all shipped/landed) -- outcomes is no longer
+// SDK-untyped, so this constructs the field directly rather than stuffing it
+// into AdditionalProperties. The AdditionalProperties fallback added in
+// internal/core/processor.go for this field is now dormant (verified by the
+// regression tests in processor_test.go), staying available for whatever
+// SDK field next lags its JSON shape.
 func buildFlowResponse() *pingone.DaVinciFlowResponse {
 	links := pingone.NewDaVinciFlowResponseLinks(
 		*pingone.NewJSONHALLink("https://example.com/environment"),
@@ -49,11 +57,9 @@ func buildFlowResponse() *pingone.DaVinciFlowResponse {
 		func() pingone.DaVinciFlowGraphDataResponseElementsNodeData {
 			d := pingone.NewDaVinciFlowGraphDataResponseElementsNodeData("esqd1w6k6h", "CONNECTION")
 			d.SetLabel("Save/Resend")
-			d.AdditionalProperties = map[string]interface{}{
-				"outcomes": []interface{}{
-					map[string]interface{}{"result": "submit", "label": "Save", "id": "0qw160q8zo"},
-					map[string]interface{}{"result": "resend", "label": "Didn't receive an email? Resend", "id": "k0hv0wr75q"},
-				},
+			d.Outcomes = []pingone.DaVinciFlowGraphDataResponseElementsNodeDataOutcome{
+				*pingone.NewDaVinciFlowGraphDataResponseElementsNodeDataOutcome("submit", "Save", "0qw160q8zo"),
+				*pingone.NewDaVinciFlowGraphDataResponseElementsNodeDataOutcome("resend", "Didn't receive an email? Resend", "k0hv0wr75q"),
 			}
 			return *d
 		}(),
