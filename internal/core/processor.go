@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 )
@@ -612,6 +613,13 @@ func isEmptyValue(field reflect.Value) bool {
 // findFieldByPath resolves a dot-notation path (e.g. "Parent.Field") against
 // a reflect.Value representing a struct. Each segment is matched by exact
 // struct field name. Pointer fields are dereferenced automatically at each step.
+//
+// When a segment fails to match a named field, and the current struct has an
+// exported AdditionalProperties map[string]interface{} field, resolution falls
+// back to a lookup in that map (see findAdditionalPropertiesField). This
+// covers SDK fields that unmarshal into the generic catch-all because a typed
+// struct field doesn't exist yet — the fallback is generic, not tied to any
+// specific field name.
 func findFieldByPath(val reflect.Value, path string) (reflect.Value, bool) {
 	parts := strings.Split(path, ".")
 	current := val
@@ -631,7 +639,12 @@ func findFieldByPath(val reflect.Value, path string) (reflect.Value, bool) {
 
 		field := findStructField(current, part)
 		if !field.IsValid() {
-			return reflect.Value{}, false
+			fallback, ok := findAdditionalPropertiesField(current, part)
+			if !ok {
+				return reflect.Value{}, false
+			}
+			current = fallback
+			continue
 		}
 		current = field
 	}
@@ -648,6 +661,53 @@ func findStructField(val reflect.Value, name string) reflect.Value {
 		}
 	}
 	return reflect.Value{}
+}
+
+// findAdditionalPropertiesField is the fallback used by findFieldByPath when
+// a named-field lookup misses. If val has an exported AdditionalProperties
+// map[string]interface{} field, it looks up name as a key in that map —
+// trying the exact segment string first, then a lower-first-letter camelCase
+// variant (Go PascalCase source_path values commonly correspond to camelCase
+// JSON keys, e.g. "Outcomes" -> "outcomes", "IdUnique" -> "idUnique"). This is
+// a deliberate, narrow exception to the "source_path uses Go field names"
+// rule, scoped only to this fallback path.
+//
+// Returns (reflect.Value{}, false) when val has no AdditionalProperties
+// field, the field is nil, or neither key variant is present in the map.
+func findAdditionalPropertiesField(val reflect.Value, name string) (reflect.Value, bool) {
+	apField := findStructField(val, "AdditionalProperties")
+	if !apField.IsValid() || apField.Kind() != reflect.Map || apField.IsNil() {
+		return reflect.Value{}, false
+	}
+
+	for _, key := range []string{name, lowerFirst(name)} {
+		mv := apField.MapIndex(reflect.ValueOf(key))
+		if !mv.IsValid() {
+			continue
+		}
+		// mv is a reflect.Interface (the map's value type); unwrap it to the
+		// concrete underlying value so downstream reflection (Kind checks,
+		// pointer dereferencing, slice iteration) behaves the same as it
+		// would for a named struct field.
+		elem := mv.Elem()
+		if !elem.IsValid() {
+			// Explicit nil entry in the map — treat as absent, consistent
+			// with nil-pointer handling elsewhere in the processor.
+			continue
+		}
+		return elem, true
+	}
+	return reflect.Value{}, false
+}
+
+// lowerFirst lowercases the first rune of s, leaving the rest unchanged.
+func lowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToLower(r[0])
+	return string(r)
 }
 
 // convertValue converts a reflect.Value to the appropriate Go type based on schema type

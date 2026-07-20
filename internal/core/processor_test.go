@@ -1816,3 +1816,279 @@ func TestProcessorNilValueKeepEmpty_ListWithNestedAttrs_EmptySlice(t *testing.T)
 	assert.Equal(t, []interface{}{}, jsLinks,
 		"js_links should be []interface{}{} not nil/absent when nil_value: keep_empty on a list with empty slice")
 }
+
+// ── AdditionalProperties fallback tests ─────────────────────────
+
+// MockNodeDataWithAdditionalProperties mirrors the shape of SDK structs like
+// DaVinciFlowGraphDataResponseElementsNodeData: a mix of named fields and a
+// generic AdditionalProperties catch-all map that receives any JSON key
+// without a corresponding typed field.
+type MockNodeDataWithAdditionalProperties struct {
+	ID                   string
+	Label                string
+	AdditionalProperties map[string]interface{}
+}
+
+// MockOutcomeItem mirrors the flat shape of a single outcome entry:
+// { result, label, id }.
+type MockOutcomeItem struct {
+	ID     string
+	Result string
+	Label  string
+}
+
+func additionalPropertiesFallbackDef(resourceType string) *schema.ResourceDefinition {
+	return &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "test",
+			ResourceType: resourceType,
+			APIType:      "NodeData",
+			Name:         "Node Data Test",
+			ShortName:    "nodedata",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			IDField:   "ID",
+			NameField: "Label",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string", SourcePath: "ID"},
+			{Name: "Label", TerraformName: "label", Type: "string", SourcePath: "Label"},
+			{
+				Name:          "Outcomes",
+				TerraformName: "outcomes",
+				Type:          "list",
+				SourcePath:    "Outcomes",
+				NestedAttributes: []schema.AttributeDefinition{
+					{Name: "ID", TerraformName: "id", Type: "string", SourcePath: "ID"},
+					{Name: "Result", TerraformName: "result", Type: "string", SourcePath: "Result"},
+					{Name: "Label", TerraformName: "label", Type: "string", SourcePath: "Label"},
+				},
+			},
+		},
+	}
+}
+
+// TestProcessorAdditionalPropertiesFallback_PresentViaLowerFirstKey verifies
+// that a source_path with no matching named field (e.g. "Outcomes") falls
+// back to a lookup in AdditionalProperties under the lower-first-letter
+// camelCase key ("outcomes"), matching the SDK's raw-JSON-derived casing, and
+// that the resolved []interface{} of map[string]interface{} elements is
+// processed correctly through the existing nested_attributes pipeline.
+func TestProcessorAdditionalPropertiesFallback_PresentViaLowerFirstKey(t *testing.T) {
+	def := additionalPropertiesFallbackDef("test_ap_fallback_present")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockNodeDataWithAdditionalProperties{
+		ID:    "node-1",
+		Label: "Save/Resend",
+		AdditionalProperties: map[string]interface{}{
+			"outcomes": []interface{}{
+				map[string]interface{}{"result": "submit", "label": "Save", "id": "0qw160q8zo"},
+				map[string]interface{}{"result": "resend", "label": "Didn't receive an email? Resend", "id": "k0hv0wr75q"},
+			},
+		},
+	}
+
+	result, err := p.ProcessResource("test_ap_fallback_present", mock)
+	require.NoError(t, err)
+
+	outcomes, ok := result.Attributes["outcomes"].([]interface{})
+	require.True(t, ok, "outcomes should be []interface{}, got %T", result.Attributes["outcomes"])
+	require.Len(t, outcomes, 2)
+
+	first, ok := outcomes[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "0qw160q8zo", first["id"])
+	assert.Equal(t, "submit", first["result"])
+	assert.Equal(t, "Save", first["label"])
+
+	second, ok := outcomes[1].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "k0hv0wr75q", second["id"])
+	assert.Equal(t, "resend", second["result"])
+	assert.Equal(t, "Didn't receive an email? Resend", second["label"])
+}
+
+// TestProcessorAdditionalPropertiesFallback_PresentViaExactKey verifies the
+// fallback also matches when the map key already matches the exact segment
+// string (no lower-first-letter adjustment needed).
+func TestProcessorAdditionalPropertiesFallback_PresentViaExactKey(t *testing.T) {
+	def := additionalPropertiesFallbackDef("test_ap_fallback_exact")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockNodeDataWithAdditionalProperties{
+		ID:    "node-2",
+		Label: "Exact Key",
+		AdditionalProperties: map[string]interface{}{
+			"Outcomes": []interface{}{
+				map[string]interface{}{"result": "submit", "label": "Save", "id": "abc123"},
+			},
+		},
+	}
+
+	result, err := p.ProcessResource("test_ap_fallback_exact", mock)
+	require.NoError(t, err)
+
+	outcomes, ok := result.Attributes["outcomes"].([]interface{})
+	require.True(t, ok, "outcomes should be []interface{}, got %T", result.Attributes["outcomes"])
+	require.Len(t, outcomes, 1)
+	first, ok := outcomes[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "abc123", first["id"])
+}
+
+// TestProcessorAdditionalPropertiesFallback_KeyAbsent verifies that when the
+// struct has an AdditionalProperties map but neither casing of the segment
+// name is present as a key, the attribute resolves as absent — same as
+// today's behavior for any unresolved field. No outcomes key should appear
+// in the output at all (not an empty list, not null).
+func TestProcessorAdditionalPropertiesFallback_KeyAbsent(t *testing.T) {
+	def := additionalPropertiesFallbackDef("test_ap_fallback_absent")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockNodeDataWithAdditionalProperties{
+		ID:    "node-3",
+		Label: "No Outcomes",
+		AdditionalProperties: map[string]interface{}{
+			"someOtherKey": "irrelevant",
+		},
+	}
+
+	result, err := p.ProcessResource("test_ap_fallback_absent", mock)
+	require.NoError(t, err)
+
+	_, exists := result.Attributes["outcomes"]
+	assert.False(t, exists, "outcomes should not be present when the key is absent from AdditionalProperties")
+}
+
+// TestProcessorAdditionalPropertiesFallback_NilAdditionalProperties verifies
+// that a nil (unset) AdditionalProperties map is treated the same as a
+// missing key — no panic, attribute simply absent.
+func TestProcessorAdditionalPropertiesFallback_NilAdditionalProperties(t *testing.T) {
+	def := additionalPropertiesFallbackDef("test_ap_fallback_nil_map")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockNodeDataWithAdditionalProperties{
+		ID:                   "node-4",
+		Label:                "Nil Map",
+		AdditionalProperties: nil,
+	}
+
+	result, err := p.ProcessResource("test_ap_fallback_nil_map", mock)
+	require.NoError(t, err)
+
+	_, exists := result.Attributes["outcomes"]
+	assert.False(t, exists, "outcomes should not be present when AdditionalProperties is nil")
+}
+
+// TestProcessorAdditionalPropertiesFallback_NoAdditionalPropertiesField
+// verifies that structs with no AdditionalProperties field at all are
+// completely unaffected — a regression guard proving the fallback doesn't
+// change behavior for the many existing structs that lack this field.
+func TestProcessorAdditionalPropertiesFallback_NoAdditionalPropertiesField(t *testing.T) {
+	def := additionalPropertiesFallbackDef("test_ap_fallback_no_field")
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	// MockNestedResource (defined earlier in this file) has no
+	// AdditionalProperties field at all.
+	mock := &struct {
+		ID    string
+		Label string
+	}{ID: "node-5", Label: "No AP Field"}
+
+	result, err := p.ProcessResource("test_ap_fallback_no_field", mock)
+	require.NoError(t, err)
+
+	assert.Equal(t, "node-5", result.Attributes["id"])
+	assert.Equal(t, "No AP Field", result.Attributes["label"])
+	_, exists := result.Attributes["outcomes"]
+	assert.False(t, exists, "outcomes should not be present when the struct has no AdditionalProperties field")
+}
+
+// MockOutcomeElementWithAP is a slice element whose "Id" is not a named
+// field — it only exists in the element's own AdditionalProperties map,
+// mirroring how MapKeyPath resolution would need to fall back per-element.
+type MockOutcomeElementWithAP struct {
+	Result               string
+	AdditionalProperties map[string]interface{}
+}
+
+// MockNodeDataWithOutcomeSlice has a normal named Outcomes slice field (so
+// this test isolates convertSliceToMap's own findFieldByPath call for
+// map_key_path resolution, rather than conflating it with the outer-field
+// fallback already covered by the tests above).
+type MockNodeDataWithOutcomeSlice struct {
+	ID       string
+	Outcomes []MockOutcomeElementWithAP
+}
+
+// TestProcessorAdditionalPropertiesFallback_MapKeyPath verifies the fallback
+// also engages for convertSliceToMap's map_key_path resolution, since that
+// function calls the same findFieldByPath — proving the fix is generic
+// across every findFieldByPath call site, not just processOneAttribute's
+// direct path, per Task 1's scope note that this should be verified rather
+// than special-cased. Here, MapKeyPath "Id" has no named field on the slice
+// element struct; it only resolves via that element's own AdditionalProperties
+// map (key "id", lower-first-letter match).
+func TestProcessorAdditionalPropertiesFallback_MapKeyPath(t *testing.T) {
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "test",
+			ResourceType: "test_ap_fallback_map_key_path",
+			APIType:      "NodeData",
+			Name:         "Node Data Test",
+			ShortName:    "nodedata",
+			Version:      "1.0",
+		},
+		API: schema.APIDefinition{
+			IDField:   "ID",
+			NameField: "ID",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string", SourcePath: "ID"},
+			{
+				Name:          "Outcomes",
+				TerraformName: "outcomes",
+				Type:          "map",
+				SourcePath:    "Outcomes",
+				MapKeyPath:    "Id",
+				NestedAttributes: []schema.AttributeDefinition{
+					{Name: "Result", TerraformName: "result", Type: "string", SourcePath: "Result"},
+				},
+			},
+		},
+	}
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(def))
+	p := core.NewProcessor(registry)
+
+	mock := &MockNodeDataWithOutcomeSlice{
+		ID: "node-6",
+		Outcomes: []MockOutcomeElementWithAP{
+			{
+				Result:               "submit",
+				AdditionalProperties: map[string]interface{}{"id": "out-1"},
+			},
+		},
+	}
+
+	result, err := p.ProcessResource("test_ap_fallback_map_key_path", mock)
+	require.NoError(t, err)
+
+	outcomes, ok := result.Attributes["outcomes"].(map[string]interface{})
+	require.True(t, ok, "outcomes should be map[string]interface{}, got %T", result.Attributes["outcomes"])
+	entry, ok := outcomes["out-1"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "submit", entry["result"])
+}

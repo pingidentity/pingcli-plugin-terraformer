@@ -381,6 +381,43 @@ attributes:
                     source_path: Properties
                     transform: jsonencode_raw
 
+                  # Outcomes: multi-outcome node routing (e.g. pingOneFormsConnector
+                  # showForm "Save"/"Resend" exit paths). Only present on nodes whose
+                  # connector/capability defines named exit paths; absent otherwise --
+                  # no attribute is emitted in that case.
+                  #
+                  # pingone-go-client v0.12.0+ has a typed Outcomes field on
+                  # DaVinciFlowGraphDataResponseElementsNodeData, so this resolves via
+                  # the normal named-field path in findFieldByPath. Older SDK versions
+                  # (no typed field) fall back to AdditionalProperties["outcomes"] via
+                  # the generic fallback in internal/core/processor.go -- see PR #127
+                  # for the full history.
+                  #
+                  # terraform-provider-pingone#1342 / PR #1345 added provider-side
+                  # support for this attribute (merged to main, not yet in a tagged
+                  # release as of PR #127 -- see that PR's description for the release
+                  # status). Applying HCL with an outcomes block will fail against
+                  # provider releases predating that fix.
+                  - name: Outcomes
+                    terraform_name: outcomes
+                    type: list
+                    source_path: Outcomes
+                    nested_attributes:
+                      - name: Id
+                        terraform_name: id
+                        type: string
+                        source_path: Id
+
+                      - name: Result
+                        terraform_name: result
+                        type: string
+                        source_path: Result
+
+                      - name: Label
+                        terraform_name: label
+                        type: string
+                        source_path: Label
+
               - name: Position
                 terraform_name: position
                 type: object

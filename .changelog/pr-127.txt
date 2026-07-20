@@ -1,0 +1,3 @@
+```release-note:bug
+`resource/pingone_davinci_flow`: Fixed multi-outcome node routing (e.g. PingOne Forms nodes with multiple buttons/links) being dropped on export, which broke the flow when the exported HCL was re-applied. Requires `terraform-provider-pingone` with `outcomes` support on `graph_data.elements.nodes.*.data`.
+```
