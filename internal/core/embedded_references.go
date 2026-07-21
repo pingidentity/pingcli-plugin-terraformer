@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/graph"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
 )
@@ -31,6 +32,44 @@ type EmbeddedReferenceRule struct {
 	// a human-readable variable suffix (e.g., "nodeTitle.value"). When the key
 	// is absent the first 8 characters of the UUID are used instead.
 	VariableNamingPath string
+
+	// PreconditionKeyPath is an optional JSON key path (dot-notation, resolved
+	// against the same parsed JSON blob as JSONKeyPath) that must resolve to
+	// exactly PreconditionValue before this rule fires. Zero value ("") means
+	// no precondition — the rule fires unconditionally, matching pre-existing
+	// behavior. Used, for example, to gate a rule on a sibling mode-flag key
+	// (e.g., only act on "themeId.value" when "theme.value" == "useThemeId").
+	PreconditionKeyPath string
+
+	// PreconditionValue is the exact string PreconditionKeyPath must resolve to
+	// for the rule to fire. Ignored when PreconditionKeyPath is empty.
+	PreconditionValue string
+
+	// UnwrapMode controls how the value at JSONKeyPath is extracted and
+	// re-embedded:
+	//   ""          (default / zero value) — JSONKeyPath resolves directly to
+	//                a plain string (pre-existing behavior).
+	//   "rich_text" — the value at JSONKeyPath is itself a JSON string
+	//                containing a Slate-style rich-text wrapper
+	//                (`[{"children":[{"text":"<value>"}]}]`); the inner value
+	//                is unwrapped before resolution and the resolved
+	//                reference/variable is re-embedded back inside the
+	//                wrapper on write.
+	UnwrapMode string
+}
+
+// richTextUnwrapMode is the UnwrapMode value that enables Slate-style
+// rich-text unwrap/rewrap of the value found at JSONKeyPath.
+const richTextUnwrapMode = "rich_text"
+
+// looksLikeUUID reports whether s is formatted as a valid UUID. It is used as
+// an unconditional guard before any extracted (or unwrapped) string is ever
+// treated as a resolvable reference/fallback-variable target — this rejects
+// sentinel/mode-flag strings (e.g., "useThemeId", "activeTheme") without
+// needing to enumerate them. Named to avoid colliding with the common local
+// variable name "uuid" used at call sites for the extracted value.
+func looksLikeUUID(s string) bool {
+	return uuid.Validate(s) == nil
 }
 
 // EmbeddedReferenceRegistry collects rules
@@ -179,31 +218,62 @@ func processRawHCLValue(
 		return value
 	}
 
-	// Walk the JSON path to find the UUID
-	uuid := walkJSONPath(jsonData, rule.JSONKeyPath)
-	if uuid == "" {
+	// Precondition: a sibling JSON key path must resolve to exactly
+	// PreconditionValue before this rule fires. Zero-value PreconditionKeyPath
+	// means no precondition — fires unconditionally, matching pre-existing
+	// behavior.
+	if rule.PreconditionKeyPath != "" {
+		if walkJSONPath(jsonData, rule.PreconditionKeyPath) != rule.PreconditionValue {
+			return value
+		}
+	}
+
+	// Walk the JSON path to find the value. In "rich_text" UnwrapMode this is
+	// the Slate wrapper string; otherwise it is the plain UUID string.
+	extracted := walkJSONPath(jsonData, rule.JSONKeyPath)
+	if extracted == "" {
+		return value
+	}
+
+	var wrapper string
+	uuidStr := extracted
+	if rule.UnwrapMode == richTextUnwrapMode {
+		wrapper = extracted
+		uuidStr = unwrapRichText(wrapper)
+		if uuidStr == "" {
+			// Malformed/unexpected wrapper shape — no-op, no panic.
+			return value
+		}
+	}
+
+	// Unconditional UUID-format guard: only strings shaped like a UUID are
+	// ever treated as a resolvable reference/fallback-variable target. Any
+	// other string (e.g. a mode-flag sentinel such as "useThemeId" or
+	// "activeTheme") no-ops exactly like "no value found", regardless of
+	// Strategy.
+	if !looksLikeUUID(uuidStr) {
 		return value
 	}
 
 	// Strategy: "variable" — always emit a variable, skip graph lookup
 	if rule.Strategy == "variable" {
-		varName := deriveVariableName(rule, jsonData, uuid)
+		varName := deriveVariableName(rule, jsonData, uuidStr)
 		tfRef := fmt.Sprintf("${var.%s}", varName)
-		newValue := replaceUUIDInRawHCL(value, uuid, tfRef)
-		addEmbeddedFallbackVariable(varName, rule, uuid, varSeen, fallbackVars)
-		return RawHCLValue(newValue)
+		newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
+		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
+		return newValue
 	}
 
 	// Strategy: "reference" (default) or "reference_with_fallback" — try graph lookup
-	refName, err := g.GetReferenceName(rule.TargetResourceType, uuid)
+	refName, err := g.GetReferenceName(rule.TargetResourceType, uuidStr)
 	if err != nil {
 		// UUID not found in graph
 		if rule.Strategy == "reference_with_fallback" {
-			varName := deriveVariableName(rule, jsonData, uuid)
+			varName := deriveVariableName(rule, jsonData, uuidStr)
 			tfRef := fmt.Sprintf("${var.%s}", varName)
-			newValue := replaceUUIDInRawHCL(value, uuid, tfRef)
-			addEmbeddedFallbackVariable(varName, rule, uuid, varSeen, fallbackVars)
-			return RawHCLValue(newValue)
+			newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
+			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
+			return newValue
 		}
 		// Default strategy: leave unchanged
 		return value
@@ -213,12 +283,90 @@ func processRawHCLValue(
 	tfRef := fmt.Sprintf("${%s.%s.%s}", rule.TargetResourceType, refName, rule.ReferenceField)
 
 	// Replace the UUID string in the RawHCLValue with the terraform reference
-	newValue := replaceUUIDInRawHCL(value, uuid, tfRef)
+	newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 
 	// Add graph edge
-	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuid, "properties."+rule.JSONKeyPath, "")
+	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, "properties."+rule.JSONKeyPath, "")
 
-	return RawHCLValue(newValue)
+	return newValue
+}
+
+// replaceExtractedValue re-embeds a resolved reference/variable string in
+// place of the originally extracted value. It chooses the escaping-aware
+// rich-text rewrap path when the rule uses UnwrapMode == "rich_text", and
+// falls back to the plain substring replace (replaceUUIDInRawHCL) otherwise.
+func replaceExtractedValue(value RawHCLValue, rule EmbeddedReferenceRule, wrapper string, uuidStr string, tfRef string) RawHCLValue {
+	if rule.UnwrapMode == richTextUnwrapMode {
+		return replaceRichTextInRawHCL(value, wrapper, uuidStr, tfRef)
+	}
+	return RawHCLValue(replaceUUIDInRawHCL(value, uuidStr, tfRef))
+}
+
+// unwrapRichText extracts the inner "text" value from a Slate-style
+// rich-text wrapper of the shape `[{"children":[{"text":"<value>"}]}]`. Only
+// the first array element's first child is read, matching the confirmed
+// evidence shape. Returns "" on any shape mismatch (not an array, empty
+// array, missing "children", missing/non-string "text") — mirroring
+// walkJSONPath's existing "return empty on mismatch" convention. Never
+// panics on malformed input.
+func unwrapRichText(wrapper string) string {
+	var elements []interface{}
+	if err := json.Unmarshal([]byte(wrapper), &elements); err != nil {
+		return ""
+	}
+	if len(elements) == 0 {
+		return ""
+	}
+
+	elem, ok := elements[0].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	childrenRaw, exists := elem["children"]
+	if !exists {
+		return ""
+	}
+	children, ok := childrenRaw.([]interface{})
+	if !ok || len(children) == 0 {
+		return ""
+	}
+
+	child, ok := children[0].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	text, ok := child["text"].(string)
+	if !ok {
+		return ""
+	}
+
+	return text
+}
+
+// replaceRichTextInRawHCL re-embeds a resolved reference/variable string
+// inside a Slate-style rich-text wrapper and substitutes the escaped wrapper
+// text within the raw HCL string. Unlike replaceUUIDInRawHCL's plain
+// substring replace, this accounts for the wrapper being JSON-encoded a
+// second time when the outer `properties` map was marshaled by
+// transformJSONEncodeRaw — so quotes inside the wrapper appear
+// backslash-escaped in the RawHCLValue text. Re-deriving both the old and
+// new wrapper's escaped form via json.Marshal (rather than hand-escaping)
+// normalizes the escaping identically to how the original text was produced.
+func replaceRichTextInRawHCL(value RawHCLValue, wrapper string, uuidStr string, tfRef string) RawHCLValue {
+	newWrapper := strings.Replace(wrapper, uuidStr, tfRef, 1)
+
+	oldEscaped, err := json.Marshal(wrapper)
+	if err != nil {
+		return value
+	}
+	newEscaped, err := json.Marshal(newWrapper)
+	if err != nil {
+		return value
+	}
+
+	return RawHCLValue(strings.Replace(string(value), string(oldEscaped), string(newEscaped), 1))
 }
 
 // deriveVariableName builds a Terraform variable name from the rule's VariablePrefix
