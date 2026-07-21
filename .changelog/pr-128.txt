@@ -1,0 +1,3 @@
+```release-note:enhancement
+`resource/pingone_davinci_flow`: Resolved DaVinci form node theme references (`theme.value` and the indirect `themeId.value` rich-text-wrapped UUID used when `theme.value` is "useThemeId") to `pingone_branding_theme`, matching the existing `form.value` behavior. Until `pingone_branding_theme` export support lands, the theme ID is emitted as an overridable Terraform variable.
+```
