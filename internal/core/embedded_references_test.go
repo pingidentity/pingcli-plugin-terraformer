@@ -1,8 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/graph"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
@@ -69,7 +72,7 @@ func TestEmbeddedReferenceRegistry_RegisterAndRetrieve(t *testing.T) {
 func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 	// Create graph with target flow and source flow
 	g := graph.New()
-	g.AddResource("pingone_davinci_flow", "flow-abc123", "pingcli__My-0020-Flow")
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-000000000001", "pingcli__My-0020-Flow")
 	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
 
 	rule := EmbeddedReferenceRule{
@@ -86,7 +89,7 @@ func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 				"nodes": map[string]interface{}{
 					"node1": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue("jsonencode({\n  \"nodeTitle\": {\n    \"value\": \"Sign On Flow\"\n  },\n  \"subFlowId\": {\n    \"value\": {\n      \"label\": \"My Flow\",\n      \"value\": \"flow-abc123\"\n    }\n  }\n})"),
+							"properties": RawHCLValue("jsonencode({\n  \"nodeTitle\": {\n    \"value\": \"Sign On Flow\"\n  },\n  \"subFlowId\": {\n    \"value\": {\n      \"label\": \"My Flow\",\n      \"value\": \"aaaaaaaa-0000-4000-8000-000000000001\"\n    }\n  }\n})"),
 						},
 					},
 				},
@@ -116,7 +119,7 @@ func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 	}
 
 	// UUID string itself should no longer appear
-	if strings.Contains(string(resolvedValue), "\"flow-abc123\"") {
+	if strings.Contains(string(resolvedValue), "\"aaaaaaaa-0000-4000-8000-000000000001\"") {
 		t.Errorf("expected raw UUID to be removed, still found in: %s", resolvedValue)
 	}
 
@@ -136,7 +139,7 @@ func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 // nodes within a single flow, some with subFlowId and some without
 func TestResolveEmbeddedReferences_MultipleNodes(t *testing.T) {
 	g := graph.New()
-	g.AddResource("pingone_davinci_flow", "flow-sub1", "pingcli__Sub-0020-Flow-1")
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-000000000002", "pingcli__Sub-0020-Flow-1")
 	g.AddResource("pingone_davinci_flow", "flow-sub2", "pingcli__Sub-0020-Flow-2")
 	g.AddResource("pingone_davinci_flow", "parent-flow", "pingcli__Parent-Flow")
 
@@ -155,7 +158,7 @@ func TestResolveEmbeddedReferences_MultipleNodes(t *testing.T) {
 				"nodes": map[string]interface{}{
 					"node1": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue("jsonencode({\n  \"subFlowId\": {\n    \"value\": {\n      \"label\": \"Sub Flow 1\",\n      \"value\": \"flow-sub1\"\n    }\n  }\n})"),
+							"properties": RawHCLValue("jsonencode({\n  \"subFlowId\": {\n    \"value\": {\n      \"label\": \"Sub Flow 1\",\n      \"value\": \"aaaaaaaa-0000-4000-8000-000000000002\"\n    }\n  }\n})"),
 						},
 					},
 					"node2": map[string]interface{}{
@@ -316,9 +319,9 @@ func TestResolveEmbeddedReferences_NoMatchingJSONPath(t *testing.T) {
 // (*) in AttributePath correctly iterates over all map keys at that level
 func TestResolveEmbeddedReferences_WildcardTraversal(t *testing.T) {
 	g := graph.New()
-	g.AddResource("pingone_davinci_flow", "flow-a", "pingcli__Flow-A")
-	g.AddResource("pingone_davinci_flow", "flow-b", "pingcli__Flow-B")
-	g.AddResource("pingone_davinci_flow", "flow-c", "pingcli__Flow-C")
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-00000000000a", "pingcli__Flow-A")
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-00000000000b", "pingcli__Flow-B")
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-00000000000c", "pingcli__Flow-C")
 	g.AddResource("pingone_davinci_flow", "parent-flow", "pingcli__Parent-Flow")
 
 	rule := EmbeddedReferenceRule{
@@ -336,17 +339,17 @@ func TestResolveEmbeddedReferences_WildcardTraversal(t *testing.T) {
 				"nodes": map[string]interface{}{
 					"nodeA": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "flow-a"}}})`),
+							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "aaaaaaaa-0000-4000-8000-00000000000a"}}})`),
 						},
 					},
 					"nodeB": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "flow-b"}}})`),
+							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "aaaaaaaa-0000-4000-8000-00000000000b"}}})`),
 						},
 					},
 					"nodeC": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "flow-c"}}})`),
+							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "aaaaaaaa-0000-4000-8000-00000000000c"}}})`),
 						},
 					},
 				},
@@ -493,7 +496,7 @@ func TestResolveEmbeddedReferences_DifferentResourceTypeSkipped(t *testing.T) {
 // with different JSONKeyPath values work correctly, demonstrating extensibility
 func TestResolveEmbeddedReferences_ExtensibleNewRule(t *testing.T) {
 	g := graph.New()
-	g.AddResource("pingone_davinci_connector", "conn-custom1", "pingcli__Custom-Connector")
+	g.AddResource("pingone_davinci_connector", "aaaaaaaa-0000-4000-8000-000000000d01", "pingcli__Custom-Connector")
 	g.AddResource("pingone_davinci_flow", "flow-with-connector", "pingcli__Flow-With-Connector")
 
 	// Custom rule with different JSONKeyPath
@@ -511,7 +514,7 @@ func TestResolveEmbeddedReferences_ExtensibleNewRule(t *testing.T) {
 				"nodes": map[string]interface{}{
 					"node1": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"customConnectorId": {"value": "conn-custom1"}})`),
+							"properties": RawHCLValue(`jsonencode({"customConnectorId": {"value": "aaaaaaaa-0000-4000-8000-000000000d01"}})`),
 						},
 					},
 				},
@@ -546,7 +549,7 @@ func TestResolveEmbeddedReferences_ExtensibleNewRule(t *testing.T) {
 // attributes outside the targeted paths are not modified
 func TestResolveEmbeddedReferences_PreservesOtherAttributes(t *testing.T) {
 	g := graph.New()
-	g.AddResource("pingone_davinci_flow", "flow-sub1", "pingcli__Sub-Flow")
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-000000000e01", "pingcli__Sub-Flow")
 	g.AddResource("pingone_davinci_flow", "parent-flow", "pingcli__Parent-Flow")
 
 	rule := EmbeddedReferenceRule{
@@ -568,7 +571,7 @@ func TestResolveEmbeddedReferences_PreservesOtherAttributes(t *testing.T) {
 				"nodes": map[string]interface{}{
 					"node1": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "flow-sub1"}}})`),
+							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "aaaaaaaa-0000-4000-8000-000000000e01"}}})`),
 						},
 					},
 				},
@@ -633,7 +636,7 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDNotInGraph(
 	}
 
 	// Properties include both the UUID field and the naming field
-	propertiesJSON := `jsonencode({"form": {"value": "form-uuid-abc123"}, "nodeTitle": {"value": "Example - Sign On"}})`
+	propertiesJSON := `jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-000000000001"}, "nodeTitle": {"value": "Example - Sign On"}})`
 
 	attrs := map[string]interface{}{
 		"graph_data": map[string]interface{}{
@@ -673,7 +676,7 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDNotInGraph(
 	}
 
 	// Raw UUID string should no longer appear
-	if strings.Contains(string(resolvedValue), `"form-uuid-abc123"`) {
+	if strings.Contains(string(resolvedValue), `"bbbbbbbb-0000-4000-8000-000000000001"`) {
 		t.Errorf("expected raw UUID to be removed, still found in: %s", resolvedValue)
 	}
 
@@ -700,7 +703,7 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDNotInGraph(
 // FallbackVariable is returned.
 func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDInGraph(t *testing.T) {
 	g := graph.New()
-	g.AddResource("pingone_davinci_form", "form-uuid-abc123", "pingcli__Example_Sign_On")
+	g.AddResource("pingone_davinci_form", "bbbbbbbb-0000-4000-8000-000000000001", "pingcli__Example_Sign_On")
 	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
 
 	rule := EmbeddedReferenceRule{
@@ -714,7 +717,7 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDInGraph(t *
 		VariableNamingPath: "nodeTitle.value",
 	}
 
-	propertiesJSON := `jsonencode({"form": {"value": "form-uuid-abc123"}, "nodeTitle": {"value": "Example - Sign On"}})`
+	propertiesJSON := `jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-000000000001"}, "nodeTitle": {"value": "Example - Sign On"}})`
 
 	attrs := map[string]interface{}{
 		"graph_data": map[string]interface{}{
@@ -770,7 +773,7 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDInGraph(t *
 func TestResolveEmbeddedReferences_StrategyVariable_AlwaysEmitsVariable(t *testing.T) {
 	g := graph.New()
 	// Target IS in the graph — but strategy "variable" should still emit a var
-	g.AddResource("pingone_davinci_form", "form-uuid-xyz", "pingcli__Some_Form")
+	g.AddResource("pingone_davinci_form", "bbbbbbbb-0000-4000-8000-000000000002", "pingcli__Some_Form")
 	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
 
 	rule := EmbeddedReferenceRule{
@@ -784,7 +787,7 @@ func TestResolveEmbeddedReferences_StrategyVariable_AlwaysEmitsVariable(t *testi
 		VariableNamingPath: "nodeTitle.value",
 	}
 
-	propertiesJSON := `jsonencode({"form": {"value": "form-uuid-xyz"}, "nodeTitle": {"value": "Sign On Node"}})`
+	propertiesJSON := `jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-000000000002"}, "nodeTitle": {"value": "Sign On Node"}})`
 
 	attrs := map[string]interface{}{
 		"graph_data": map[string]interface{}{
@@ -846,7 +849,7 @@ func TestResolveEmbeddedReferences_StrategyVariable_AlwaysEmitsVariable(t *testi
 //   - UUID not in graph → left unchanged, no variable emitted
 func TestResolveEmbeddedReferences_StrategyDefault_BackwardCompatible(t *testing.T) {
 	g := graph.New()
-	g.AddResource("pingone_davinci_flow", "flow-in-graph", "pingcli__In-Graph-Flow")
+	g.AddResource("pingone_davinci_flow", "bbbbbbbb-0000-4000-8000-000000000003", "pingcli__In-Graph-Flow")
 	g.AddResource("pingone_davinci_flow", "parent-flow", "pingcli__Parent-Flow")
 
 	rule := EmbeddedReferenceRule{
@@ -864,7 +867,7 @@ func TestResolveEmbeddedReferences_StrategyDefault_BackwardCompatible(t *testing
 				"nodes": map[string]interface{}{
 					"node-known": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "flow-in-graph"}}})`),
+							"properties": RawHCLValue(`jsonencode({"subFlowId": {"value": {"value": "bbbbbbbb-0000-4000-8000-000000000003"}}})`),
 						},
 					},
 					"node-unknown": map[string]interface{}{
@@ -935,7 +938,7 @@ func TestResolveEmbeddedReferences_VariableNamingPath_Missing(t *testing.T) {
 	}
 
 	// Properties do NOT contain nodeTitle — only the UUID field
-	propertiesJSON := `jsonencode({"form": {"value": "abcde123-4567-890"}})`
+	propertiesJSON := `jsonencode({"form": {"value": "abcde123-0000-4000-8000-000000000000"}})`
 
 	attrs := map[string]interface{}{
 		"graph_data": map[string]interface{}{
@@ -968,7 +971,7 @@ func TestResolveEmbeddedReferences_VariableNamingPath_Missing(t *testing.T) {
 
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
-	// UUID "abcde123-4567-890": first 8 chars = "abcde123", SanitizeVariableName = "abcde123"
+	// UUID "abcde123-0000-4000-8000-000000000000": first 8 chars = "abcde123", SanitizeVariableName = "abcde123"
 	// Variable name = "davinci_form_abcde123"
 	const expectedVarRef = "${var.davinci_form_abcde123}"
 	if !strings.Contains(string(resolvedValue), expectedVarRef) {
@@ -1011,12 +1014,12 @@ func TestResolveEmbeddedReferences_MultipleNodesDistinctVariables(t *testing.T) 
 				"nodes": map[string]interface{}{
 					"node1": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"form": {"value": "form-uuid-111"}, "nodeTitle": {"value": "Login Form"}})`),
+							"properties": RawHCLValue(`jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-000000000011"}, "nodeTitle": {"value": "Login Form"}})`),
 						},
 					},
 					"node2": map[string]interface{}{
 						"data": map[string]interface{}{
-							"properties": RawHCLValue(`jsonencode({"form": {"value": "form-uuid-222"}, "nodeTitle": {"value": "Signup Form"}})`),
+							"properties": RawHCLValue(`jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-000000000022"}, "nodeTitle": {"value": "Signup Form"}})`),
 						},
 					},
 				},
@@ -1089,7 +1092,7 @@ func TestResolveEmbeddedReferences_DuplicateUUIDs_Deduplicated(t *testing.T) {
 	}
 
 	// Two nodes share the same UUID
-	sharedProps := `jsonencode({"form": {"value": "form-uuid-same"}, "nodeTitle": {"value": "Shared Form"}})`
+	sharedProps := `jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-000000000033"}, "nodeTitle": {"value": "Shared Form"}})`
 
 	attrs := map[string]interface{}{
 		"graph_data": map[string]interface{}{
@@ -1140,5 +1143,581 @@ func TestResolveEmbeddedReferences_DuplicateUUIDs_Deduplicated(t *testing.T) {
 	}
 	if len(fallbackVars) > 0 && fallbackVars[0].Name != "davinci_form_shared_form" {
 		t.Errorf("expected FallbackVariable.Name %q, got %q", "davinci_form_shared_form", fallbackVars[0].Name)
+	}
+}
+
+// TestLooksLikeUUID verifies the UUID-format guard helper against a mix of
+// valid UUID-shaped strings and the non-UUID placeholder/sentinel strings
+// used throughout this file's fixtures.
+func TestLooksLikeUUID(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"valid hyphenated UUID", "860b5cd5-45cc-466d-abbd-64298bb90bed", true},
+		{"valid UUID uppercase", "860B5CD5-45CC-466D-ABBD-64298BB90BED", true},
+		{"valid UUID no hyphens", "860b5cd545cc466dabbd64298bb90bed", true},
+		{"empty string", "", false},
+		{"sentinel useThemeId", "useThemeId", false},
+		{"sentinel activeTheme", "activeTheme", false},
+		{"legacy placeholder flow-abc123", "flow-abc123", false},
+		{"legacy placeholder form-uuid-xyz", "form-uuid-xyz", false},
+		{"legacy placeholder conn-custom1", "conn-custom1", false},
+		{"truncated uuid-like string", "abcde123-4567-890", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := looksLikeUUID(tt.input); got != tt.want {
+				t.Errorf("looksLikeUUID(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestResolveEmbeddedReferences_Precondition_Match verifies that a rule with
+// PreconditionKeyPath set fires when the sibling path resolves to exactly
+// PreconditionValue.
+func TestResolveEmbeddedReferences_Precondition_Match(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_branding_theme", "cccccccc-0000-4000-8000-000000000001", "pingcli__My_Theme")
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:        "pingone_davinci_flow",
+		AttributePath:       "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType:  "pingone_branding_theme",
+		JSONKeyPath:         "themeId.value",
+		ReferenceField:      "id",
+		Strategy:            "reference_with_fallback",
+		VariablePrefix:      "davinci_theme",
+		VariableNamingPath:  "nodeTitle.value",
+		PreconditionKeyPath: "theme.value",
+		PreconditionValue:   "useThemeId",
+	}
+
+	propertiesJSON := `jsonencode({"theme": {"value": "useThemeId"}, "themeId": {"value": "cccccccc-0000-4000-8000-000000000001"}, "nodeTitle": {"value": "Theme Node"}})`
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	const expectedRef = "${pingone_branding_theme.pingcli__My_Theme.id}"
+	if !strings.Contains(string(resolvedValue), expectedRef) {
+		t.Errorf("expected precondition-satisfied rule to resolve to %q, got: %s", expectedRef, resolvedValue)
+	}
+
+	// theme.value (the precondition key itself) must remain unchanged
+	if !strings.Contains(string(resolvedValue), `"useThemeId"`) {
+		t.Error("expected theme.value to remain the literal string \"useThemeId\"")
+	}
+}
+
+// TestResolveEmbeddedReferences_Precondition_NoMatch verifies that when the
+// precondition key resolves to a value other than PreconditionValue, the
+// rule no-ops: no change, no fallback variable, no graph edge.
+func TestResolveEmbeddedReferences_Precondition_NoMatch(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_branding_theme", "cccccccc-0000-4000-8000-000000000002", "pingcli__My_Theme")
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:        "pingone_davinci_flow",
+		AttributePath:       "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType:  "pingone_branding_theme",
+		JSONKeyPath:         "themeId.value",
+		ReferenceField:      "id",
+		Strategy:            "reference_with_fallback",
+		VariablePrefix:      "davinci_theme",
+		VariableNamingPath:  "nodeTitle.value",
+		PreconditionKeyPath: "theme.value",
+		PreconditionValue:   "useThemeId",
+	}
+
+	// theme.value is a direct UUID (case 1 shape), not "useThemeId" — precondition fails
+	propertiesJSON := `jsonencode({"theme": {"value": "cccccccc-0000-4000-8000-000000000003"}, "themeId": {"value": "cccccccc-0000-4000-8000-000000000002"}, "nodeTitle": {"value": "Theme Node"}})`
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	originalValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	if resolvedValue != originalValue {
+		t.Errorf("expected value unchanged when precondition doesn't match, got: %s", resolvedValue)
+	}
+	if len(fallbackVars) != 0 {
+		t.Errorf("expected 0 FallbackVariables when precondition doesn't match, got %d", len(fallbackVars))
+	}
+
+	deps := g.GetDependencies("pingone_davinci_flow", "parent-flow-id")
+	if len(deps) != 0 {
+		t.Errorf("expected no graph edges when precondition doesn't match, got %d", len(deps))
+	}
+}
+
+// TestResolveEmbeddedReferences_Precondition_KeyAbsent verifies that when the
+// precondition key is entirely absent from the JSON, it is treated as a
+// non-match — the rule no-ops.
+func TestResolveEmbeddedReferences_Precondition_KeyAbsent(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_branding_theme", "cccccccc-0000-4000-8000-000000000004", "pingcli__My_Theme")
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:        "pingone_davinci_flow",
+		AttributePath:       "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType:  "pingone_branding_theme",
+		JSONKeyPath:         "themeId.value",
+		ReferenceField:      "id",
+		Strategy:            "reference_with_fallback",
+		VariablePrefix:      "davinci_theme",
+		VariableNamingPath:  "nodeTitle.value",
+		PreconditionKeyPath: "theme.value",
+		PreconditionValue:   "useThemeId",
+	}
+
+	// "theme" key is entirely absent (customForm-capability-like shape)
+	propertiesJSON := `jsonencode({"themeId": {"value": "cccccccc-0000-4000-8000-000000000004"}, "nodeTitle": {"value": "Theme Node"}})`
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	originalValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	if resolvedValue != originalValue {
+		t.Errorf("expected value unchanged when precondition key absent, got: %s", resolvedValue)
+	}
+	if len(fallbackVars) != 0 {
+		t.Errorf("expected 0 FallbackVariables when precondition key absent, got %d", len(fallbackVars))
+	}
+}
+
+// themeRichTextRule mirrors the theme.value/themeId.value case-3 rule shape
+// that Task 2 will register against pingone_branding_theme.
+func themeRichTextRule() EmbeddedReferenceRule {
+	return EmbeddedReferenceRule{
+		ResourceType:        "pingone_davinci_flow",
+		AttributePath:       "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType:  "pingone_branding_theme",
+		JSONKeyPath:         "themeId.value",
+		ReferenceField:      "id",
+		Strategy:            "reference_with_fallback",
+		VariablePrefix:      "davinci_theme",
+		VariableNamingPath:  "nodeTitle.value",
+		PreconditionKeyPath: "theme.value",
+		PreconditionValue:   "useThemeId",
+		UnwrapMode:          "rich_text",
+	}
+}
+
+// richTextPropertiesJSON builds a properties RawHCLValue blob shaped like a
+// showForm node using the "useThemeId" mode flag, with the UUID embedded
+// inside a Slate-style rich-text wrapper at themeId.value — matching the
+// double-JSON-encoding that transformJSONEncodeRaw produces in production.
+func richTextPropertiesJSON(t *testing.T, uuidStr string) string {
+	t.Helper()
+
+	wrapper := `[{"children":[{"text":"` + uuidStr + `"}]}]`
+	escapedWrapper, err := json.Marshal(wrapper)
+	if err != nil {
+		t.Fatalf("failed to marshal wrapper: %v", err)
+	}
+
+	return `jsonencode({"theme": {"value": "useThemeId"}, "themeId": {"value": ` + string(escapedWrapper) + `}, "nodeTitle": {"value": "Theme Node"}})`
+}
+
+// TestResolveEmbeddedReferences_RichTextUnwrap_ResolvesToVariable verifies
+// that UnwrapMode "rich_text" correctly extracts the UUID from the Slate
+// wrapper, resolves it via reference_with_fallback when not in the graph,
+// and re-embeds the variable reference back inside the wrapper, preserving
+// its outer JSON structure.
+func TestResolveEmbeddedReferences_RichTextUnwrap_ResolvesToVariable(t *testing.T) {
+	g := graph.New()
+	// Target UUID not in graph — no pingone_branding_theme resources registered
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := themeRichTextRule()
+	const themeUUID = "dddddddd-0000-4000-8000-000000000001"
+	propertiesJSON := richTextPropertiesJSON(t, themeUUID)
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	// theme.value must remain the literal string "useThemeId"
+	if !strings.Contains(string(resolvedValue), `"useThemeId"`) {
+		t.Error("expected theme.value to remain the literal string \"useThemeId\"")
+	}
+
+	// The raw UUID must no longer appear
+	if strings.Contains(string(resolvedValue), themeUUID) {
+		t.Errorf("expected raw UUID to be removed from wrapper, still found in: %s", resolvedValue)
+	}
+
+	const expectedVarRef = "${var.davinci_theme_theme_node}"
+	if !strings.Contains(string(resolvedValue), expectedVarRef) {
+		t.Errorf("expected wrapper to contain var reference %q, got: %s", expectedVarRef, resolvedValue)
+	}
+
+	// Verify the wrapper's outer JSON structure round-trips: unmarshal the
+	// outer properties JSON, then unmarshal themeId.value (a JSON string)
+	// back into the Slate array shape with the resolved value swapped in.
+	jsonStr := extractJSONFromRawHCL(resolvedValue)
+	var outer map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &outer); err != nil {
+		t.Fatalf("expected resolved properties to remain valid JSON: %v", err)
+	}
+	themeIDValue := outer["themeId"].(map[string]interface{})["value"].(string)
+
+	var wrapperArr []map[string]interface{}
+	if err := json.Unmarshal([]byte(themeIDValue), &wrapperArr); err != nil {
+		t.Fatalf("expected themeId.value to round-trip as a JSON array: %v", err)
+	}
+	if len(wrapperArr) != 1 {
+		t.Fatalf("expected wrapper array to have exactly 1 element, got %d", len(wrapperArr))
+	}
+	children := wrapperArr[0]["children"].([]interface{})
+	text := children[0].(map[string]interface{})["text"].(string)
+	if text != expectedVarRef {
+		t.Errorf("expected wrapper inner text to be %q, got %q", expectedVarRef, text)
+	}
+
+	if len(fallbackVars) != 1 {
+		t.Fatalf("expected 1 FallbackVariable, got %d", len(fallbackVars))
+	}
+	if fallbackVars[0].Name != "davinci_theme_theme_node" {
+		t.Errorf("expected FallbackVariable.Name %q, got %q", "davinci_theme_theme_node", fallbackVars[0].Name)
+	}
+}
+
+// TestResolveEmbeddedReferences_RichTextUnwrap_ResolvesToReference verifies
+// that UnwrapMode "rich_text" resolves to a direct resource reference (with
+// a graph edge) when the unwrapped UUID IS present in the graph.
+func TestResolveEmbeddedReferences_RichTextUnwrap_ResolvesToReference(t *testing.T) {
+	g := graph.New()
+	const themeUUID = "dddddddd-0000-4000-8000-000000000002"
+	g.AddResource("pingone_branding_theme", themeUUID, "pingcli__My_Theme")
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := themeRichTextRule()
+	propertiesJSON := richTextPropertiesJSON(t, themeUUID)
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	if !strings.Contains(string(resolvedValue), `"useThemeId"`) {
+		t.Error("expected theme.value to remain the literal string \"useThemeId\"")
+	}
+
+	const expectedRef = "${pingone_branding_theme.pingcli__My_Theme.id}"
+	if !strings.Contains(string(resolvedValue), expectedRef) {
+		t.Errorf("expected wrapper to contain resource reference %q, got: %s", expectedRef, resolvedValue)
+	}
+
+	if strings.Contains(string(resolvedValue), themeUUID) {
+		t.Errorf("expected raw UUID to be removed from wrapper, still found in: %s", resolvedValue)
+	}
+
+	if len(fallbackVars) != 0 {
+		t.Errorf("expected 0 FallbackVariables when UUID resolved to reference, got %d", len(fallbackVars))
+	}
+
+	deps := g.GetDependencies("pingone_davinci_flow", "parent-flow-id")
+	if len(deps) == 0 {
+		t.Error("expected graph edge to be created for rich-text-unwrapped reference")
+	}
+}
+
+// TestResolveEmbeddedReferences_RichTextUnwrap_MalformedWrapper verifies
+// that a variety of malformed/unexpected wrapper shapes leave the value
+// unchanged, emit no fallback variable/graph edge, and never panic.
+func TestResolveEmbeddedReferences_RichTextUnwrap_MalformedWrapper(t *testing.T) {
+	tests := []struct {
+		name          string
+		themeIDValueJ string // JSON-encoded (escaped) themeId.value content
+	}{
+		{"not an array", `"{\"children\":[{\"text\":\"dddddddd-0000-4000-8000-000000000003\"}]}"`},
+		{"empty array", `"[]"`},
+		{"missing children", `"[{}]"`},
+		{"non-string text", `"[{\"children\":[{\"text\":123}]}]"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := graph.New()
+			g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+			rule := themeRichTextRule()
+			propertiesJSON := `jsonencode({"theme": {"value": "useThemeId"}, "themeId": {"value": ` + tt.themeIDValueJ + `}, "nodeTitle": {"value": "Theme Node"}})`
+
+			attrs := map[string]interface{}{
+				"graph_data": map[string]interface{}{
+					"elements": map[string]interface{}{
+						"nodes": map[string]interface{}{
+							"node1": map[string]interface{}{
+								"data": map[string]interface{}{
+									"properties": RawHCLValue(propertiesJSON),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			resourceData := &ResourceData{
+				ResourceType: "pingone_davinci_flow",
+				ID:           "parent-flow-id",
+				Label:        "pingcli__Parent-Flow",
+				Attributes:   attrs,
+			}
+
+			exportedData := &ExportedResourceData{
+				ResourceType: "pingone_davinci_flow",
+				Definition:   testResourceDef("pingone_davinci_flow"),
+				Resources:    []*ResourceData{resourceData},
+			}
+
+			originalValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+			var fallbackVars []FallbackVariable
+			require.NotPanics(t, func() {
+				fallbackVars = ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+			})
+
+			resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+			if resolvedValue != originalValue {
+				t.Errorf("expected value unchanged for malformed wrapper %q, got: %s", tt.name, resolvedValue)
+			}
+			if len(fallbackVars) != 0 {
+				t.Errorf("expected 0 FallbackVariables for malformed wrapper %q, got %d", tt.name, len(fallbackVars))
+			}
+
+			deps := g.GetDependencies("pingone_davinci_flow", "parent-flow-id")
+			if len(deps) != 0 {
+				t.Errorf("expected no graph edges for malformed wrapper %q, got %d", tt.name, len(deps))
+			}
+		})
+	}
+}
+
+// TestResolveEmbeddedReferences_UUIDFormatGuard_NoOpPerStrategy verifies that
+// the unconditional UUID-format guard rejects a non-UUID-shaped extracted
+// value identically to "no value found" — regardless of Strategy.
+func TestResolveEmbeddedReferences_UUIDFormatGuard_NoOpPerStrategy(t *testing.T) {
+	tests := []struct {
+		name     string
+		strategy string
+	}{
+		{"default strategy", ""},
+		{"reference_with_fallback strategy", "reference_with_fallback"},
+		{"variable strategy", "variable"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := graph.New()
+			// Register a resource keyed by the literal sentinel string so that,
+			// absent the format guard, "reference"/"reference_with_fallback"
+			// strategies would otherwise resolve it as a direct graph hit.
+			g.AddResource("pingone_branding_theme", "activeTheme", "pingcli__Should_Not_Resolve")
+			g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+			rule := EmbeddedReferenceRule{
+				ResourceType:       "pingone_davinci_flow",
+				AttributePath:      "graph_data.elements.nodes.*.data.properties",
+				TargetResourceType: "pingone_branding_theme",
+				JSONKeyPath:        "theme.value",
+				ReferenceField:     "id",
+				Strategy:           tt.strategy,
+				VariablePrefix:     "davinci_theme",
+				VariableNamingPath: "nodeTitle.value",
+			}
+
+			propertiesJSON := `jsonencode({"theme": {"value": "activeTheme"}, "nodeTitle": {"value": "Theme Node"}})`
+
+			attrs := map[string]interface{}{
+				"graph_data": map[string]interface{}{
+					"elements": map[string]interface{}{
+						"nodes": map[string]interface{}{
+							"node1": map[string]interface{}{
+								"data": map[string]interface{}{
+									"properties": RawHCLValue(propertiesJSON),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			resourceData := &ResourceData{
+				ResourceType: "pingone_davinci_flow",
+				ID:           "parent-flow-id",
+				Label:        "pingcli__Parent-Flow",
+				Attributes:   attrs,
+			}
+
+			exportedData := &ExportedResourceData{
+				ResourceType: "pingone_davinci_flow",
+				Definition:   testResourceDef("pingone_davinci_flow"),
+				Resources:    []*ResourceData{resourceData},
+			}
+
+			originalValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+			fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+			resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+			if resolvedValue != originalValue {
+				t.Errorf("expected value unchanged for non-UUID sentinel under strategy %q, got: %s", tt.strategy, resolvedValue)
+			}
+			if len(fallbackVars) != 0 {
+				t.Errorf("expected 0 FallbackVariables for non-UUID sentinel under strategy %q, got %d", tt.strategy, len(fallbackVars))
+			}
+
+			deps := g.GetDependencies("pingone_davinci_flow", "parent-flow-id")
+			if len(deps) != 0 {
+				t.Errorf("expected no graph edges for non-UUID sentinel under strategy %q, got %d", tt.strategy, len(deps))
+			}
+		})
 	}
 }

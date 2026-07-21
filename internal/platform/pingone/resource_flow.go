@@ -63,6 +63,47 @@ func init() {
 		VariablePrefix:     "davinci_form",
 		VariableNamingPath: "nodeTitle.value",
 	})
+
+	// Embedded reference with fallback: theme.value inside node properties
+	// (showForm capability) references a DaVinci UI template. Mirrors the
+	// form.value rule above. theme.value may also hold a non-UUID mode-flag
+	// sentinel (e.g. "useThemeId", or the unconfirmed "activeTheme") instead
+	// of a direct UUID — those are left untouched by the unconditional
+	// UUID-format guard in core.processRawHCLValue, not by an enumerated
+	// skip list here. The pingone_branding_theme resource is not yet
+	// exported, so the UUID is emitted as a Terraform variable; once
+	// pingone_branding_theme is added, the graph lookup will succeed and the
+	// variable will be automatically promoted to a resource reference.
+	registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_branding_theme",
+		JSONKeyPath:        "theme.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_theme",
+		VariableNamingPath: "nodeTitle.value",
+	})
+
+	// Embedded reference with fallback: themeId.value inside node properties
+	// holds the theme UUID rich-text/Slate-wrapped
+	// (`[{"children":[{"text":"<uuid>"}]}]`) when theme.value is the mode
+	// flag "useThemeId". Gated on the sibling theme.value precondition so it
+	// only fires in that indirect mode; theme.value itself is left
+	// unmodified by this rule.
+	registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+		ResourceType:        "pingone_davinci_flow",
+		AttributePath:       "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType:  "pingone_branding_theme",
+		JSONKeyPath:         "themeId.value",
+		ReferenceField:      "id",
+		Strategy:            "reference_with_fallback",
+		VariablePrefix:      "davinci_theme",
+		VariableNamingPath:  "nodeTitle.value",
+		PreconditionKeyPath: "theme.value",
+		PreconditionValue:   "useThemeId",
+		UnwrapMode:          "rich_text",
+	})
 }
 
 // listFlowIDs fetches only flow IDs and names from the list endpoint via raw HTTP

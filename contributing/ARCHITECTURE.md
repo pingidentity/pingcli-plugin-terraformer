@@ -489,6 +489,24 @@ type EmbeddedReferenceRule struct {
     TargetResourceType string  // what the UUID references (e.g., "pingone_davinci_flow")
     JSONKeyPath        string  // path inside JSON blob (e.g., "subFlowId.value.value")
     ReferenceField     string  // TF attribute to reference (e.g., "id")
+
+    Strategy           string  // "" / "reference" (default), "reference_with_fallback", or "variable"
+    VariablePrefix     string  // combined with VariableNamingPath's suffix to name a fallback variable
+    VariableNamingPath string  // JSON key path used to derive a human-readable variable suffix
+
+    // PreconditionKeyPath / PreconditionValue: optional sibling JSON key path
+    // (resolved against the same parsed blob as JSONKeyPath) that must equal
+    // PreconditionValue before the rule fires. Zero value ("") means no
+    // precondition — fires unconditionally (pre-existing behavior).
+    PreconditionKeyPath string
+    PreconditionValue   string
+
+    // UnwrapMode: "" (default, JSONKeyPath resolves directly to a plain
+    // string) or "rich_text" (the value at JSONKeyPath is itself a JSON
+    // string containing a Slate-style rich-text wrapper —
+    // `[{"children":[{"text":"<value>"}]}]` — unwrapped before resolution
+    // and re-embedded inside the wrapper on write).
+    UnwrapMode string
 }
 
 type EmbeddedReferenceRegistry struct { ... }
@@ -508,11 +526,51 @@ type EmbeddedReferenceRegistry struct { ... }
 
 1. **Walk attribute path**: Navigate `ResourceData.Attributes` following dot-notation path segments. `*` matches all map keys at that level.
 2. **Extract JSON**: For each `RawHCLValue`, parse the `jsonencode(...)` expression to extract the JSON object inside.
-3. **Walk JSON**: Navigate the JSON structure following `JSONKeyPath` (dot-notation) to locate the UUID string.
-4. **Lookup**: Query the dependency graph for a resource matching `TargetResourceType` with the extracted UUID.
-5. **Replace**: Update the JSON blob, replacing the UUID with `${resource_type.label.reference_field}` (Terraform interpolation syntax with single `$`).
-6. **Serialize**: Re-marshal the JSON and update the `RawHCLValue` in the attributes map.
-7. **Add Graph Edge**: Record the dependency in the graph so `--include-upstream` and cycle detection work correctly.
+3. **Check precondition** (if `PreconditionKeyPath` is set): walk `PreconditionKeyPath` against the same parsed JSON; if it doesn't resolve to exactly `PreconditionValue` (including when the key is absent), the rule no-ops for this value — no change, no fallback variable, no graph edge.
+4. **Walk JSON**: Navigate the JSON structure following `JSONKeyPath` (dot-notation) to locate the value. When `UnwrapMode == "rich_text"`, this locates the Slate-style wrapper string, not the raw UUID directly.
+5. **Unwrap** (if `UnwrapMode == "rich_text"`): parse the wrapper `[{"children":[{"text":"<value>"}]}]` and extract the inner `text` value. Any shape mismatch (not an array, empty array, missing `children`, missing/non-string `text`) results in a no-op, mirroring `walkJSONPath`'s "return empty on mismatch" convention — never a panic.
+6. **UUID-format guard** (unconditional): the extracted (or unwrapped) string is validated via `looksLikeUUID` (backed by `github.com/google/uuid`'s `Validate`). Only a UUID-shaped string is treated as a resolvable reference/fallback-variable target — anything else (a sentinel/mode-flag string such as `"useThemeId"` or `"activeTheme"`, or any future sentinel) no-ops exactly like "no value found," **regardless of `Strategy`**. This is a single check point applied uniformly, not a per-rule opt-in, so no enumerated skip-list is needed and no future rule registration can accidentally reintroduce the bug this guard closes.
+7. **Lookup**: Query the dependency graph for a resource matching `TargetResourceType` with the extracted UUID.
+8. **Replace**: Update the JSON blob, replacing the UUID with `${resource_type.label.reference_field}` (Terraform interpolation syntax with single `$`) or a fallback `${var.name}` reference, depending on `Strategy`. For `UnwrapMode == "rich_text"`, the replacement happens *inside* the wrapper (see below) rather than as a bare substring swap.
+9. **Serialize**: Re-marshal the JSON and update the `RawHCLValue` in the attributes map.
+10. **Add Graph Edge**: Record the dependency in the graph so `--include-upstream` and cycle detection work correctly (skipped for `Strategy: "variable"` or when only a fallback variable is emitted).
+
+**When to use `PreconditionKeyPath`**: when a rule should only fire based on a sibling key's value — e.g., a mode-flag key that switches which of two sibling keys holds the real reference (`theme.value == "useThemeId"` gates whether `themeId.value` should be resolved). Leave both fields at their zero value (`""`) for rules that should fire unconditionally, exactly like `subFlowId`/`form.value` do today.
+
+**When to use `UnwrapMode: "rich_text"`**: when the value at `JSONKeyPath` is not a plain UUID string but a JSON-encoded Slate/rich-text wrapper (as produced by some DaVinci node editor fields). Because the outer `properties` map is itself re-encoded via `jsonencode_raw`, the wrapper's inner quotes appear **backslash-escaped** in the final `RawHCLValue` text — a plain substring replace (as `replaceUUIDInRawHCL` does for the no-unwrap path) would not match. The rich-text path instead swaps the UUID for the resolved reference inside the *unescaped* wrapper string, then re-derives both the old and new wrapper's escaped form via `json.Marshal` (which normalizes escaping identically to how the original text was produced) before substituting inside the `RawHCLValue`.
+
+**Worked example — `pingone_branding_theme` reference on a `showForm` node** (registered against `internal/platform/pingone/resource_flow.go`): a node's `theme.value` may hold a direct UUID, be absent, or be the literal string `"useThemeId"` with the real UUID embedded in a rich-text wrapper at `themeId.value`. Two rules cover this:
+
+```go
+// Case 1: direct UUID at theme.value — no precondition, no unwrap.
+registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+    ResourceType:       "pingone_davinci_flow",
+    AttributePath:      "graph_data.elements.nodes.*.data.properties",
+    TargetResourceType: "pingone_branding_theme",
+    JSONKeyPath:        "theme.value",
+    ReferenceField:     "id",
+    Strategy:           "reference_with_fallback",
+    VariablePrefix:     "davinci_theme",
+    VariableNamingPath: "nodeTitle.value",
+})
+
+// Case 3: rich-text-wrapped UUID at themeId.value, gated on theme.value == "useThemeId".
+registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+    ResourceType:        "pingone_davinci_flow",
+    AttributePath:       "graph_data.elements.nodes.*.data.properties",
+    TargetResourceType:  "pingone_branding_theme",
+    JSONKeyPath:         "themeId.value",
+    ReferenceField:      "id",
+    Strategy:            "reference_with_fallback",
+    VariablePrefix:      "davinci_theme",
+    VariableNamingPath:  "nodeTitle.value",
+    PreconditionKeyPath: "theme.value",
+    PreconditionValue:   "useThemeId",
+    UnwrapMode:          "rich_text",
+})
+```
+
+Case 1's rule fires unconditionally on `theme.value`, but the format guard rejects non-UUID values like `"useThemeId"` or `"activeTheme"` before `Strategy` is consulted — no `SkipValues` list is needed. Case 3's rule only fires when `theme.value` is exactly `"useThemeId"`, and only ever touches the UUID nested inside `themeId.value`'s wrapper — `theme.value` itself is left untouched by this rule.
 
 #### Example: DaVinci Flow `subFlowId` Rule
 
