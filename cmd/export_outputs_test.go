@@ -16,12 +16,12 @@ import (
 
 func TestParseOutputPath(t *testing.T) {
 	tests := []struct {
-		name          string
-		raw           string
-		wantOk        bool
-		wantResType   string
-		wantLabel     string
-		wantAttrPath  string
+		name         string
+		raw          string
+		wantOk       bool
+		wantResType  string
+		wantLabel    string
+		wantAttrPath string
 	}{
 		{
 			name:         "valid 3-segment path",

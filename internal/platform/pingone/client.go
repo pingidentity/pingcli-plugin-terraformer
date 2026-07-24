@@ -12,6 +12,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/patrickcping/pingone-go-sdk-v2/management"
+	pingonesdkv2 "github.com/patrickcping/pingone-go-sdk-v2/pingone"
 	"github.com/pingidentity/pingone-go-client/config"
 	"github.com/pingidentity/pingone-go-client/oauth2"
 	"github.com/pingidentity/pingone-go-client/pingone"
@@ -28,14 +30,44 @@ var _ clients.APIClient = (*Client)(nil)
 // Resource-specific list/get logic and custom handlers live in resource_*.go
 // files. Each file registers everything for its resource via init().
 type Client struct {
-	apiClient     *pingone.APIClient
-	environmentID uuid.UUID
-	warnings      []string
+	apiClient        *pingone.APIClient
+	managementCfg    *pingonesdkv2.Config
+	managementClient *management.APIClient
+	environmentID    uuid.UUID
+	warnings         []string
 }
 
 // New creates a DaVinci APIClient from a pre-built SDK client and environment ID.
 func New(apiClient *pingone.APIClient, environmentID uuid.UUID) *Client {
 	return &Client{apiClient: apiClient, environmentID: environmentID}
+}
+
+// NewWithManagementClient creates a Client from a pre-built DaVinci SDK
+// client and a pre-built management SDK client. Used by tests that need to
+// inject a fake management.APIClient without performing a real OAuth
+// exchange.
+func NewWithManagementClient(apiClient *pingone.APIClient, managementClient *management.APIClient, environmentID uuid.UUID) *Client {
+	return &Client{apiClient: apiClient, managementClient: managementClient, environmentID: environmentID}
+}
+
+// management lazily builds and caches the management SDK API client. The
+// management SDK performs an OAuth token exchange as soon as the client is
+// built (unlike the DaVinci SDK, which defers auth to the first request), so
+// construction is deferred until a management resource handler actually
+// needs it.
+func (c *Client) management(ctx context.Context) (*management.APIClient, error) {
+	if c.managementClient != nil {
+		return c.managementClient, nil
+	}
+	if c.managementCfg == nil {
+		return nil, fmt.Errorf("management API client not configured")
+	}
+	client, err := c.managementCfg.ManagementAPIClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize management API client: %w", err)
+	}
+	c.managementClient = client
+	return client, nil
 }
 
 // Platform returns the platform identifier.
@@ -106,12 +138,20 @@ func NewFromCredentials(ctx context.Context, workerEnvID, exportEnvID, region, c
 		return nil, fmt.Errorf("failed to initialize API client: %w", err)
 	}
 
+	regionCode := management.EnumRegionCode(region)
+	managementCfg := &pingonesdkv2.Config{
+		ClientID:      &clientID,
+		ClientSecret:  &clientSecret,
+		EnvironmentID: &workerEnvID,
+		RegionCode:    &regionCode,
+	}
+
 	envUUID, err := uuid.Parse(exportEnvID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid export environment ID format: %w", err)
 	}
 
-	return &Client{apiClient: apiClient, environmentID: envUUID}, nil
+	return &Client{apiClient: apiClient, managementCfg: managementCfg, environmentID: envUUID}, nil
 }
 
 // ValidRegions returns the list of valid PingOne region codes.
