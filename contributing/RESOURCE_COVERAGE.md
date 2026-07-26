@@ -64,7 +64,7 @@ Legend: ✅ Supported · ❌ Not yet supported
 | `pingone_application_role_assignment` | ❌ |
 | `pingone_application_secret` | ❌ |
 | `pingone_application_sign_on_policy_assignment` | ❌ |
-| `pingone_group` | ❌ |
+| `pingone_group` | ✅ |
 | `pingone_group_nesting` | ❌ |
 | `pingone_group_role_assignment` | ❌ |
 | `pingone_identity_provider` | ❌ |
