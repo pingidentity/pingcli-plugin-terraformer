@@ -13,6 +13,7 @@ import (
 
 func TestSupportedResourceTypes(t *testing.T) {
 	expected := []string{
+		"pingone_application",
 		"pingone_davinci_application",
 		"pingone_davinci_application_flow_policy",
 		"pingone_davinci_connector_instance",
