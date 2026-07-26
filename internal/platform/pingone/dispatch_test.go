@@ -21,6 +21,7 @@ func TestSupportedResourceTypes(t *testing.T) {
 		"pingone_davinci_flow_enable",
 		"pingone_davinci_variable",
 		"pingone_environment",
+		"pingone_resource",
 	}
 	assert.Equal(t, expected, SupportedResourceTypes())
 }

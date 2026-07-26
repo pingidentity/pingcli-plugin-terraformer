@@ -73,7 +73,7 @@ Legend: ✅ Supported · ❌ Not yet supported
 | `pingone_population` | ❌ |
 | `pingone_population_default` | ❌ |
 | `pingone_population_default_identity_provider` | ❌ |
-| `pingone_resource` | ❌ |
+| `pingone_resource` | ✅ |
 | `pingone_resource_attribute` | ❌ |
 | `pingone_resource_scope` | ❌ |
 | `pingone_resource_scope_openid` | ❌ |
