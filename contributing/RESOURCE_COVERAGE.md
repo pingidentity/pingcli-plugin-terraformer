@@ -70,7 +70,7 @@ Legend: ✅ Supported · ❌ Not yet supported
 | `pingone_identity_provider` | ❌ |
 | `pingone_identity_provider_attribute` | ❌ |
 | `pingone_password_policy` | ❌ |
-| `pingone_population` | ❌ |
+| `pingone_population` | ✅ |
 | `pingone_population_default` | ❌ |
 | `pingone_population_default_identity_provider` | ❌ |
 | `pingone_resource` | ❌ |
