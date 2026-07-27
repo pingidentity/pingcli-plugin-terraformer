@@ -23,6 +23,7 @@ func TestSupportedResourceTypes(t *testing.T) {
 		"pingone_environment",
 		"pingone_group",
 		"pingone_population",
+		"pingone_resource",
 	}
 	assert.Equal(t, expected, SupportedResourceTypes())
 }

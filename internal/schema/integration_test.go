@@ -73,8 +73,8 @@ func TestRegistryLoadPlatform(t *testing.T) {
 	err := registry.LoadPlatform("../../definitions", "pingone")
 	require.NoError(t, err)
 
-	// Should have loaded all definitions (8 enabled ones, 1 environment is disabled)
-	assert.Equal(t, 8, registry.Count())
+	// Should have loaded all definitions (10 enabled ones, 1 environment is disabled)
+	assert.Equal(t, 10, registry.Count())
 
 	// Get the variable definition
 	def, err := registry.Get("pingone_davinci_variable")
@@ -89,8 +89,8 @@ func TestRegistryLoadFromFS(t *testing.T) {
 	err := registry.LoadFromFS(definitions.FS, "pingone")
 	require.NoError(t, err)
 
-	// Should have loaded all definitions (8 enabled ones, 1 environment is disabled).
-	assert.Equal(t, 8, registry.Count())
+	// Should have loaded all definitions (10 enabled ones, 1 environment is disabled).
+	assert.Equal(t, 10, registry.Count())
 
 	// Verify a specific definition loaded correctly.
 	def, err := registry.Get("pingone_davinci_variable")
@@ -105,7 +105,7 @@ func TestLoaderLoadFromFS(t *testing.T) {
 	// Load from embedded FS.
 	defs, err := loader.LoadFromFS(definitions.FS, "pingone")
 	require.NoError(t, err)
-	assert.Len(t, defs, 9)
+	assert.Len(t, defs, 10)
 
 	// Verify each definition has valid metadata.
 	for _, def := range defs {
