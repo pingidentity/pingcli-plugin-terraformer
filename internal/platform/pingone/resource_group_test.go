@@ -26,10 +26,10 @@ func TestGroupResourceHandlerFunctions(t *testing.T) {
 	assert.NotNil(t, h.get)
 }
 
-// newTestManagementClient builds a management.APIClient pointed at the given
+// newTestGroupManagementClient builds a management.APIClient pointed at the given
 // httptest.Server so listGroups/getGroup can be exercised without a real
 // OAuth exchange or network call.
-func newTestManagementClient(serverURL string) *management.APIClient {
+func newTestGroupManagementClient(serverURL string) *management.APIClient {
 	cfg := management.NewConfiguration()
 	cfg.Servers = management.ServerConfigurations{
 		{URL: serverURL, Variables: map[string]management.ServerVariable{}},
@@ -98,7 +98,7 @@ func TestListGroups(t *testing.T) {
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
-			c := NewWithManagementClient(nil, newTestManagementClient(srv.URL), uuid.New())
+			c := NewWithManagementClient(nil, newTestGroupManagementClient(srv.URL), uuid.New())
 
 			result, err := listGroups(context.Background(), c, "")
 
@@ -170,7 +170,7 @@ func TestGetGroup(t *testing.T) {
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
 
-			c := NewWithManagementClient(nil, newTestManagementClient(srv.URL), uuid.New())
+			c := NewWithManagementClient(nil, newTestGroupManagementClient(srv.URL), uuid.New())
 
 			result, err := getGroup(context.Background(), c, "", tt.resourceID)
 

@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newTestManagementClient builds a management.APIClient pointed at a test
+// newTestResourceManagementClient builds a management.APIClient pointed at a test
 // server, bypassing the real OAuth exchange. All requests to it carry a
 // fake bearer token via management.ContextAccessToken.
-func newTestManagementClient(serverURL string) *management.APIClient {
+func newTestResourceManagementClient(serverURL string) *management.APIClient {
 	cfg := management.NewConfiguration()
 	cfg.Servers = management.ServerConfigurations{
 		{URL: serverURL},
@@ -102,7 +102,7 @@ func TestListResources(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			mgmt := newTestManagementClient(srv.URL)
+			mgmt := newTestResourceManagementClient(srv.URL)
 			c := NewWithManagementClient(nil, mgmt, uuid.New())
 
 			result, err := listResources(testCtx(), c, "")
@@ -173,7 +173,7 @@ func TestGetResource(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			mgmt := newTestManagementClient(srv.URL)
+			mgmt := newTestResourceManagementClient(srv.URL)
 			c := NewWithManagementClient(nil, mgmt, uuid.New())
 
 			result, err := getResource(testCtx(), c, "", tt.resourceID)

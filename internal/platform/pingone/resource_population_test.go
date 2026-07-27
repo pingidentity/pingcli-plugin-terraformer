@@ -28,10 +28,10 @@ func TestPopulationResourceHandlerFunctions(t *testing.T) {
 
 // ── test helpers ─────────────────────────────────────────────────
 
-// newTestManagementClient builds a management.APIClient whose requests are
+// newTestPopulationManagementClient builds a management.APIClient whose requests are
 // routed to the given httptest.Server, and a Client wired to use it via
 // NewWithManagementClient (avoiding a real OAuth exchange).
-func newTestManagementClient(t *testing.T, srv *httptest.Server, envID uuid.UUID) *Client {
+func newTestPopulationManagementClient(t *testing.T, srv *httptest.Server, envID uuid.UUID) *Client {
 	t.Helper()
 	cfg := management.NewConfiguration()
 	cfg.Servers = management.ServerConfigurations{
@@ -61,7 +61,7 @@ func TestListPopulations_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := listPopulations(context.Background(), c, "")
 	require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestListPopulations_Empty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := listPopulations(context.Background(), c, "")
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func TestListPopulations_NoEmbedded(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := listPopulations(context.Background(), c, "")
 	require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestListPopulations_APIError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := listPopulations(context.Background(), c, "")
 	require.Error(t, err)
@@ -160,7 +160,7 @@ func TestGetPopulation_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := getPopulation(context.Background(), c, "", "pop-1")
 	require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestGetPopulation_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := getPopulation(context.Background(), c, "", "missing-id")
 	require.Error(t, err)
@@ -200,7 +200,7 @@ func TestGetPopulation_EmptyResourceID(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newTestManagementClient(t, srv, envID)
+	c := newTestPopulationManagementClient(t, srv, envID)
 
 	result, err := getPopulation(context.Background(), c, "", "")
 	require.Error(t, err)
