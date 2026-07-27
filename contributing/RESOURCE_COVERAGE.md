@@ -56,7 +56,7 @@ Legend: ✅ Supported · ❌ Not yet supported
 
 | Resource | Supported |
 |---|---|
-| `pingone_application` | ❌ |
+| `pingone_application` | ✅ |
 | `pingone_application_attribute_mapping` | ❌ |
 | `pingone_application_flow_policy_assignment` | ❌ |
 | `pingone_application_resource` | ❌ |
