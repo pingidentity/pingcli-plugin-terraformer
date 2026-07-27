@@ -105,7 +105,7 @@ func TestLoaderLoadFromFS(t *testing.T) {
 	// Load from embedded FS.
 	defs, err := loader.LoadFromFS(definitions.FS, "pingone")
 	require.NoError(t, err)
-	assert.Len(t, defs, 8)
+	assert.Len(t, defs, 9)
 
 	// Verify each definition has valid metadata.
 	for _, def := range defs {
