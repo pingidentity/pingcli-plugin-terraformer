@@ -2,9 +2,12 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/graph"
@@ -1144,6 +1147,94 @@ func TestResolveEmbeddedReferences_DuplicateUUIDs_Deduplicated(t *testing.T) {
 	if len(fallbackVars) > 0 && fallbackVars[0].Name != "davinci_form_shared_form" {
 		t.Errorf("expected FallbackVariable.Name %q, got %q", "davinci_form_shared_form", fallbackVars[0].Name)
 	}
+}
+
+// TestResolveEmbeddedReferences_DistinctUUIDsSameTitle_NoCollision is the
+// #130 regression test: two DIFFERENT nodes share the same nodeTitle (e.g.
+// "Continue") but reference DIFFERENT UUIDs. Because the variable name is
+// derived from the human-readable title, not the UUID, both would previously
+// derive the identical name and collapse onto one fallback variable — the
+// second node's raw HCL would then be silently rewritten to reference the
+// first node's (wrong) UUID. Both nodes must now resolve to distinct
+// variables, each carrying its own UUID as the Default.
+func TestResolveEmbeddedReferences_DistinctUUIDsSameTitle_NoCollision(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_form",
+		JSONKeyPath:        "form.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_form",
+		VariableNamingPath: "nodeTitle.value",
+	}
+
+	// Two nodes titled identically ("Continue") but pointing at different UUIDs.
+	node1UUID := "cccccccc-0000-4000-8000-000000000001"
+	node2UUID := "cccccccc-0000-4000-8000-000000000002"
+	node1Props := `jsonencode({"form": {"value": "` + node1UUID + `"}, "nodeTitle": {"value": "Continue"}})`
+	node2Props := `jsonencode({"form": {"value": "` + node2UUID + `"}, "nodeTitle": {"value": "Continue"}})`
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(node1Props),
+						},
+					},
+					"node2": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(node2Props),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	// Two distinct UUIDs must never collapse into one FallbackVariable.
+	require.Len(t, fallbackVars, 2, "distinct UUIDs sharing a derived name must not collapse into one fallback variable")
+
+	nodes := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})
+	props1 := string(nodes["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue))
+	props2 := string(nodes["node2"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue))
+
+	// The two rewritten HCL blobs must NOT reference the same variable name.
+	varRefPattern := regexp.MustCompile(`\$\{var\.([a-zA-Z0-9_]+)\}`)
+	m1 := varRefPattern.FindStringSubmatch(props1)
+	m2 := varRefPattern.FindStringSubmatch(props2)
+	require.Len(t, m1, 2, "node1 properties must contain a var reference, got: %s", props1)
+	require.Len(t, m2, 2, "node2 properties must contain a var reference, got: %s", props2)
+	assert.NotEqual(t, m1[1], m2[1], "node1 and node2 must not be rewritten to reference the same variable")
+
+	// Each FallbackVariable's Default must match the UUID actually embedded
+	// in that node's rewritten properties, keyed by variable name.
+	defaultsByName := make(map[string]string)
+	for _, fv := range fallbackVars {
+		defaultsByName[fv.Name] = fmt.Sprintf("%v", fv.Default)
+	}
+	assert.Equal(t, node1UUID, defaultsByName[m1[1]])
+	assert.Equal(t, node2UUID, defaultsByName[m2[1]])
 }
 
 // TestLooksLikeUUID verifies the UUID-format guard helper against a mix of

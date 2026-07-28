@@ -1,0 +1,3 @@
+```release-note:bug
+Fixed fallback Terraform variables for not-yet-exported reference targets (e.g. `pingone_branding_theme`, `pingone_password_policy`) and embedded DaVinci node references silently colliding by derived name instead of by the underlying UUID. Two resources referencing different instances of the same missing target type, or two DaVinci nodes sharing a title but referencing different UUIDs, now produce distinct variables instead of one resource silently inheriting another's ID.
+```

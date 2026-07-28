@@ -471,6 +471,8 @@ type EmbeddedReferenceRule struct {
 
 **Using `UnwrapMode: "rich_text"`**: set this when the value at `JSONKeyPath` is not a plain UUID string but a JSON-encoded Slate/rich-text wrapper. Because the outer JSON blob is itself passed through `jsonencode_raw` a second time, the wrapper's inner quotes are backslash-escaped inside the final `RawHCLValue` text — a plain substring replace would not match, so the rich-text path re-derives the escaped form via `json.Marshal` before substituting. You do not need to do anything special in your rule literal beyond setting `UnwrapMode: "rich_text"`; the engine handles both extraction and re-embedding.
 
+**Fallback variable naming**: `VariablePrefix` + the `VariableNamingPath` suffix name the fallback variable, but that name is derived from human-readable data, not the UUID — two different nodes can share a title (e.g. both titled "Continue") and derive the same base name while referencing different UUIDs. You don't need to handle this in the rule definition: `ResolveEmbeddedReferences` runs every generated name through a shared `fallbackVariableAllocator` (see ARCHITECTURE.md) that dedupes by UUID and disambiguates colliding names automatically. Never dedupe fallback variable names yourself with a plain `map[string]bool` keyed on the name string — that's the bug this allocator exists to prevent (#130).
+
 ### Step 1: Analyze the Structure
 
 Find the API struct and the YAML attribute:

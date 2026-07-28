@@ -111,6 +111,12 @@ func ResolveEmbeddedReferences(
 	varSeen := make(map[string]bool)
 	var fallbackVars []FallbackVariable
 
+	// Shared across all rules/resources so that two different UUIDs which
+	// derive the same human-readable variable name (e.g. two DaVinci nodes
+	// both titled "Continue") are disambiguated instead of silently
+	// colliding onto one variable (see #130).
+	allocator := newFallbackVariableAllocator()
+
 	for _, exportedData := range results {
 		for _, rule := range rules {
 			// Skip if resource type doesn't match
@@ -120,7 +126,7 @@ func ResolveEmbeddedReferences(
 
 			// Process each resource of this type
 			for _, resource := range exportedData.Resources {
-				processResourceWithRule(resource, rule, g, varSeen, &fallbackVars)
+				processResourceWithRule(resource, rule, g, allocator, varSeen, &fallbackVars)
 			}
 		}
 	}
@@ -129,12 +135,12 @@ func ResolveEmbeddedReferences(
 }
 
 // processResourceWithRule applies a single rule to a resource
-func processResourceWithRule(resource *ResourceData, rule EmbeddedReferenceRule, g *graph.DependencyGraph, varSeen map[string]bool, fallbackVars *[]FallbackVariable) {
+func processResourceWithRule(resource *ResourceData, rule EmbeddedReferenceRule, g *graph.DependencyGraph, allocator *fallbackVariableAllocator, varSeen map[string]bool, fallbackVars *[]FallbackVariable) {
 	// Parse the attribute path into segments
 	pathSegments := strings.Split(rule.AttributePath, ".")
 
 	// Walk the path and process all matching RawHCLValues
-	walkAndProcessPath(resource.Attributes, pathSegments, 0, rule, resource, g, varSeen, fallbackVars)
+	walkAndProcessPath(resource.Attributes, pathSegments, 0, rule, resource, g, allocator, varSeen, fallbackVars)
 }
 
 // walkAndProcessPath recursively walks the attribute path and processes matching values
@@ -145,6 +151,7 @@ func walkAndProcessPath(
 	rule EmbeddedReferenceRule,
 	resource *ResourceData,
 	g *graph.DependencyGraph,
+	allocator *fallbackVariableAllocator,
 	varSeen map[string]bool,
 	fallbackVars *[]FallbackVariable,
 ) {
@@ -166,12 +173,12 @@ func walkAndProcessPath(
 				if isLastSegment {
 					// This key should be a RawHCLValue - try to process it
 					if rawValue, ok := nextValue.(RawHCLValue); ok {
-						processedValue := processRawHCLValue(rawValue, rule, resource, g, varSeen, fallbackVars)
+						processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, varSeen, fallbackVars)
 						typedCurrent[key] = processedValue
 					}
 				} else {
 					// Continue walking deeper
-					walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, varSeen, fallbackVars)
+					walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, allocator, varSeen, fallbackVars)
 				}
 			}
 		} else {
@@ -184,12 +191,12 @@ func walkAndProcessPath(
 			if isLastSegment {
 				// This is a RawHCLValue - process it
 				if rawValue, ok := nextValue.(RawHCLValue); ok {
-					processedValue := processRawHCLValue(rawValue, rule, resource, g, varSeen, fallbackVars)
+					processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, varSeen, fallbackVars)
 					typedCurrent[segment] = processedValue
 				}
 			} else {
 				// Continue walking deeper
-				walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, varSeen, fallbackVars)
+				walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, allocator, varSeen, fallbackVars)
 			}
 		}
 	}
@@ -202,6 +209,7 @@ func processRawHCLValue(
 	rule EmbeddedReferenceRule,
 	resource *ResourceData,
 	g *graph.DependencyGraph,
+	allocator *fallbackVariableAllocator,
 	varSeen map[string]bool,
 	fallbackVars *[]FallbackVariable,
 ) RawHCLValue {
@@ -257,7 +265,7 @@ func processRawHCLValue(
 
 	// Strategy: "variable" — always emit a variable, skip graph lookup
 	if rule.Strategy == "variable" {
-		varName := deriveVariableName(rule, jsonData, uuidStr)
+		varName := allocatedVariableName(rule, jsonData, uuidStr, allocator)
 		tfRef := fmt.Sprintf("${var.%s}", varName)
 		newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
@@ -269,7 +277,7 @@ func processRawHCLValue(
 	if err != nil {
 		// UUID not found in graph
 		if rule.Strategy == "reference_with_fallback" {
-			varName := deriveVariableName(rule, jsonData, uuidStr)
+			varName := allocatedVariableName(rule, jsonData, uuidStr, allocator)
 			tfRef := fmt.Sprintf("${var.%s}", varName)
 			newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
@@ -394,6 +402,17 @@ func deriveVariableName(rule EmbeddedReferenceRule, jsonData interface{}, uuid s
 		return rule.VariablePrefix + "_" + suffix
 	}
 	return suffix
+}
+
+// allocatedVariableName derives the base variable name via deriveVariableName
+// and then resolves it through allocator, keyed on uuid. This guarantees that
+// two different UUIDs which happen to derive the same human-readable name
+// (e.g. two DaVinci nodes both titled "Continue") get distinct variables
+// instead of silently colliding onto one (see #130) — while repeated calls
+// for the same UUID still return the same name.
+func allocatedVariableName(rule EmbeddedReferenceRule, jsonData interface{}, uuid string, allocator *fallbackVariableAllocator) string {
+	baseName := deriveVariableName(rule, jsonData, uuid)
+	return allocator.allocate(uuid, baseName, uuid)
 }
 
 // addEmbeddedFallbackVariable adds a FallbackVariable entry if not already seen.

@@ -470,6 +470,12 @@ type FallbackVariable struct {
 
 The caller (cmd/export.go) is responsible for formatting, variable extraction, import block generation, and module assembly using the returned `ExportResult`.
 
+**Fallback variable naming standard**: a fallback variable's name is derived from static schema/rule metadata (e.g. `ReferencesType + ReferenceField`, or a rule's `VariablePrefix` + a human-readable `VariableNamingPath` suffix) — never from the UUID. Two *different* UUIDs can legitimately derive the identical base name (e.g. two populations both falling back to `pingone_branding_theme_id` for different theme instances, or two DaVinci nodes both titled "Continue"). Both fallback-variable code paths — `resolveOneReference`/`collectFallbackVars` in `orchestrator.go`, and `addEmbeddedFallbackVariable`/`deriveVariableName` in `embedded_references.go` — route every generated name through a shared `fallbackVariableAllocator` (`internal/core/fallback_variable_allocator.go`) before dedup. The allocator:
+- Keys dedup on the **UUID being resolved**, not the derived name, so repeat references to the *same* UUID still collapse onto one variable.
+- When two *different* UUIDs would otherwise produce the same base name, disambiguates the second (and subsequent) name(s) by appending a UUID-derived suffix (`utils.SanitizeVariableName` of the first 8 hex chars, falling back to the full UUID on the astronomically unlikely case that the short suffix also collides).
+
+Any new fallback-variable-producing code path must route its generated name through this shared allocator rather than deduping on the name string directly — deduping on the name alone is the root cause of #130 and #138 (silent misattribution when two distinct target instances share a derived name).
+
 ### Embedded Reference Resolution
 
 The existing schema-driven reference system (via `references_type` on `AttributeDefinition`) resolves UUID strings in typed, structured attributes. However, some resources store UUID references **inside opaque `RawHCLValue` blobs** produced by `jsonencode_raw` transforms. These embedded UUIDs cannot be discovered by the standard reference resolution pass because they are buried inside JSON-encoded strings.
