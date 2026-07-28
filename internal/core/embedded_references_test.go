@@ -1237,6 +1237,85 @@ func TestResolveEmbeddedReferences_DistinctUUIDsSameTitle_NoCollision(t *testing
 	assert.Equal(t, node2UUID, defaultsByName[m2[1]])
 }
 
+// TestResolveEmbeddedReferences_DisambiguatedName_StableAcrossEnvironments
+// verifies the disambiguation hint is the node's own traversal key (e.g. its
+// "data.id"), not the target UUID: exporting the SAME flow structure (same
+// node ids and titles) against two different "environments" — i.e. the same
+// two nodes but pointing at different target UUIDs, as would happen
+// exporting the same DaVinci flow from two PingOne environments — must
+// produce the SAME variable names both times. Only each variable's Default
+// (the UUID) should differ. If the UUID leaked into the name itself, the
+// checked-in module code would differ across environment exports, breaking
+// the "one module, per-environment tfvars" model.
+func TestResolveEmbeddedReferences_DisambiguatedName_StableAcrossEnvironments(t *testing.T) {
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_form",
+		JSONKeyPath:        "form.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_form",
+		VariableNamingPath: "nodeTitle.value",
+	}
+
+	buildAttrs := func(node1UUID, node2UUID string) map[string]interface{} {
+		node1Props := `jsonencode({"form": {"value": "` + node1UUID + `"}, "nodeTitle": {"value": "Continue"}})`
+		node2Props := `jsonencode({"form": {"value": "` + node2UUID + `"}, "nodeTitle": {"value": "Continue"}})`
+		return map[string]interface{}{
+			"graph_data": map[string]interface{}{
+				"elements": map[string]interface{}{
+					"nodes": map[string]interface{}{
+						// Same node ids (map keys) in both "environments" — this is
+						// what makes the flow structure identical across exports.
+						"node1": map[string]interface{}{
+							"data": map[string]interface{}{"properties": RawHCLValue(node1Props)},
+						},
+						"node2": map[string]interface{}{
+							"data": map[string]interface{}{"properties": RawHCLValue(node2Props)},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	runExport := func(node1UUID, node2UUID string) []FallbackVariable {
+		g := graph.New()
+		attrs := buildAttrs(node1UUID, node2UUID)
+		exportedData := &ExportedResourceData{
+			ResourceType: "pingone_davinci_flow",
+			Definition:   testResourceDef("pingone_davinci_flow"),
+			Resources: []*ResourceData{{
+				ResourceType: "pingone_davinci_flow",
+				ID:           "parent-flow-id",
+				Label:        "pingcli__Parent-Flow",
+				Attributes:   attrs,
+			}},
+		}
+		return ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+	}
+
+	// "Environment A" and "Environment B" export the identical flow
+	// structure, but the target form UUIDs differ per environment.
+	varsA := runExport("aaaaaaaa-0000-4000-8000-000000000001", "aaaaaaaa-0000-4000-8000-000000000002")
+	varsB := runExport("bbbbbbbb-0000-4000-8000-000000000001", "bbbbbbbb-0000-4000-8000-000000000002")
+
+	require.Len(t, varsA, 2)
+	require.Len(t, varsB, 2)
+
+	namesA := make(map[string]bool)
+	for _, fv := range varsA {
+		namesA[fv.Name] = true
+	}
+	namesB := make(map[string]bool)
+	for _, fv := range varsB {
+		namesB[fv.Name] = true
+	}
+
+	assert.Equal(t, namesA, namesB, "variable names must be identical across environment exports of the same flow structure")
+}
+
 // TestLooksLikeUUID verifies the UUID-format guard helper against a mix of
 // valid UUID-shaped strings and the non-UUID placeholder/sentinel strings
 // used throughout this file's fixtures.

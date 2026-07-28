@@ -399,7 +399,7 @@ func (o *ExportOrchestrator) resolveReferences(results []*ExportedResourceData, 
 	allocator := newFallbackVariableAllocator()
 	for _, erd := range results {
 		for _, rd := range erd.Resources {
-			disambiguateFallbackVariableNames(rd.Attributes, erd.Definition.Attributes, allocator)
+			disambiguateFallbackVariableNames(rd.Attributes, erd.Definition.Attributes, rd.Label, allocator)
 		}
 	}
 
@@ -419,12 +419,16 @@ func (o *ExportOrchestrator) resolveReferences(results []*ExportedResourceData, 
 // name (ReferencesType + ReferenceField) is identical — e.g. two resources
 // both falling back to "pingone_branding_theme_id" for different theme
 // UUIDs. The first UUID seen for a given base name keeps that name;
-// subsequent distinct UUIDs are disambiguated with a UUID-derived suffix.
+// subsequent distinct UUIDs are disambiguated using resourceLabel — the
+// referencing resource's own Terraform label, which (unlike the target
+// UUID) is stable across environments for the same exported configuration,
+// so the generated variable *name* doesn't change from one environment's
+// export to another's; only its default value does.
 // The canonical "pingone_environment_id" variable is exempt, since every
 // reference to it is expected to share one variable regardless of UUID.
 // Must run after resolveAttrs and before collectFallbackVars so collection
 // sees the final, unique names.
-func disambiguateFallbackVariableNames(attrs map[string]interface{}, defs []schema.AttributeDefinition, allocator *fallbackVariableAllocator) {
+func disambiguateFallbackVariableNames(attrs map[string]interface{}, defs []schema.AttributeDefinition, resourceLabel string, allocator *fallbackVariableAllocator) {
 	for _, attrDef := range defs {
 		tName := attrDef.TerraformName
 		if tName == "" {
@@ -438,7 +442,7 @@ func disambiguateFallbackVariableNames(attrs map[string]interface{}, defs []sche
 
 		if ref, ok := val.(ResolvedReference); ok {
 			if ref.IsVariable && ref.VariableName != "pingone_environment_id" {
-				newName := allocator.allocate(ref.OriginalValue, ref.VariableName, ref.OriginalValue)
+				newName := allocator.allocate(ref.OriginalValue, ref.VariableName, resourceLabel)
 				if newName != ref.VariableName {
 					ref.VariableName = newName
 					attrs[tName] = ref
@@ -450,14 +454,14 @@ func disambiguateFallbackVariableNames(attrs map[string]interface{}, defs []sche
 		// Recurse into nested structures.
 		if attrDef.Type == "object" && len(attrDef.NestedAttributes) > 0 {
 			if m, ok := val.(map[string]interface{}); ok {
-				disambiguateFallbackVariableNames(m, attrDef.NestedAttributes, allocator)
+				disambiguateFallbackVariableNames(m, attrDef.NestedAttributes, resourceLabel, allocator)
 			}
 		}
 		if (attrDef.Type == "list" || attrDef.Type == "set") && len(attrDef.NestedAttributes) > 0 {
 			if slice, ok := val.([]interface{}); ok {
 				for _, item := range slice {
 					if itemMap, ok := item.(map[string]interface{}); ok {
-						disambiguateFallbackVariableNames(itemMap, attrDef.NestedAttributes, allocator)
+						disambiguateFallbackVariableNames(itemMap, attrDef.NestedAttributes, resourceLabel, allocator)
 					}
 				}
 			}
@@ -466,7 +470,7 @@ func disambiguateFallbackVariableNames(attrs map[string]interface{}, defs []sche
 			if m, ok := val.(map[string]interface{}); ok {
 				for _, entryVal := range m {
 					if entryMap, ok := entryVal.(map[string]interface{}); ok {
-						disambiguateFallbackVariableNames(entryMap, attrDef.NestedAttributes, allocator)
+						disambiguateFallbackVariableNames(entryMap, attrDef.NestedAttributes, resourceLabel, allocator)
 					}
 				}
 			}

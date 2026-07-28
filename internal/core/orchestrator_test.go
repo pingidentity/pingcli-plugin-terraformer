@@ -1698,8 +1698,11 @@ func TestDisambiguateFallbackVariableNames_DistinctUUIDsSameBaseName(t *testing.
 	}
 
 	allocator := newFallbackVariableAllocator()
-	disambiguateFallbackVariableNames(attrsA, defs, allocator)
-	disambiguateFallbackVariableNames(attrsB, defs, allocator)
+	// Disambiguation hint is the REFERENCING resource's own stable label,
+	// not the target UUID — so the variable name stays the same across
+	// environments even though the UUID default value differs per environment.
+	disambiguateFallbackVariableNames(attrsA, defs, "pingcli__sample_users", allocator)
+	disambiguateFallbackVariableNames(attrsB, defs, "pingcli__sam_population", allocator)
 
 	refA := attrsA["theme_id"].(ResolvedReference)
 	refB := attrsB["theme_id"].(ResolvedReference)
@@ -1709,6 +1712,8 @@ func TestDisambiguateFallbackVariableNames_DistinctUUIDsSameBaseName(t *testing.
 	// The second, distinct UUID must be disambiguated, not collapsed onto A's variable.
 	assert.NotEqual(t, refA.VariableName, refB.VariableName)
 	assert.Contains(t, refB.VariableName, "pingone_branding_theme_id")
+	// The disambiguation suffix is the referencing resource's own label, not a UUID fragment.
+	assert.Contains(t, refB.VariableName, "sam_population")
 
 	// Collecting fallback vars afterward must yield TWO distinct variables,
 	// each carrying its own original UUID as the Default.
@@ -1750,8 +1755,10 @@ func TestDisambiguateFallbackVariableNames_SameUUIDStaysDeduped(t *testing.T) {
 	attrsB := map[string]interface{}{"theme_id": sameRef}
 
 	allocator := newFallbackVariableAllocator()
-	disambiguateFallbackVariableNames(attrsA, defs, allocator)
-	disambiguateFallbackVariableNames(attrsB, defs, allocator)
+	// Different referencing resources, but the SAME target UUID: must still
+	// dedupe to one variable regardless of the (different) disambiguation hints.
+	disambiguateFallbackVariableNames(attrsA, defs, "pingcli__sample_users", allocator)
+	disambiguateFallbackVariableNames(attrsB, defs, "pingcli__more_sample_users", allocator)
 
 	refA := attrsA["theme_id"].(ResolvedReference)
 	refB := attrsB["theme_id"].(ResolvedReference)

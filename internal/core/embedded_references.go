@@ -140,10 +140,15 @@ func processResourceWithRule(resource *ResourceData, rule EmbeddedReferenceRule,
 	pathSegments := strings.Split(rule.AttributePath, ".")
 
 	// Walk the path and process all matching RawHCLValues
-	walkAndProcessPath(resource.Attributes, pathSegments, 0, rule, resource, g, allocator, varSeen, fallbackVars)
+	walkAndProcessPath(resource.Attributes, pathSegments, 0, rule, resource, g, allocator, "", varSeen, fallbackVars)
 }
 
-// walkAndProcessPath recursively walks the attribute path and processes matching values
+// walkAndProcessPath recursively walks the attribute path and processes
+// matching values. traversalKey accumulates the wildcard-matched map keys
+// seen so far (e.g. a DaVinci node's own "data.id") — these are stable,
+// environment-portable identifiers for whatever is being iterated, and are
+// passed down to processRawHCLValue as a disambiguation hint distinct from
+// the target UUID being resolved.
 func walkAndProcessPath(
 	current interface{},
 	pathSegments []string,
@@ -152,6 +157,7 @@ func walkAndProcessPath(
 	resource *ResourceData,
 	g *graph.DependencyGraph,
 	allocator *fallbackVariableAllocator,
+	traversalKey string,
 	varSeen map[string]bool,
 	fallbackVars *[]FallbackVariable,
 ) {
@@ -167,18 +173,24 @@ func walkAndProcessPath(
 	switch typedCurrent := current.(type) {
 	case map[string]interface{}:
 		if segment == "*" {
-			// Wildcard: process all keys in this map
+			// Wildcard: process all keys in this map. The map key itself
+			// becomes (part of) the disambiguation hint for whatever is
+			// found beneath it.
 			for key := range typedCurrent {
 				nextValue := typedCurrent[key]
+				nextTraversalKey := key
+				if traversalKey != "" {
+					nextTraversalKey = traversalKey + "_" + key
+				}
 				if isLastSegment {
 					// This key should be a RawHCLValue - try to process it
 					if rawValue, ok := nextValue.(RawHCLValue); ok {
-						processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, varSeen, fallbackVars)
+						processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, nextTraversalKey, varSeen, fallbackVars)
 						typedCurrent[key] = processedValue
 					}
 				} else {
 					// Continue walking deeper
-					walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, allocator, varSeen, fallbackVars)
+					walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, allocator, nextTraversalKey, varSeen, fallbackVars)
 				}
 			}
 		} else {
@@ -191,12 +203,12 @@ func walkAndProcessPath(
 			if isLastSegment {
 				// This is a RawHCLValue - process it
 				if rawValue, ok := nextValue.(RawHCLValue); ok {
-					processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, varSeen, fallbackVars)
+					processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, traversalKey, varSeen, fallbackVars)
 					typedCurrent[segment] = processedValue
 				}
 			} else {
 				// Continue walking deeper
-				walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, allocator, varSeen, fallbackVars)
+				walkAndProcessPath(nextValue, pathSegments, segmentIndex+1, rule, resource, g, allocator, traversalKey, varSeen, fallbackVars)
 			}
 		}
 	}
@@ -204,12 +216,17 @@ func walkAndProcessPath(
 
 // processRawHCLValue extracts JSON from the RawHCLValue, finds the UUID at JSONKeyPath,
 // and replaces it with a Terraform reference or variable depending on the rule's Strategy.
+// traversalKey is a stable, environment-portable identifier (e.g. a DaVinci
+// node's own "data.id", accumulated by walkAndProcessPath's wildcard steps)
+// used to disambiguate fallback variable names when two different reference
+// sites derive the same human-readable base name — see allocatedVariableName.
 func processRawHCLValue(
 	value RawHCLValue,
 	rule EmbeddedReferenceRule,
 	resource *ResourceData,
 	g *graph.DependencyGraph,
 	allocator *fallbackVariableAllocator,
+	traversalKey string,
 	varSeen map[string]bool,
 	fallbackVars *[]FallbackVariable,
 ) RawHCLValue {
@@ -265,7 +282,7 @@ func processRawHCLValue(
 
 	// Strategy: "variable" — always emit a variable, skip graph lookup
 	if rule.Strategy == "variable" {
-		varName := allocatedVariableName(rule, jsonData, uuidStr, allocator)
+		varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
 		tfRef := fmt.Sprintf("${var.%s}", varName)
 		newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
@@ -277,7 +294,7 @@ func processRawHCLValue(
 	if err != nil {
 		// UUID not found in graph
 		if rule.Strategy == "reference_with_fallback" {
-			varName := allocatedVariableName(rule, jsonData, uuidStr, allocator)
+			varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
 			tfRef := fmt.Sprintf("${var.%s}", varName)
 			newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
@@ -410,9 +427,22 @@ func deriveVariableName(rule EmbeddedReferenceRule, jsonData interface{}, uuid s
 // (e.g. two DaVinci nodes both titled "Continue") get distinct variables
 // instead of silently colliding onto one (see #130) — while repeated calls
 // for the same UUID still return the same name.
-func allocatedVariableName(rule EmbeddedReferenceRule, jsonData interface{}, uuid string, allocator *fallbackVariableAllocator) string {
+//
+// traversalKey (the wildcard-matched map key(s) leading to this value, e.g.
+// a DaVinci node's own "data.id") is used as the disambiguation hint rather
+// than the UUID itself: the UUID is per-environment API data, so baking it
+// into the variable *name* would make the same logical reference site
+// produce a different variable name in every environment export. The
+// traversal key is stable across environments for the same exported
+// configuration. Falls back to a UUID prefix only if no traversal key was
+// captured (defensive — every wildcard-based rule populates one).
+func allocatedVariableName(rule EmbeddedReferenceRule, jsonData interface{}, uuid string, traversalKey string, allocator *fallbackVariableAllocator) string {
 	baseName := deriveVariableName(rule, jsonData, uuid)
-	return allocator.allocate(uuid, baseName, uuid)
+	hint := traversalKey
+	if hint == "" {
+		hint = uuid
+	}
+	return allocator.allocate(uuid, baseName, hint)
 }
 
 // addEmbeddedFallbackVariable adds a FallbackVariable entry if not already seen.
