@@ -769,6 +769,27 @@ The orchestrator calls **only** `ListResources`. It never calls `GetResource` di
 
 Clients may collect non-fatal warnings during resource operations (e.g., 403 errors on certain endpoints). The cmd layer drains these via `Warnings()` after `orchestrator.Export()` and logs them for user visibility.
 
+### Two PingOne SDKs
+
+`internal/platform/pingone.Client` wraps **two** underlying PingOne SDKs, not one:
+
+| SDK | Field on `Client` | Covers |
+|---|---|---|
+| `github.com/pingidentity/pingone-go-client` | `apiClient *pingone.APIClient` | DaVinci, Environments, Connectors, ConfigurationManagement — 34 API paths total |
+| `github.com/patrickcping/pingone-go-sdk-v2/management` | `managementClient *management.APIClient` (built lazily, see below) | Everything else — Applications, Groups, Populations, Resources, and the bulk of the Platform/SSO/Authorize resource categories. This is the same SDK `terraform-provider-pingone` itself depends on. |
+
+The first SDK was the repo's only dependency through the initial DaVinci-focused build-out. It has no service for any resource outside DaVinci/Environments/Connectors — confirmable via `go doc github.com/pingidentity/pingone-go-client/pingone APIClient`. The second SDK was added specifically to unblock the ~90-resource Platform/SSO/Authorize/MFA/Protect/Verify backlog tracked in issue #119.
+
+**Resource handlers must pick the right SDK per resource**: DaVinci/Environment/Connector handlers use `c.apiClient` directly. Every other resource handler must call `c.management(ctx)` — never construct a `management.APIClient` directly, and never read `c.managementClient` directly from a handler. `c.management(ctx)` lazily builds and caches the client because `pingonesdkv2.Config.ManagementAPIClient(ctx)` performs a real OAuth token exchange the moment it's called (unlike the DaVinci SDK, which defers auth to the first request) — eager construction in `NewFromCredentials` would make every `Client` construction do a live network call and break tests that use fake/invalid credentials.
+
+The `management` SDK also has different shapes than `pingone-go-client` that affect how `source_path`/handlers are written:
+- IDs are `*string`, not `uuid.UUID` — no `.Id` sub-struct on relationship fields.
+- Every `ReadAll<Resource>` list method returns the same shared `EntityArray`/`EntityArrayEmbedded` type (one struct with ~40+ typed slice fields) rather than a per-resource typed collection.
+- Some response fields are discriminated unions (e.g. `ReadOneApplication200Response{ApplicationOIDC, ApplicationSAML, ...}`) requiring `.GetActualInstance()` to unwrap.
+- No typed `*ResponseLinks` HAL struct — `Links *map[string]LinksHATEOASValue` is a flat map.
+
+See `.claude/skills/new-resource-pingone/SKILL.md` for the full pattern reference (pagination, list/get code templates, gotchas) — that skill file is gitignored/local-only, so this section is the durable record of the two-SDK split for anyone reading the checked-in docs.
+
 ### Platform Package Structure
 
 All PingOne resource handlers live in a single flat package at `internal/platform/pingone/`. There are no sub-packages per service — base and DaVinci resources share one package:
