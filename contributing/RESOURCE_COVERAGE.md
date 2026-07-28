@@ -18,7 +18,7 @@ Legend: ✅ Supported · ❌ Not yet supported
 | `pingone_agreement_localization_revision` | ❌ |
 | `pingone_alert_channel` | ❌ |
 | `pingone_branding_settings` | ❌ |
-| `pingone_branding_theme` | ❌ |
+| `pingone_branding_theme` | ✅ |
 | `pingone_branding_theme_default` | ❌ |
 | `pingone_certificate` | ❌ |
 | `pingone_certificate_signing_response` | ❌ |

@@ -70,10 +70,7 @@ func init() {
 	// sentinel (e.g. "useThemeId", or the unconfirmed "activeTheme") instead
 	// of a direct UUID — those are left untouched by the unconditional
 	// UUID-format guard in core.processRawHCLValue, not by an enumerated
-	// skip list here. The pingone_branding_theme resource is not yet
-	// exported, so the UUID is emitted as a Terraform variable; once
-	// pingone_branding_theme is added, the graph lookup will succeed and the
-	// variable will be automatically promoted to a resource reference.
+	// skip list here.
 	registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
 		ResourceType:       "pingone_davinci_flow",
 		AttributePath:      "graph_data.elements.nodes.*.data.properties",

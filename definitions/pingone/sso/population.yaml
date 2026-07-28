@@ -79,10 +79,6 @@ attributes:
         reference_field: id
 
   # Theme - optional nested object. References a branding theme resource.
-  # pingone_branding_theme is not yet exported by this tool either (see
-  # resource_flow.go's identical fallback note for the DaVinci showForm theme
-  # reference), so this also falls back to a Terraform variable until that
-  # resource type is added.
   - name: Theme
     terraform_name: theme
     type: object
