@@ -1660,6 +1660,176 @@ func TestCollectFallbackVars_MixedTypes(t *testing.T) {
 	assert.Equal(t, "pingone_davinci_application_pingcli__my_app_id", out[0].Name)
 }
 
+// TestDisambiguateFallbackVariableNames_DistinctUUIDsSameBaseName tests the
+// #138 regression: two resources referencing DIFFERENT UUIDs of the same
+// not-yet-exported target type derive the same schema-based base variable
+// name (ReferencesType + ReferenceField has no UUID awareness). Both must
+// end up with distinct variable names — the second must not silently adopt
+// the first UUID's variable.
+func TestDisambiguateFallbackVariableNames_DistinctUUIDsSameBaseName(t *testing.T) {
+	defs := []schema.AttributeDefinition{
+		{
+			Name:           "theme_id",
+			TerraformName:  "theme_id",
+			Type:           "string",
+			ReferencesType: "pingone_branding_theme",
+			ReferenceField: "id",
+		},
+	}
+
+	// Two separate resources' attribute maps, both falling back to the same
+	// static base name "pingone_branding_theme_id" but for different UUIDs —
+	// mirrors the "Sample Users" vs "sam-population" scenario from #138.
+	attrsA := map[string]interface{}{
+		"theme_id": ResolvedReference{
+			IsVariable:    true,
+			VariableName:  "pingone_branding_theme_id",
+			ResourceType:  "pingone_branding_theme",
+			OriginalValue: "ca2d934c-5c98-42e0-8c09-fcbc559049b0",
+		},
+	}
+	attrsB := map[string]interface{}{
+		"theme_id": ResolvedReference{
+			IsVariable:    true,
+			VariableName:  "pingone_branding_theme_id",
+			ResourceType:  "pingone_branding_theme",
+			OriginalValue: "df05370a-07f3-4ed0-927a-9cc307ed8780",
+		},
+	}
+
+	allocator := newFallbackVariableAllocator()
+	// Disambiguation hint is the REFERENCING resource's own stable label,
+	// not the target UUID — so the variable name stays the same across
+	// environments even though the UUID default value differs per environment.
+	disambiguateFallbackVariableNames(attrsA, defs, "pingcli__sample_users", allocator)
+	disambiguateFallbackVariableNames(attrsB, defs, "pingcli__sam_population", allocator)
+
+	refA := attrsA["theme_id"].(ResolvedReference)
+	refB := attrsB["theme_id"].(ResolvedReference)
+
+	// The first UUID keeps the canonical base name.
+	assert.Equal(t, "pingone_branding_theme_id", refA.VariableName)
+	// The second, distinct UUID must be disambiguated, not collapsed onto A's variable.
+	assert.NotEqual(t, refA.VariableName, refB.VariableName)
+	assert.Contains(t, refB.VariableName, "pingone_branding_theme_id")
+	// The disambiguation suffix is the referencing resource's own label, not a UUID fragment.
+	assert.Contains(t, refB.VariableName, "sam_population")
+
+	// Collecting fallback vars afterward must yield TWO distinct variables,
+	// each carrying its own original UUID as the Default.
+	seen := make(map[string]bool)
+	var out []FallbackVariable
+	collectFallbackVars(attrsA, defs, seen, &out)
+	collectFallbackVars(attrsB, defs, seen, &out)
+
+	require.Len(t, out, 2)
+	names := make(map[string]string)
+	for _, fv := range out {
+		names[fv.Name] = fmt.Sprintf("%v", fv.Default)
+	}
+	assert.Equal(t, "ca2d934c-5c98-42e0-8c09-fcbc559049b0", names[refA.VariableName])
+	assert.Equal(t, "df05370a-07f3-4ed0-927a-9cc307ed8780", names[refB.VariableName])
+}
+
+// TestDisambiguateFallbackVariableNames_SameUUIDStaysDeduped ensures the fix
+// for #138 doesn't regress the legitimate case: multiple references to the
+// SAME UUID/base-name pair must still collapse onto one variable name.
+func TestDisambiguateFallbackVariableNames_SameUUIDStaysDeduped(t *testing.T) {
+	defs := []schema.AttributeDefinition{
+		{
+			Name:           "theme_id",
+			TerraformName:  "theme_id",
+			Type:           "string",
+			ReferencesType: "pingone_branding_theme",
+			ReferenceField: "id",
+		},
+	}
+
+	sameRef := ResolvedReference{
+		IsVariable:    true,
+		VariableName:  "pingone_branding_theme_id",
+		ResourceType:  "pingone_branding_theme",
+		OriginalValue: "ca2d934c-5c98-42e0-8c09-fcbc559049b0",
+	}
+	attrsA := map[string]interface{}{"theme_id": sameRef}
+	attrsB := map[string]interface{}{"theme_id": sameRef}
+
+	allocator := newFallbackVariableAllocator()
+	// Different referencing resources, but the SAME target UUID: must still
+	// dedupe to one variable regardless of the (different) disambiguation hints.
+	disambiguateFallbackVariableNames(attrsA, defs, "pingcli__sample_users", allocator)
+	disambiguateFallbackVariableNames(attrsB, defs, "pingcli__more_sample_users", allocator)
+
+	refA := attrsA["theme_id"].(ResolvedReference)
+	refB := attrsB["theme_id"].(ResolvedReference)
+	assert.Equal(t, "pingone_branding_theme_id", refA.VariableName)
+	assert.Equal(t, refA.VariableName, refB.VariableName)
+
+	seen := make(map[string]bool)
+	var out []FallbackVariable
+	collectFallbackVars(attrsA, defs, seen, &out)
+	collectFallbackVars(attrsB, defs, seen, &out)
+	require.Len(t, out, 1, "same UUID must still dedupe to a single fallback variable")
+}
+
+// TestExportOrchestrator_Export_DistinctReferencedUUIDs_ProduceDistinctFallbackVars
+// is a full pipeline regression test for #138: two resources of the same
+// type reference two different instances of a not-yet-exported target type.
+// Before the fix, both fell back to the identical variable name and the
+// second resource's UUID was silently lost.
+func TestExportOrchestrator_Export_DistinctReferencedUUIDs_ProduceDistinctFallbackVars(t *testing.T) {
+	popDef := baseDef("test_population", "p", "Population", "population")
+	popDef.Attributes = append(popDef.Attributes,
+		schema.AttributeDefinition{
+			Name: "theme_id", TerraformName: "theme_id", Type: "string",
+			SourcePath: "ThemeID", Transform: "passthrough",
+			ReferencesType: "test_theme", ReferenceField: "id",
+		},
+	)
+
+	reg := newTestRegistry(t, popDef)
+	proc := NewProcessor(reg)
+
+	type popStruct struct {
+		ID      *string
+		Name    *string
+		ThemeID *string
+	}
+
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"test_population": {
+				popStruct{ID: strPtr("pop-1"), Name: strPtr("Sample Users"), ThemeID: strPtr("ca2d934c-5c98-42e0-8c09-fcbc559049b0")},
+				popStruct{ID: strPtr("pop-2"), Name: strPtr("sam-population"), ThemeID: strPtr("df05370a-07f3-4ed0-927a-9cc307ed8780")},
+			},
+		},
+	}
+
+	o := NewExportOrchestrator(reg, proc, client)
+	result, err := o.Export(context.Background(), ExportOptions{EnvironmentID: "env-1"})
+	require.NoError(t, err)
+
+	// test_theme was never registered/exported, so both theme_id references
+	// must fall back to variables — but distinct ones, since the UUIDs differ.
+	require.Len(t, result.FallbackVariables, 2, "distinct target UUIDs must not collapse onto one fallback variable")
+
+	defaultsByName := make(map[string]string)
+	names := make(map[string]bool)
+	for _, fv := range result.FallbackVariables {
+		names[fv.Name] = true
+		defaultsByName[fv.Name] = fmt.Sprintf("%v", fv.Default)
+	}
+	require.Len(t, names, 2, "fallback variable names must be unique")
+
+	gotDefaults := make(map[string]bool)
+	for _, d := range defaultsByName {
+		gotDefaults[d] = true
+	}
+	assert.True(t, gotDefaults["ca2d934c-5c98-42e0-8c09-fcbc559049b0"])
+	assert.True(t, gotDefaults["df05370a-07f3-4ed0-927a-9cc307ed8780"])
+}
+
 // --- IncludeUpstream Tests ---
 
 // flowStruct is a mock API struct that includes a connection reference.
