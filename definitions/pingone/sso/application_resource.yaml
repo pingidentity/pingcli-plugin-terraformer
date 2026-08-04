@@ -57,6 +57,17 @@ attributes:
     source_path: Parent.Id
     computed: true
 
+  # Shadow of ResourceID under a non-colliding terraform_name, purely so
+  # import_id_format can reference the parent resource's raw UUID —
+  # "{resource_id}" is an engine-reserved placeholder that always means
+  # "this resource's own ID" (data.ID), so it cannot be reused to mean the
+  # resource_id attribute above. Never rendered into the resource block.
+  - name: ParentResourceID
+    terraform_name: parent_resource_id_for_import
+    type: string
+    source_path: Parent.Id
+    computed: true
+
   - name: Name
     terraform_name: name
     type: string
@@ -96,7 +107,7 @@ dependencies:
       lookup_field: name
       reference_format: "pingone_resource.{name}.name"
 
-  import_id_format: "{env_id}/{resource_id}/{id}"
+  import_id_format: "{env_id}/{parent_resource_id_for_import}/{id}"
 
 variables:
   eligible_attributes: []

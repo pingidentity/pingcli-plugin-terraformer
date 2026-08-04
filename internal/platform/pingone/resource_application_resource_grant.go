@@ -79,6 +79,12 @@ func listApplicationResourceGrants(ctx context.Context, c *Client, envID string)
 		if !ok || app == nil {
 			continue
 		}
+		// Resource grants (OAuth scopes) are meaningful only for OIDC
+		// applications — SAML, external link, and WS-Fed applications have
+		// no grants endpoint and return 404 if queried.
+		if app.OIDC == nil {
+			continue
+		}
 		iterator := mgmt.ApplicationResourceGrantsApi.ReadAllApplicationGrants(ctx, c.environmentID.String(), app.Id).Execute()
 		for cursor, err := range iterator {
 			if err != nil {

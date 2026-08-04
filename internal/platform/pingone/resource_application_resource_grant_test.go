@@ -165,6 +165,35 @@ func TestListApplicationResourceGrants_SkipsGrantWhenResourceTypeLookupFails(t *
 	assert.NotEmpty(t, c.Warnings())
 }
 
+// TestListApplicationResourceGrants_SkipsNonOIDCApplications confirms that
+// SAML/external-link/WS-Fed applications are skipped without ever calling
+// the grants endpoint — that endpoint 404s for non-OIDC applications since
+// resource grants (OAuth scopes) don't apply to them.
+func TestListApplicationResourceGrants_SkipsNonOIDCApplications(t *testing.T) {
+	applicationsBody := map[string]any{
+		"_embedded": map[string]any{
+			"applications": []any{
+				map[string]any{
+					"id": "saml-app", "name": "SAML App", "enabled": true,
+					"protocol": "SAML", "acsUrls": []string{"https://sp.example.com/acs"},
+					"assertionDuration": 3600, "spEntityId": "sp-entity",
+				},
+			},
+		},
+	}
+	// No entry for "saml-app" in grantsByApp — if the handler queried it
+	// anyway, the mux would 404 and the whole list call would fail.
+	srv := newApplicationResourceGrantMux(applicationsBody, map[string]any{}, map[string]any{})
+	defer srv.Close()
+
+	mgmt := newTestResourceManagementClient(srv.URL)
+	c := NewWithManagementClient(nil, mgmt, uuid.New())
+
+	result, err := listApplicationResourceGrants(testCtx(), c, "")
+	require.NoError(t, err)
+	assert.Empty(t, result)
+}
+
 func TestListApplicationResourceGrants_ManagementClientUnavailable(t *testing.T) {
 	c := &Client{}
 	result, err := listApplicationResourceGrants(testCtx(), c, "")

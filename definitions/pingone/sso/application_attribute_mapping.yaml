@@ -23,6 +23,10 @@ api:
   get_method: ApplicationAttributeMappingApi.ReadOneApplicationAttributeMapping
   id_field: id
   name_field: name
+  # Mapping names (e.g. the reserved "sub"/"saml_subject" core mappings) are
+  # only unique within a single application, not across the environment —
+  # label_fields disambiguates by including application_id.
+  label_fields: [name, application_id]
   pagination_type: cursor
   additional_id_fields:
     - application_id
