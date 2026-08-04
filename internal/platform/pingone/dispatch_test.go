@@ -14,6 +14,12 @@ import (
 func TestSupportedResourceTypes(t *testing.T) {
 	expected := []string{
 		"pingone_application",
+		"pingone_application_attribute_mapping",
+		"pingone_application_flow_policy_assignment",
+		"pingone_application_resource",
+		"pingone_application_resource_grant",
+		"pingone_application_secret",
+		"pingone_application_sign_on_policy_assignment",
 		"pingone_branding_theme",
 		"pingone_davinci_application",
 		"pingone_davinci_application_flow_policy",
@@ -26,6 +32,10 @@ func TestSupportedResourceTypes(t *testing.T) {
 		"pingone_group",
 		"pingone_population",
 		"pingone_resource",
+		"pingone_resource_scope",
+		"pingone_resource_scope_openid",
+		"pingone_resource_scope_pingone_api",
+		"pingone_sign_on_policy",
 	}
 	assert.Equal(t, expected, SupportedResourceTypes())
 }

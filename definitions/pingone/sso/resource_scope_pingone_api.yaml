@@ -1,0 +1,74 @@
+# PingOne API Resource Scope Definition
+#
+# Scopes on the built-in PINGONE_API resource (implicit per environment —
+# there is exactly one, so resource_id is computed rather than a required
+# input). See resource_scope_openid.yaml for the shared ResourceScope /
+# ResourceScopesApi background; this variant additionally exposes
+# schema_attributes, supported only for the p1:read:user / p1:update:user
+# scope family per the provider docs.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_resource_scope_pingone_api
+  api_type: ResourceScope
+  name: PingOne API Resource Scope
+  short_name: resource_scope_pingone_api
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: ResourceScope
+  list_method: ResourceScopesApi.ReadAllResourceScopes
+  get_method: ResourceScopesApi.ReadOneResourceScope
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: ResourceID
+    terraform_name: resource_id
+    type: string
+    source_path: Resource.Id
+    computed: true
+
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  - name: SchemaAttributes
+    terraform_name: schema_attributes
+    type: set
+    source_path: SchemaAttributes
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{id}"
+
+variables:
+  eligible_attributes: []

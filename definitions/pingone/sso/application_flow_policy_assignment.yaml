@@ -1,0 +1,83 @@
+# PingOne Application Flow Policy Assignment Resource Definition
+#
+# Children of pingone_application. flow_policy_id references
+# pingone_davinci_application_flow_policy, which is already implemented in
+# this repo (via the DaVinci SDK) — this resource itself uses the management
+# SDK's ApplicationFlowPolicyAssignmentsApi, a different SDK than the flow
+# policy resource, but both address the same underlying PingOne flow policy
+# ID space, so the reference resolves normally.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_application_flow_policy_assignment
+  api_type: FlowPolicyAssignment
+  name: PingOne Application Flow Policy Assignment
+  short_name: application_flow_policy_assignment
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: FlowPolicyAssignment
+  list_method: ApplicationFlowPolicyAssignmentsApi.ReadAllFlowPolicyAssignments
+  get_method: ApplicationFlowPolicyAssignmentsApi.ReadOneFlowPolicyAssignment
+  id_field: id
+  name_field: id
+  pagination_type: cursor
+  additional_id_fields:
+    - application_id
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: ApplicationID
+    terraform_name: application_id
+    type: string
+    source_path: Application.Id
+    required: true
+    references_type: pingone_application
+    reference_field: id
+
+  - name: FlowPolicyID
+    terraform_name: flow_policy_id
+    type: string
+    source_path: FlowPolicy.Id
+    required: true
+    references_type: pingone_davinci_application_flow_policy
+    reference_field: id
+
+  - name: Priority
+    terraform_name: priority
+    type: number
+    source_path: Priority
+    required: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_application
+      field_path: Application.Id
+      lookup_field: id
+      reference_format: "pingone_application.{name}.id"
+    - resource_type: pingone_davinci_application_flow_policy
+      field_path: FlowPolicy.Id
+      lookup_field: id
+      reference_format: "pingone_davinci_application_flow_policy.{name}.id"
+
+  import_id_format: "{env_id}/{application_id}/{id}"
+
+variables:
+  eligible_attributes: []

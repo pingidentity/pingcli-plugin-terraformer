@@ -1,0 +1,62 @@
+# PingOne Sign-On Policy Resource Definition
+
+metadata:
+  platform: pingone
+  resource_type: pingone_sign_on_policy
+  api_type: SignOnPolicy
+  name: PingOne Sign-On Policy
+  short_name: sign_on_policy
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: SignOnPolicy
+  list_method: SignOnPoliciesApi.ReadAllSignOnPolicies
+  get_method: SignOnPoliciesApi.ReadOneSignOnPolicy
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  - name: Default
+    terraform_name: default
+    type: bool
+    source_path: Default
+    computed: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []
