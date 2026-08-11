@@ -3,6 +3,8 @@ package pingone
 import (
 	"context"
 	"fmt"
+
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
 )
 
 func init() {
@@ -10,6 +12,22 @@ func init() {
 	registerResource("pingone_group", resourceHandler{
 		list: listGroups,
 		get:  getGroup,
+	})
+
+	// Embedded reference: user_filter is a plain SCIM filter string (not a
+	// jsonencode(...) JSON blob) that may embed a population UUID, e.g.
+	// `population.id eq "<uuid>"`. reference_with_fallback mirrors the
+	// DaVinci embedded-reference precedent (resource_flow.go) — resolve via
+	// the graph when possible, otherwise emit a variable so the export never
+	// fails outright over a filtered-out or cross-environment population.
+	registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		PlainStringPattern: `population\.id eq "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"`,
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "group_user_filter_population",
 	})
 }
 

@@ -1891,3 +1891,248 @@ func TestResolveEmbeddedReferences_UUIDFormatGuard_NoOpPerStrategy(t *testing.T)
 		})
 	}
 }
+
+// ── PlainStringPattern (plain-string, non-JSON embedded UUID) ──────────
+
+const testPopulationFilterPattern = `population\.id eq "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"`
+
+func TestResolveEmbeddedReferences_PlainString_ResolvesToReference(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_population", "aaaaaaaa-0000-4000-8000-000000000001", "pingcli__My-Population")
+	g.AddResource("pingone_group", "group-1", "pingcli__My-Group")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		PlainStringPattern: testPopulationFilterPattern,
+		Strategy:           "reference_with_fallback",
+	}
+
+	attrs := map[string]interface{}{
+		"user_filter": `population.id eq "aaaaaaaa-0000-4000-8000-000000000001"`,
+	}
+	resourceData := &ResourceData{
+		ResourceType: "pingone_group",
+		ID:           "group-1",
+		Label:        "pingcli__My-Group",
+		Attributes:   attrs,
+	}
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_group",
+		Definition:   testResourceDef("pingone_group"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	is, ok := attrs["user_filter"].(InterpolatedString)
+	require.True(t, ok, "expected InterpolatedString, got %T", attrs["user_filter"])
+	assert.Equal(t, `population.id eq "${pingone_population.pingcli__My-Population.id}"`, string(is))
+	assert.Empty(t, fallbackVars)
+
+	deps := g.GetDependencies("pingone_group", "group-1")
+	assert.Len(t, deps, 1)
+}
+
+func TestResolveEmbeddedReferences_PlainString_FallsBackToVariable(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_group", "group-1", "pingcli__My-Group")
+	// Population deliberately NOT added to the graph.
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		PlainStringPattern: testPopulationFilterPattern,
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "group_user_filter_population",
+	}
+
+	attrs := map[string]interface{}{
+		"user_filter": `population.id eq "aaaaaaaa-0000-4000-8000-000000000001"`,
+	}
+	resourceData := &ResourceData{
+		ResourceType: "pingone_group",
+		ID:           "group-1",
+		Label:        "pingcli__My-Group",
+		Attributes:   attrs,
+	}
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_group",
+		Definition:   testResourceDef("pingone_group"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	is, ok := attrs["user_filter"].(InterpolatedString)
+	require.True(t, ok, "expected InterpolatedString, got %T", attrs["user_filter"])
+	assert.Contains(t, string(is), "${var.group_user_filter_population_")
+	require.Len(t, fallbackVars, 1)
+	assert.Equal(t, "aaaaaaaa-0000-4000-8000-000000000001", fallbackVars[0].Default)
+}
+
+func TestResolveEmbeddedReferences_PlainString_DefaultStrategyLeavesUnresolvedUnchanged(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_group", "group-1", "pingcli__My-Group")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		PlainStringPattern: testPopulationFilterPattern,
+		// Strategy left at default ("reference") — no fallback.
+	}
+
+	original := `population.id eq "aaaaaaaa-0000-4000-8000-000000000001"`
+	attrs := map[string]interface{}{
+		"user_filter": original,
+	}
+	resourceData := &ResourceData{
+		ResourceType: "pingone_group",
+		ID:           "group-1",
+		Label:        "pingcli__My-Group",
+		Attributes:   attrs,
+	}
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_group",
+		Definition:   testResourceDef("pingone_group"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	// Left as the original plain string type — no substitution attempted.
+	assert.Equal(t, original, attrs["user_filter"])
+	assert.Empty(t, fallbackVars)
+}
+
+func TestResolveEmbeddedReferences_PlainString_MultipleOccurrences(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_population", "aaaaaaaa-0000-4000-8000-000000000001", "pingcli__Pop-A")
+	// Second population deliberately NOT in the graph.
+	g.AddResource("pingone_group", "group-1", "pingcli__My-Group")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		PlainStringPattern: testPopulationFilterPattern,
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "group_user_filter_population",
+	}
+
+	attrs := map[string]interface{}{
+		"user_filter": `population.id eq "aaaaaaaa-0000-4000-8000-000000000001" or population.id eq "bbbbbbbb-0000-4000-8000-000000000002"`,
+	}
+	resourceData := &ResourceData{
+		ResourceType: "pingone_group",
+		ID:           "group-1",
+		Label:        "pingcli__My-Group",
+		Attributes:   attrs,
+	}
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_group",
+		Definition:   testResourceDef("pingone_group"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	is, ok := attrs["user_filter"].(InterpolatedString)
+	require.True(t, ok, "expected InterpolatedString, got %T", attrs["user_filter"])
+	assert.Contains(t, string(is), "${pingone_population.pingcli__Pop-A.id}")
+	assert.Contains(t, string(is), "${var.group_user_filter_population_")
+	require.Len(t, fallbackVars, 1)
+}
+
+func TestResolveEmbeddedReferences_PlainString_NonUUIDMatchLeftUnchanged(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_group", "group-1", "pingcli__My-Group")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		// Deliberately loose pattern (no UUID-shape enforcement of its own)
+		// to prove the engine's own UUID-format guard rejects the match.
+		PlainStringPattern: `population\.id eq "([^"]+)"`,
+	}
+
+	original := `population.id eq "not-a-uuid"`
+	attrs := map[string]interface{}{
+		"user_filter": original,
+	}
+	resourceData := &ResourceData{
+		ResourceType: "pingone_group",
+		ID:           "group-1",
+		Label:        "pingcli__My-Group",
+		Attributes:   attrs,
+	}
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_group",
+		Definition:   testResourceDef("pingone_group"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	assert.Equal(t, original, attrs["user_filter"])
+}
+
+func TestResolveEmbeddedReferences_PlainString_NoMatchLeavesTypeUnchanged(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_group", "group-1", "pingcli__My-Group")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_group",
+		AttributePath:      "user_filter",
+		TargetResourceType: "pingone_population",
+		ReferenceField:     "id",
+		PlainStringPattern: testPopulationFilterPattern,
+	}
+
+	original := `email endsWith "@example.com"`
+	attrs := map[string]interface{}{
+		"user_filter": original,
+	}
+	resourceData := &ResourceData{
+		ResourceType: "pingone_group",
+		ID:           "group-1",
+		Label:        "pingcli__My-Group",
+		Attributes:   attrs,
+	}
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_group",
+		Definition:   testResourceDef("pingone_group"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	// Still a plain string, not InterpolatedString — no-op.
+	_, isInterpolated := attrs["user_filter"].(InterpolatedString)
+	assert.False(t, isInterpolated)
+	assert.Equal(t, original, attrs["user_filter"])
+}
+
+func TestCompilePlainStringPattern_InvalidRegexRejected(t *testing.T) {
+	_, ok := compilePlainStringPattern(`(unterminated`)
+	assert.False(t, ok)
+}
+
+func TestCompilePlainStringPattern_WrongCaptureGroupCountRejected(t *testing.T) {
+	// Zero capture groups.
+	_, ok := compilePlainStringPattern(`population\.id eq "[0-9a-f-]+"`)
+	assert.False(t, ok)
+
+	// Two capture groups.
+	_, ok = compilePlainStringPattern(`(population)\.id eq "([0-9a-f-]+)"`)
+	assert.False(t, ok)
+}

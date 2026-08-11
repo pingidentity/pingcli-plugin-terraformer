@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -56,6 +57,24 @@ type EmbeddedReferenceRule struct {
 	//                reference/variable is re-embedded back inside the
 	//                wrapper on write.
 	UnwrapMode string
+
+	// PlainStringPattern switches the rule into "plain string" mode: the
+	// attribute value is a plain (non-JSON, non-jsonencode-wrapped) string
+	// attribute — e.g. a SCIM filter clause like
+	// `population.id eq "<uuid>"` — rather than a RawHCLValue JSON blob.
+	// AttributePath addresses a plain string attribute directly (no
+	// jsonencode(...) unwrapping, no JSONKeyPath/UnwrapMode/Precondition —
+	// those only apply to JSON-blob mode and are ignored when this is set).
+	//
+	// The pattern must contain exactly one capture group matching a UUID
+	// (e.g. `population\.id eq "([0-9a-f-]+)"`). The matched UUID is
+	// resolved via the dependency graph exactly like JSON-blob mode
+	// (Strategy applies identically), and the result is an
+	// InterpolatedString — the entire string value with the matched UUID
+	// substring replaced by a raw "${...}" interpolation expression, ready
+	// for formatters to render as a quoted string literal without escaping
+	// that expression.
+	PlainStringPattern string
 }
 
 // richTextUnwrapMode is the UnwrapMode value that enables Slate-style
@@ -183,8 +202,14 @@ func walkAndProcessPath(
 					nextTraversalKey = traversalKey + "_" + key
 				}
 				if isLastSegment {
-					// This key should be a RawHCLValue - try to process it
-					if rawValue, ok := nextValue.(RawHCLValue); ok {
+					if rule.PlainStringPattern != "" {
+						if strValue, ok := nextValue.(string); ok {
+							if processed, changed := processPlainString(strValue, rule, resource, g, allocator, nextTraversalKey, varSeen, fallbackVars); changed {
+								typedCurrent[key] = processed
+							}
+						}
+					} else if rawValue, ok := nextValue.(RawHCLValue); ok {
+						// This key should be a RawHCLValue - try to process it
 						processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, nextTraversalKey, varSeen, fallbackVars)
 						typedCurrent[key] = processedValue
 					}
@@ -201,8 +226,14 @@ func walkAndProcessPath(
 			}
 
 			if isLastSegment {
-				// This is a RawHCLValue - process it
-				if rawValue, ok := nextValue.(RawHCLValue); ok {
+				if rule.PlainStringPattern != "" {
+					if strValue, ok := nextValue.(string); ok {
+						if processed, changed := processPlainString(strValue, rule, resource, g, allocator, traversalKey, varSeen, fallbackVars); changed {
+							typedCurrent[segment] = processed
+						}
+					}
+				} else if rawValue, ok := nextValue.(RawHCLValue); ok {
+					// This is a RawHCLValue - process it
 					processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, traversalKey, varSeen, fallbackVars)
 					typedCurrent[segment] = processedValue
 				}
@@ -314,6 +345,135 @@ func processRawHCLValue(
 	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, "properties."+rule.JSONKeyPath, "")
 
 	return newValue
+}
+
+// plainStringPatternCache memoizes compiled PlainStringPattern regexes so
+// repeated calls (one per resource of the same type) don't recompile the
+// same pattern. Keyed by the raw pattern string; safe for concurrent read
+// access since regexp.Regexp is immutable after compilation and this
+// package's resolution pass is single-threaded per Export call.
+var plainStringPatternCache = make(map[string]*regexp.Regexp)
+
+// compilePlainStringPattern compiles (and caches) rule.PlainStringPattern.
+// Returns nil, false on an invalid pattern or a pattern with a capture-group
+// count other than exactly one — malformed rule configuration, not
+// malformed input data, so this no-ops rather than panicking.
+func compilePlainStringPattern(pattern string) (*regexp.Regexp, bool) {
+	if re, ok := plainStringPatternCache[pattern]; ok {
+		return re, re.NumSubexp() == 1
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, false
+	}
+	plainStringPatternCache[pattern] = re
+	return re, re.NumSubexp() == 1
+}
+
+// processPlainString finds every UUID embedded inside a plain (non-JSON)
+// string attribute value via rule.PlainStringPattern's single capture group
+// (a SCIM filter may legitimately reference the same target type more than
+// once, e.g. `population.id eq "u1" or population.id eq "u2"`), and resolves
+// each to a Terraform reference or variable exactly like
+// processRawHCLValue's JSON-blob path (same Strategy semantics). Returns an
+// InterpolatedString — the original string with every resolved UUID
+// substring replaced by a raw "${...}" expression — instead of a
+// jsonencode(...)-wrapped RawHCLValue.
+//
+// Occurrences that don't resolve (non-UUID-shaped match, or default strategy
+// with the UUID not yet in the graph) are left untouched in place; only
+// resolved occurrences are substituted. Returns (value, false) unchanged if
+// no occurrence resolved at all.
+func processPlainString(
+	value string,
+	rule EmbeddedReferenceRule,
+	resource *ResourceData,
+	g *graph.DependencyGraph,
+	allocator *fallbackVariableAllocator,
+	traversalKey string,
+	varSeen map[string]bool,
+	fallbackVars *[]FallbackVariable,
+) (InterpolatedString, bool) {
+	re, ok := compilePlainStringPattern(rule.PlainStringPattern)
+	if !ok {
+		return "", false
+	}
+
+	matches := re.FindAllStringSubmatchIndex(value, -1)
+	if matches == nil {
+		return "", false
+	}
+
+	var sb strings.Builder
+	lastEnd := 0
+	changed := false
+
+	for _, match := range matches {
+		// match[2], match[3] bound the first (and required-to-be-only) capture group.
+		start, end := match[2], match[3]
+		uuidStr := value[start:end]
+
+		tfRef, resolved := resolvePlainStringReference(rule, resource, uuidStr, g, allocator, traversalKey, varSeen, fallbackVars)
+		if !resolved {
+			continue
+		}
+
+		sb.WriteString(value[lastEnd:start])
+		sb.WriteString("${")
+		sb.WriteString(tfRef)
+		sb.WriteString("}")
+		lastEnd = end
+		changed = true
+	}
+	sb.WriteString(value[lastEnd:])
+
+	if !changed {
+		return "", false
+	}
+	return InterpolatedString(sb.String()), true
+}
+
+// resolvePlainStringReference resolves a single UUID occurrence found by
+// processPlainString to a Terraform expression string (a resource traversal
+// like "pingone_population.my_pop.id", or a variable reference like
+// "var.pingone_population_id"), applying the same UUID-format guard and
+// Strategy semantics as processRawHCLValue's JSON-blob path. Returns
+// ("", false) when the occurrence should be left unresolved in place.
+func resolvePlainStringReference(
+	rule EmbeddedReferenceRule,
+	resource *ResourceData,
+	uuidStr string,
+	g *graph.DependencyGraph,
+	allocator *fallbackVariableAllocator,
+	traversalKey string,
+	varSeen map[string]bool,
+	fallbackVars *[]FallbackVariable,
+) (string, bool) {
+	// Unconditional UUID-format guard, mirroring processRawHCLValue.
+	if !looksLikeUUID(uuidStr) {
+		return "", false
+	}
+
+	// Strategy: "variable" — always emit a variable, skip graph lookup.
+	if rule.Strategy == "variable" {
+		varName := allocatedVariableName(rule, nil, uuidStr, traversalKey, allocator)
+		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
+		return "var." + varName, true
+	}
+
+	// Strategy: "reference" (default) or "reference_with_fallback" — try graph lookup.
+	refName, err := g.GetReferenceName(rule.TargetResourceType, uuidStr)
+	if err != nil {
+		if rule.Strategy == "reference_with_fallback" {
+			varName := allocatedVariableName(rule, nil, uuidStr, traversalKey, allocator)
+			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
+			return "var." + varName, true
+		}
+		return "", false
+	}
+
+	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, rule.AttributePath, "")
+	return fmt.Sprintf("%s.%s.%s", rule.TargetResourceType, refName, rule.ReferenceField), true
 }
 
 // replaceExtractedValue re-embeds a resolved reference/variable string in

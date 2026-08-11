@@ -464,6 +464,30 @@ func TestFormatter_Format_ScalarTypes(t *testing.T) {
 	assert.Contains(t, output, "empty_tags")
 }
 
+func TestFormatter_Format_InterpolatedString(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := defWithScalars()
+	data := resourceData()
+	data.Attributes["misc"] = core.InterpolatedString(`population.id eq "${pingone_population.pingcli__my_pop.id}"`)
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	// The interpolation expression must appear unescaped ("${...}", not "$${...}").
+	assert.Contains(t, output, `"population.id eq \"${pingone_population.pingcli__my_pop.id}\""`)
+	assert.NotContains(t, output, "$${")
+}
+
+func TestFormatter_Format_InterpolatedString_NoExpressionFallsBackToPlainQuoting(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := defWithScalars()
+	data := resourceData()
+	data.Attributes["misc"] = core.InterpolatedString(`plain filter with no interpolation`)
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, output, `"plain filter with no interpolation"`)
+}
+
 func TestFormatter_Format_FallbackScalar(t *testing.T) {
 	f := hclformatter.NewFormatter()
 	def := defWithScalars()

@@ -211,6 +211,20 @@ func TestFormat_RawHCLValue_Scalar(t *testing.T) {
 	assert.Equal(t, "${jsonencode({\"key\": \"value\"})}", attrs["expr"])
 }
 
+func TestFormat_InterpolatedString_Scalar(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "user_filter", TerraformName: "user_filter", Type: "string",
+	})
+	data := baseData("res1", "id1", map[string]interface{}{
+		"user_filter": core.InterpolatedString(`population.id eq "${pingone_population.pingcli__my_pop.id}"`),
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	assert.Equal(t, `population.id eq "${pingone_population.pingcli__my_pop.id}"`, attrs["user_filter"])
+}
+
 func TestFormat_RawHCLValue_DynamicObject(t *testing.T) {
 	f := NewFormatter()
 	def := baseDef(schema.AttributeDefinition{
