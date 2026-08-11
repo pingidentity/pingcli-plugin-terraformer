@@ -245,6 +245,18 @@ run_entry() {
 }
 
 # ---------------------------------------------------------------------------
+# Copy reports to repo root, before the cleanup trap deletes TMPDIR_LOCAL
+# ---------------------------------------------------------------------------
+copy_reports() {
+  local reports_dir="${REPO_ROOT}/regression-reports"
+  mkdir -p "${reports_dir}"
+  for f in "${TMPDIR_LOCAL}"/report-*.json; do
+    [ -f "${f}" ] && cp "${f}" "${reports_dir}/"
+  done
+  info "Reports copied to: ${reports_dir}"
+}
+
+# ---------------------------------------------------------------------------
 # Print summary table
 # ---------------------------------------------------------------------------
 print_summary() {
@@ -350,6 +362,7 @@ main() {
     fi
   done
 
+  copy_reports
   print_summary names[@] statuses[@] breaking_counts[@] acceptable_counts[@]
 
   if [ "${overall_exit}" -ne 0 ]; then
