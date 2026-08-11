@@ -41,6 +41,7 @@ check_prerequisites() {
     PINGCLI_PINGONE_ORGADMIN_CLIENT_ID \
     PINGCLI_PINGONE_ORGADMIN_CLIENT_SECRET \
     PINGCLI_PINGONE_ORGADMIN_ENVIRONMENT_ID \
+    PINGCLI_PINGONE_ORGADMIN_REGION_CODE \
     PINGCLI_PINGONE_ORGADMIN_LICENSE_ID; do
     if [ -z "${!var:-}" ]; then
       fail "Required environment variable not set: ${var}"
@@ -60,13 +61,17 @@ check_prerequisites() {
 
 # ---------------------------------------------------------------------------
 # Optional env vars with defaults
+#
+# PINGCLI_PINGONE_ORGADMIN_REGION_CODE is NOT defaulted here, deliberately:
+# it's required (see check_prerequisites) so the org-admin credential set is
+# always fully and explicitly specified on its own terms, never inheriting
+# an assumption from the unrelated PINGCLI_PINGONE_REGION_CODE default used
+# elsewhere in this repo for the regular export credential.
 # ---------------------------------------------------------------------------
 apply_defaults() {
-  : "${PINGCLI_PINGONE_ORGADMIN_REGION_CODE:=NA}"
   : "${REGRESSION_BASE:=main}"
   : "${E2E_KEEP_ENVIRONMENT:=0}"
 
-  export PINGCLI_PINGONE_ORGADMIN_REGION_CODE
   export REGRESSION_BASE
   export E2E_KEEP_ENVIRONMENT
 }
