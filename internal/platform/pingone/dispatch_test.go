@@ -30,11 +30,17 @@ func TestSupportedResourceTypes(t *testing.T) {
 		"pingone_davinci_variable",
 		"pingone_environment",
 		"pingone_group",
+		"pingone_group_nesting",
+		"pingone_password_policy",
 		"pingone_population",
+		"pingone_population_default",
+		"pingone_population_default_identity_provider",
 		"pingone_resource",
+		"pingone_resource_attribute",
 		"pingone_resource_scope",
 		"pingone_resource_scope_openid",
 		"pingone_resource_scope_pingone_api",
+		"pingone_resource_secret",
 		"pingone_sign_on_policy",
 	}
 	assert.Equal(t, expected, SupportedResourceTypes())

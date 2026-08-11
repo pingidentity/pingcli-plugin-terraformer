@@ -2,7 +2,7 @@
 
 Tracks which resources from the [`pingidentity/pingone`](https://registry.terraform.io/providers/pingidentity/pingone/latest/docs) Terraform provider (v1.19.1, 105 resources total) are supported by this exporter.
 
-Legend: ✅ Supported · ❌ Not yet supported
+Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned)
 
 ---
 
@@ -65,26 +65,26 @@ Legend: ✅ Supported · ❌ Not yet supported
 | `pingone_application_secret` | ✅ |
 | `pingone_application_sign_on_policy_assignment` | ✅ |
 | `pingone_group` | ✅ |
-| `pingone_group_nesting` | ❌ |
+| `pingone_group_nesting` | ✅ |
 | `pingone_group_role_assignment` | ❌ |
 | `pingone_identity_provider` | ❌ |
 | `pingone_identity_provider_attribute` | ❌ |
-| `pingone_password_policy` | ❌ |
+| `pingone_password_policy` | ✅ |
 | `pingone_population` | ✅ |
-| `pingone_population_default` | ❌ |
-| `pingone_population_default_identity_provider` | ❌ |
+| `pingone_population_default` | ✅ |
+| `pingone_population_default_identity_provider` | ✅ |
 | `pingone_resource` | ✅ |
-| `pingone_resource_attribute` | ❌ |
+| `pingone_resource_attribute` | ✅ |
 | `pingone_resource_scope` | ✅ |
 | `pingone_resource_scope_openid` | ✅ |
 | `pingone_resource_scope_pingone_api` | ✅ |
-| `pingone_resource_secret` | ❌ |
+| `pingone_resource_secret` | ✅ |
 | `pingone_schema_attribute` | ❌ |
 | `pingone_sign_on_policy` | ✅ |
 | `pingone_sign_on_policy_action` | ❌ |
-| `pingone_user` | ❌ |
-| `pingone_user_application_role_assignment` | ❌ |
-| `pingone_user_group_assignment` | ❌ |
+| `pingone_user` | 🚫 |
+| `pingone_user_application_role_assignment` | 🚫 |
+| `pingone_user_group_assignment` | 🚫 |
 
 ## Authorize (7 resources)
 
@@ -148,12 +148,14 @@ Legend: ✅ Supported · ❌ Not yet supported
 | Category | Provider total | Exporter supported |
 |---|---|---|
 | Platform | 41 | 2 |
-| SSO | 29 | 14 |
+| SSO | 29 | 20 |
 | Authorize | 7 | 0 |
 | MFA | 5 | 0 |
 | DaVinci | 9 | 7 |
 | Protect | 2 | 0 |
 | Neo (Verify & Credentials) | 7 | 0 |
-| **Total** | **100** | **23** |
+| **Total** | **100** | **29** |
+
+> `pingone_user`, `pingone_user_application_role_assignment`, and `pingone_user_group_assignment` are marked out of scope — they represent individual end-user identity data, not promotable environment configuration, so they are intentionally excluded from export.
 
 > Provider source: [registry.terraform.io/providers/pingidentity/pingone](https://registry.terraform.io/providers/pingidentity/pingone/latest/docs) — v1.19.1
