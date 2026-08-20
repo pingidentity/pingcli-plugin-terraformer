@@ -563,9 +563,12 @@ func fromWSFED(v *management.ApplicationWSFED) *applicationData {
 func strPtr(s string) *string { return &s }
 
 // listSSOApplications lists all pingone_application resources in the target
-// environment, skipping the three built-in PingOne system application types
-// (Admin Console, Portal, Self Service) that have no Terraform schema
-// representation — see the doc comment above toApplicationData.
+// environment, silently skipping the three built-in PingOne system
+// application types (Admin Console, Portal, Self Service) that have no
+// Terraform schema representation — see the doc comment above
+// toApplicationData. Every PingOne environment has exactly these three, so
+// this is not an environment-specific condition worth surfacing per export;
+// see RESOURCE_COVERAGE.md and README.md for the documented behavior.
 func listSSOApplications(ctx context.Context, c *Client, _ string) ([]interface{}, error) {
 	mgmt, err := c.management(ctx)
 	if err != nil {
@@ -593,9 +596,6 @@ func listSSOApplications(ctx context.Context, c *Client, _ string) ([]interface{
 			}
 			data, ok := toApplicationData(actual)
 			if !ok {
-				c.AddWarning(fmt.Sprintf("skipping application %s: PingOne system application types "+
-					"(admin console, portal, self service) are not exportable via pingone_application "+
-					"(no corresponding Terraform schema block)", describeSkippedApplication(actual)))
 				continue
 			}
 			result = append(result, data)

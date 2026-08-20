@@ -10,6 +10,7 @@ package pingone
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/patrickcping/pingone-go-sdk-v2/management"
@@ -91,8 +92,16 @@ func (c *Client) GetResource(ctx context.Context, resourceType string, envID str
 	return h.get(ctx, c, envID, resourceID)
 }
 
-// AddWarning records a non-fatal warning message for later retrieval.
+// AddWarning records a non-fatal warning message for later retrieval,
+// skipping exact duplicates. Several resource handlers independently
+// enumerate the same underlying entities (e.g. every application-child
+// handler calls listSSOApplications), so without dedup the same message
+// (e.g. "skipping application <id>: ...") would otherwise be emitted once
+// per handler that happens to touch it.
 func (c *Client) AddWarning(msg string) {
+	if slices.Contains(c.warnings, msg) {
+		return
+	}
 	c.warnings = append(c.warnings, msg)
 }
 

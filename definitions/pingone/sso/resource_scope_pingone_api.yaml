@@ -5,7 +5,11 @@
 # input). See resource_scope_openid.yaml for the shared ResourceScope /
 # ResourceScopesApi background; this variant additionally exposes
 # schema_attributes, supported only for the p1:read:user / p1:update:user
-# scope family per the provider docs.
+# scope family per the provider docs. The Go handler
+# (resource_resource_scope_pingone_api.go) enforces this by filtering out
+# every other built-in PINGONE_API scope (p1:read:device, p1:verify:user,
+# etc.) — the provider's own name validator rejects them, so exporting one
+# unfiltered would produce HCL that fails terraform validate.
 
 metadata:
   platform: pingone

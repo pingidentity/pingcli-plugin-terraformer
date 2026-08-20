@@ -57,6 +57,52 @@ func TestListResourceScopesPingOneAPI(t *testing.T) {
 	assert.Equal(t, []string{"scope-read-user"}, gotIDs)
 }
 
+// TestListResourceScopesPingOneAPI_FiltersUnmanageableScopes confirms that
+// built-in PINGONE_API scopes other than p1:read:user/p1:update:user (and
+// their :{suffix} variants) are silently excluded rather than exported — the
+// provider's own name validator rejects every other scope, so exporting one
+// would produce HCL that fails terraform validate. Silent (no warning)
+// because these built-ins are identical across every PingOne environment.
+func TestListResourceScopesPingOneAPI_FiltersUnmanageableScopes(t *testing.T) {
+	resourcesBody := map[string]any{
+		"_embedded": map[string]any{
+			"resources": []any{
+				map[string]any{"id": "res-api", "name": "PingOne API", "type": "PINGONE_API"},
+			},
+		},
+	}
+	scopesByParent := map[string]map[string]any{
+		"res-api": {
+			"_embedded": map[string]any{
+				"scopes": []any{
+					map[string]any{"id": "scope-read-user", "name": "p1:read:user"},
+					map[string]any{"id": "scope-update-user-suffix", "name": "p1:update:user:custom"},
+					map[string]any{"id": "scope-read-device", "name": "p1:read:device"},
+					map[string]any{"id": "scope-create-pairingkey", "name": "p1:create:pairingKey"},
+				},
+			},
+		},
+	}
+
+	srv := newBuiltInResourceMux(t, resourcesBody, scopesByParent)
+	defer srv.Close()
+
+	mgmt := newTestResourceManagementClient(srv.URL)
+	c := NewWithManagementClient(nil, mgmt, uuid.New())
+
+	result, err := listResourceScopesPingOneAPI(testCtx(), c, "")
+	require.NoError(t, err)
+
+	var gotNames []string
+	for _, item := range result {
+		scope, ok := item.(*management.ResourceScope)
+		require.True(t, ok, "expected *management.ResourceScope, got %T", item)
+		gotNames = append(gotNames, scope.GetName())
+	}
+	assert.ElementsMatch(t, []string{"p1:read:user", "p1:update:user:custom"}, gotNames)
+	assert.Empty(t, c.Warnings())
+}
+
 func TestListResourceScopesPingOneAPI_ManagementClientUnavailable(t *testing.T) {
 	c := &Client{}
 	result, err := listResourceScopesPingOneAPI(testCtx(), c, "")

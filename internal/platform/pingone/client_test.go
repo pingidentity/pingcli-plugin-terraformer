@@ -198,3 +198,28 @@ func TestValidRegions(t *testing.T) {
 	assert.Contains(t, regions, "AU")
 	assert.Contains(t, regions, "SG")
 }
+
+func TestAddWarning_DedupesExactDuplicates(t *testing.T) {
+	c := &Client{}
+	c.AddWarning("skipping application app-1: PingOne system application types are not exportable")
+	c.AddWarning("skipping application app-1: PingOne system application types are not exportable")
+	c.AddWarning("skipping application app-1: PingOne system application types are not exportable")
+
+	assert.Equal(t, []string{"skipping application app-1: PingOne system application types are not exportable"}, c.Warnings())
+}
+
+func TestAddWarning_KeepsDistinctMessages(t *testing.T) {
+	c := &Client{}
+	c.AddWarning("skipping application app-1: not exportable")
+	c.AddWarning("skipping application app-2: not exportable")
+
+	assert.Equal(t, []string{
+		"skipping application app-1: not exportable",
+		"skipping application app-2: not exportable",
+	}, c.Warnings())
+}
+
+func TestAddWarning_NoWarningsReturnsNil(t *testing.T) {
+	c := &Client{}
+	assert.Empty(t, c.Warnings())
+}

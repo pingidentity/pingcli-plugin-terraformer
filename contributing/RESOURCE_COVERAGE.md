@@ -56,7 +56,7 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 
 | Resource | Supported |
 |---|---|
-| `pingone_application` | ✅ |
+| `pingone_application` | ✅ [^1] |
 | `pingone_application_attribute_mapping` | ✅ |
 | `pingone_application_flow_policy_assignment` | ✅ |
 | `pingone_application_resource` | ✅ |
@@ -77,7 +77,7 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 | `pingone_resource_attribute` | ✅ |
 | `pingone_resource_scope` | ✅ |
 | `pingone_resource_scope_openid` | ✅ |
-| `pingone_resource_scope_pingone_api` | ✅ |
+| `pingone_resource_scope_pingone_api` | ✅ [^2] |
 | `pingone_resource_secret` | ✅ |
 | `pingone_schema_attribute` | ❌ |
 | `pingone_sign_on_policy` | ✅ |
@@ -157,5 +157,9 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 | **Total** | **100** | **29** |
 
 > `pingone_user`, `pingone_user_application_role_assignment`, and `pingone_user_group_assignment` are marked out of scope — they represent individual end-user identity data, not promotable environment configuration, so they are intentionally excluded from export.
+
+[^1]: Every PingOne environment has exactly three built-in system applications (Admin Console, Portal, Self Service) with no corresponding `pingone_application` schema block — the provider cannot manage them. The exporter silently skips these three; this is not surfaced as a warning since it is identical across every environment, not an environment-specific condition.
+
+[^2]: The built-in PingOne API resource carries many scopes (`p1:read:device`, `p1:create:pairingKey`, `p1:verify:user`, etc.) that the `pingone_resource_scope_pingone_api` Terraform schema's own name validator rejects — only `p1:read:user`/`p1:update:user` and their `:{suffix}` variants are manageable via this resource type. The exporter silently filters out every other built-in scope; exporting one unfiltered would produce HCL that fails `terraform validate`.
 
 > Provider source: [registry.terraform.io/providers/pingidentity/pingone](https://registry.terraform.io/providers/pingidentity/pingone/latest/docs) — v1.19.1
