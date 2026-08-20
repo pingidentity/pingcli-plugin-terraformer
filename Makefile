@@ -83,8 +83,12 @@ regression-local: build
 	if [ $$EXIT_CODE -ne 0 ]; then exit $$EXIT_CODE; fi; \
 	echo "==> Regression test passed."
 
+e2e: build
+	@echo "==> Running provisioned-environment E2E test..."
+	@./tests/regression-provisioned/run-local.sh
+
 devcheck: build vet fmt lint test testacc
 
 devchecknotest: build vet fmt lint test
 
-.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint fmt clean regression-local devcheck devchecknotest
+.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint fmt clean regression-local e2e devcheck devchecknotest
