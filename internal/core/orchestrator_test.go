@@ -402,6 +402,83 @@ func TestResolveReferences_DirectIntegration(t *testing.T) {
 	assert.Equal(t, "test_flow.pingcli__my_flow.id", flowRef.Expression())
 }
 
+// TestExportOrchestrator_Export_EqualLabelsAcrossTypes verifies that a standard
+// typed reference resolves to the unsuffixed label owned by its target type,
+// regardless of which equal-label target type is registered first.
+func TestExportOrchestrator_Export_EqualLabelsAcrossTypes(t *testing.T) {
+	tests := []struct {
+		name string
+		defs func(*schema.ResourceDefinition, *schema.ResourceDefinition, *schema.ResourceDefinition) []*schema.ResourceDefinition
+	}{
+		{
+			name: "target A registered first",
+			defs: func(targetADef, targetBDef, sourceDef *schema.ResourceDefinition) []*schema.ResourceDefinition {
+				return []*schema.ResourceDefinition{targetADef, targetBDef, sourceDef}
+			},
+		},
+		{
+			name: "target B registered first",
+			defs: func(targetADef, targetBDef, sourceDef *schema.ResourceDefinition) []*schema.ResourceDefinition {
+				return []*schema.ResourceDefinition{targetBDef, targetADef, sourceDef}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targetADef := baseDef("type_target_a", "p", "Target A", "target_a")
+			targetBDef := baseDef("type_target_b", "p", "Target B", "target_b")
+			sourceDef := baseDef("type_source", "p", "Source", "source")
+			sourceDef.Attributes = append(sourceDef.Attributes, schema.AttributeDefinition{
+				Name: "target_id", TerraformName: "target_id", Type: "string", SourcePath: "TargetID",
+				Transform: "passthrough", ReferencesType: "type_target_b", ReferenceField: "id",
+			})
+
+			reg := newTestRegistry(t, tt.defs(targetADef, targetBDef, sourceDef)...)
+			client := &mockAPIClient{
+				platform: "p",
+				resources: map[string][]interface{}{
+					"type_target_a": {simpleStruct{ID: strPtr("shared-id"), Name: strPtr("DVA")}},
+					"type_target_b": {simpleStruct{ID: strPtr("shared-id"), Name: strPtr("DVA")}},
+					"type_source":   {sourceStruct{ID: strPtr("source-id"), Name: strPtr("source"), TargetID: strPtr("shared-id")}},
+				},
+			}
+
+			result, err := NewExportOrchestrator(reg, NewProcessor(reg), client).Export(context.Background(), ExportOptions{EnvironmentID: "env-1"})
+			require.NoError(t, err)
+
+			name, err := result.Graph.GetReferenceName("type_target_b", "shared-id")
+			require.NoError(t, err)
+			assert.Equal(t, "pingcli__DVA", name)
+
+			var targetAData, targetBData, sourceData *ExportedResourceData
+			for _, exported := range result.ResourcesByType {
+				switch exported.ResourceType {
+				case "type_target_a":
+					targetAData = exported
+				case "type_target_b":
+					targetBData = exported
+				case "type_source":
+					sourceData = exported
+				}
+			}
+			require.NotNil(t, targetAData)
+			require.NotNil(t, targetBData)
+			require.NotNil(t, sourceData)
+			require.Len(t, targetBData.Resources, 1)
+			require.Len(t, sourceData.Resources, 1)
+			assert.Equal(t, "pingcli__DVA", targetBData.Resources[0].Label)
+
+			ref, ok := sourceData.Resources[0].Attributes["target_id"].(ResolvedReference)
+			require.True(t, ok)
+			assert.False(t, ref.IsVariable)
+			assert.Equal(t, "type_target_b", ref.ResourceType)
+			assert.Equal(t, "pingcli__DVA", ref.ResourceName)
+			assert.Equal(t, "type_target_b.pingcli__DVA.id", ref.Expression())
+		})
+	}
+}
+
 func TestResolveCorrelatedReferences_NumericNestedRef(t *testing.T) {
 	// Simulates flow_deploy: flow_id resolves to a resource reference,
 	// and the nested deploy_trigger_values.deployed_version (numeric)
@@ -541,6 +618,31 @@ func TestResolveDependsOnResources_ResolvesLabels(t *testing.T) {
 	require.Len(t, resources[0].DependsOnResources, 2)
 	assert.Equal(t, "pingcli__my_var", resources[0].DependsOnResources[0].Label)
 	assert.Equal(t, "pingcli__other_var", resources[0].DependsOnResources[1].Label)
+}
+
+// TestResolveDependsOnResources_EqualLabelsAcrossTypes verifies that runtime
+// dependencies resolve labels using both their resource type and ID.
+func TestResolveDependsOnResources_EqualLabelsAcrossTypes(t *testing.T) {
+	g := graph.New()
+	g.AddResource("type_target_a", "shared-id", "pingcli__DVA")
+	g.AddResource("type_target_b", "shared-id", "pingcli__DVA")
+
+	resources := []*ResourceData{{
+		ResourceType: "type_source",
+		ID:           "source-id",
+		DependsOnResources: []RuntimeDependsOn{
+			{ResourceType: "type_target_a", ResourceID: "shared-id"},
+			{ResourceType: "type_target_b", ResourceID: "shared-id"},
+			{ResourceType: "type_target_b", ResourceID: "unknown-id"},
+		},
+	}}
+
+	resolveDependsOnResources(resources, g)
+
+	require.Len(t, resources[0].DependsOnResources, 3)
+	assert.Equal(t, "pingcli__DVA", resources[0].DependsOnResources[0].Label)
+	assert.Equal(t, "pingcli__DVA", resources[0].DependsOnResources[1].Label)
+	assert.Empty(t, resources[0].DependsOnResources[2].Label)
 }
 
 // TestResolveDependsOnResources_UnknownID_LabelEmpty verifies that when a
