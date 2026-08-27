@@ -156,6 +156,23 @@ func TestBuildOutputs_ExactMatch(t *testing.T) {
 	assert.Empty(t, logger.warnings)
 }
 
+func TestBuildOutputs_EqualLabelsRemainTypeQualified(t *testing.T) {
+	result := &core.ExportResult{ResourcesByType: []*core.ExportedResourceData{
+		{ResourceType: "target_type_a", Resources: []*core.ResourceData{{Label: "pingcli__DVA"}}},
+		{ResourceType: "target_type_b", Resources: []*core.ResourceData{{Label: "pingcli__DVA"}}},
+	}}
+	logger := &mockLogger{}
+
+	outputs := buildOutputs([]string{
+		"target_type_a.pingcli__DVA.id",
+		"target_type_b.pingcli__DVA.id",
+	}, result, logger)
+	require.Len(t, outputs, 2)
+	assert.Equal(t, "target_type_a.pingcli__DVA.id", outputs[0].Value)
+	assert.Equal(t, "target_type_b.pingcli__DVA.id", outputs[1].Value)
+	assert.Empty(t, logger.warnings)
+}
+
 func TestBuildOutputs_GlobMatchesAll(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__flow_a", "pingcli__flow_b")
 	logger := &mockLogger{}
@@ -176,6 +193,19 @@ func TestBuildOutputs_NoMatchWarns(t *testing.T) {
 	assert.Empty(t, outputs)
 	require.Len(t, logger.warnings, 1)
 	assert.Contains(t, logger.warnings[0], "matched no")
+}
+
+func TestBuildOutputs_UsesResourceTypeBeforeLabelMatching(t *testing.T) {
+	result := &core.ExportResult{ResourcesByType: []*core.ExportedResourceData{
+		{ResourceType: "target_type_a", Resources: []*core.ResourceData{{Label: "pingcli__DVA"}}},
+		{ResourceType: "target_type_b", Resources: []*core.ResourceData{{Label: "pingcli__DVA"}}},
+	}}
+	logger := &mockLogger{}
+
+	outputs := buildOutputs([]string{"target_type_b.pingcli__DVA.value"}, result, logger)
+	require.Len(t, outputs, 1)
+	assert.Equal(t, "target_type_b.pingcli__DVA.value", outputs[0].Value)
+	assert.Equal(t, "target_type_b__pingcli__DVA__value", outputs[0].Name)
 }
 
 func TestBuildOutputs_UnknownResourceTypeWarns(t *testing.T) {
