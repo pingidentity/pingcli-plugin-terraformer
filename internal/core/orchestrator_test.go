@@ -44,6 +44,12 @@ type simpleStruct struct {
 	Name *string
 }
 
+type sourceStruct struct {
+	ID       *string
+	Name     *string
+	TargetID *string
+}
+
 func strPtr(s string) *string { return &s }
 
 func newTestRegistry(t *testing.T, defs ...*schema.ResourceDefinition) *schema.Registry {
@@ -1265,7 +1271,7 @@ func TestResolveOneReference_ExcludedResource(t *testing.T) {
 	g := graph.New()
 	g.AddResource("pingone_davinci_application", "app-uuid-123", "pingcli__my_app")
 
-	excludedIDs := map[string]bool{"app-uuid-123": true}
+	excludedIDs := excludedResourceSet{newExcludedResourceIdentity("pingone_davinci_application", "app-uuid-123"): true}
 
 	result := resolveOneReference(attrDef, "app-uuid-123", g, excludedIDs)
 
@@ -1277,6 +1283,42 @@ func TestResolveOneReference_ExcludedResource(t *testing.T) {
 	assert.Equal(t, "pingone_davinci_application", result.ResourceType)
 }
 
+// TestResolveOneReference_ExcludedResourceTypeAware tests that exclusion state is
+// scoped to the referenced resource type when API IDs overlap.
+func TestResolveOneReference_ExcludedResourceTypeAware(t *testing.T) {
+	g := graph.New()
+	g.AddResource("type_a", "shared-id", "pingcli__a")
+	g.AddResource("type_b", "shared-id", "pingcli__b")
+
+	excludedIDs := excludedResourceSet{
+		newExcludedResourceIdentity("type_a", "shared-id"): true,
+	}
+
+	tests := []struct {
+		name         string
+		referencesTo string
+		isVariable   bool
+		resourceName string
+	}{
+		{name: "excluded type", referencesTo: "type_a", isVariable: true, resourceName: ""},
+		{name: "included type with same ID", referencesTo: "type_b", isVariable: false, resourceName: "pingcli__b"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attrDef := schema.AttributeDefinition{
+				Name:           "target_id",
+				TerraformName:  "target_id",
+				Type:           "string",
+				ReferencesType: tt.referencesTo,
+				ReferenceField: "id",
+			}
+			result := resolveOneReference(attrDef, "shared-id", g, excludedIDs)
+			assert.Equal(t, tt.isVariable, result.IsVariable)
+			assert.Equal(t, tt.resourceName, result.ResourceName)
+		})
+	}
+}
+
 // TestResolveOneReference_ExcludedResourceUniqueness tests that two different
 // excluded resources of the same type produce different variable names.
 func TestResolveOneReference_ExcludedResourceUniqueness(t *testing.T) {
@@ -1284,9 +1326,9 @@ func TestResolveOneReference_ExcludedResourceUniqueness(t *testing.T) {
 	g.AddResource("pingone_davinci_application", "app-uuid-1", "pingcli__app_one")
 	g.AddResource("pingone_davinci_application", "app-uuid-2", "pingcli__app_two")
 
-	excludedIDs := map[string]bool{
-		"app-uuid-1": true,
-		"app-uuid-2": true,
+	excludedIDs := excludedResourceSet{
+		newExcludedResourceIdentity("pingone_davinci_application", "app-uuid-1"): true,
+		newExcludedResourceIdentity("pingone_davinci_application", "app-uuid-2"): true,
 	}
 
 	attrDef := schema.AttributeDefinition{
@@ -1316,7 +1358,7 @@ func TestResolveOneReference_SameExcludedResourceSameVarName(t *testing.T) {
 	g := graph.New()
 	g.AddResource("pingone_davinci_application", "app-uuid-123", "pingcli__my_app")
 
-	excludedIDs := map[string]bool{"app-uuid-123": true}
+	excludedIDs := excludedResourceSet{newExcludedResourceIdentity("pingone_davinci_application", "app-uuid-123"): true}
 
 	// Multiple attribute definitions (e.g., from different nested levels)
 	attrDef1 := schema.AttributeDefinition{
@@ -1352,7 +1394,7 @@ func TestResolveOneReference_ExcludedResourceWithCustomReferenceField(t *testing
 	g := graph.New()
 	g.AddResource("pingone_davinci_flow", "flow-uuid-abc", "pingcli__my_flow")
 
-	excludedIDs := map[string]bool{"flow-uuid-abc": true}
+	excludedIDs := excludedResourceSet{newExcludedResourceIdentity("pingone_davinci_flow", "flow-uuid-abc"): true}
 
 	attrDef := schema.AttributeDefinition{
 		Name:           "current_version",
@@ -1377,7 +1419,7 @@ func TestResolveOneReference_ExcludedEnvironmentKeepsCanonicalName(t *testing.T)
 	g := graph.New()
 	g.AddResource("pingone_environment", "env-uuid-123", "pingcli__production")
 
-	excludedIDs := map[string]bool{"env-uuid-123": true}
+	excludedIDs := excludedResourceSet{newExcludedResourceIdentity("pingone_environment", "env-uuid-123"): true}
 
 	attrDef := schema.AttributeDefinition{
 		Name:           "environment_id",
@@ -1828,6 +1870,103 @@ func TestExportOrchestrator_Export_DistinctReferencedUUIDs_ProduceDistinctFallba
 	}
 	assert.True(t, gotDefaults["ca2d934c-5c98-42e0-8c09-fcbc559049b0"])
 	assert.True(t, gotDefaults["df05370a-07f3-4ed0-927a-9cc307ed8780"])
+}
+
+// TestExportOrchestrator_Export_FilterExclusionIsTypeAware verifies that direct
+// filtering of one resource type does not force a same-ID reference to another
+// included resource type into a fallback variable.
+func TestExportOrchestrator_Export_FilterExclusionIsTypeAware(t *testing.T) {
+	targetADef := baseDef("type_target_a", "p", "Target A", "target_a")
+	targetBDef := baseDef("type_target_b", "p", "Target B", "target_b")
+	sourceDef := baseDef("type_source", "p", "Source", "source")
+	sourceDef.Attributes = append(sourceDef.Attributes, schema.AttributeDefinition{
+		Name:           "target_id",
+		TerraformName:  "target_id",
+		Type:           "string",
+		SourcePath:     "TargetID",
+		Transform:      "passthrough",
+		ReferencesType: "type_target_b",
+		ReferenceField: "id",
+	})
+
+	reg := newTestRegistry(t, targetADef, targetBDef, sourceDef)
+	proc := NewProcessor(reg)
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_target_a": {simpleStruct{ID: strPtr("shared-id"), Name: strPtr("target-a")}},
+			"type_target_b": {simpleStruct{ID: strPtr("shared-id"), Name: strPtr("target-b")}},
+			"type_source":   {sourceStruct{ID: strPtr("source-id"), Name: strPtr("source"), TargetID: strPtr("shared-id")}},
+		},
+	}
+	filterObj, err := filter.NewResourceFilter([]string{"type_target_b*", "type_source*"}, nil)
+	require.NoError(t, err)
+
+	result, err := NewExportOrchestrator(reg, proc, client).Export(context.Background(), ExportOptions{
+		EnvironmentID:  "env-1",
+		ResourceFilter: filterObj,
+	})
+	require.NoError(t, err)
+
+	typeMap := make(map[string]*ExportedResourceData)
+	for _, erd := range result.ResourcesByType {
+		typeMap[erd.ResourceType] = erd
+	}
+	assert.NotContains(t, typeMap, "type_target_a")
+	sourceData := typeMap["type_source"]
+	require.NotNil(t, sourceData)
+	targetRef, ok := sourceData.Resources[0].Attributes["target_id"].(ResolvedReference)
+	require.True(t, ok)
+	assert.False(t, targetRef.IsVariable)
+	assert.Equal(t, "type_target_b", targetRef.ResourceType)
+	assert.Equal(t, "pingcli__target-b", targetRef.ResourceName)
+	assert.Empty(t, result.FallbackVariables)
+}
+
+// TestExportOrchestrator_Export_IncludeUpstreamExclusionIsTypeAware verifies
+// upstream expansion marks excluded resources using the same type-qualified key
+// used by reference resolution.
+func TestExportOrchestrator_Export_IncludeUpstreamExclusionIsTypeAware(t *testing.T) {
+	targetADef := baseDef("type_target_a", "p", "Target A", "target_a")
+	targetBDef := baseDef("type_target_b", "p", "Target B", "target_b")
+	sourceDef := baseDef("type_source", "p", "Source", "source")
+	sourceDef.Dependencies.DependsOn = []schema.DependencyRule{{ResourceType: "type_target_b"}}
+	sourceDef.Attributes = append(sourceDef.Attributes, schema.AttributeDefinition{
+		Name: "target_id", TerraformName: "target_id", Type: "string", SourcePath: "TargetID",
+		Transform: "passthrough", ReferencesType: "type_target_b", ReferenceField: "id",
+	})
+
+	reg := newTestRegistry(t, targetADef, targetBDef, sourceDef)
+	proc := NewProcessor(reg)
+	client := &mockAPIClient{
+		platform: "p",
+		resources: map[string][]interface{}{
+			"type_target_a": {simpleStruct{ID: strPtr("shared-id"), Name: strPtr("target-a")}},
+			"type_target_b": {simpleStruct{ID: strPtr("shared-id"), Name: strPtr("target-b")}},
+			"type_source":   {sourceStruct{ID: strPtr("source-id"), Name: strPtr("source"), TargetID: strPtr("shared-id")}},
+		},
+	}
+	filterObj, err := filter.NewResourceFilter([]string{"type_source*"}, nil)
+	require.NoError(t, err)
+
+	result, err := NewExportOrchestrator(reg, proc, client).Export(context.Background(), ExportOptions{
+		EnvironmentID: "env-1", ResourceFilter: filterObj, IncludeUpstream: true,
+	})
+	require.NoError(t, err)
+	assert.Len(t, result.ResourcesByType, 2)
+
+	var sourceData *ExportedResourceData
+	for _, erd := range result.ResourcesByType {
+		if erd.ResourceType == "type_source" {
+			sourceData = erd
+		}
+	}
+	require.NotNil(t, sourceData)
+	targetRef, ok := sourceData.Resources[0].Attributes["target_id"].(ResolvedReference)
+	require.True(t, ok)
+	assert.False(t, targetRef.IsVariable)
+	assert.Equal(t, "type_target_b", targetRef.ResourceType)
+	assert.Empty(t, result.FallbackVariables)
 }
 
 // --- IncludeUpstream Tests ---
