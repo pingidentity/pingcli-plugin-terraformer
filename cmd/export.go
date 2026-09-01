@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -309,14 +310,12 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatf
 		_ = logger.Warn(w, nil)
 	}
 
-	// Handle --list-resources mode: print resource addresses and exit
+	// Handle --list-resources mode: print resource addresses and exit.
+	// Addresses are enumerated output, so they go to stdout (not the logger)
+	// to remain pipeable — matching list-outputs behaviour.
 	if listResources {
-		for _, erd := range result.ResourcesByType {
-			for _, rd := range erd.Resources {
-				if err := logger.Message(fmt.Sprintf("%s.%s", erd.ResourceType, rd.Label), nil); err != nil {
-					return fmt.Errorf("failed to log resource: %w", err)
-				}
-			}
+		if err := writeResourceAddresses(os.Stdout, result); err != nil {
+			return err
 		}
 		return nil // Exit early, don't generate module
 	}
@@ -537,6 +536,24 @@ func parseOutputPath(raw string) (outputAttrPath, bool) {
 		labelPattern: parts[1],
 		attrPath:     parts[2],
 	}, true
+}
+
+// writeResourceAddresses writes one "resource_type.label" address per line to
+// w. Used by --list-resources; addresses are enumerated output and belong on
+// stdout so they stay pipeable, matching the list-outputs command.
+func writeResourceAddresses(w io.Writer, result *core.ExportResult) error {
+	buf := bufio.NewWriter(w)
+	for _, erd := range result.ResourcesByType {
+		for _, rd := range erd.Resources {
+			if _, err := fmt.Fprintf(buf, "%s.%s\n", erd.ResourceType, rd.Label); err != nil {
+				return fmt.Errorf("failed to write resource address: %w", err)
+			}
+		}
+	}
+	if err := buf.Flush(); err != nil {
+		return fmt.Errorf("failed to flush resource addresses: %w", err)
+	}
+	return nil
 }
 
 // collectOutputPaths merges --output-attribute values with lines read from

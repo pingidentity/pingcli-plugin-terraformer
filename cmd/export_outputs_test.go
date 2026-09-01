@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,12 +17,12 @@ import (
 
 func TestParseOutputPath(t *testing.T) {
 	tests := []struct {
-		name          string
-		raw           string
-		wantOk        bool
-		wantResType   string
-		wantLabel     string
-		wantAttrPath  string
+		name         string
+		raw          string
+		wantOk       bool
+		wantResType  string
+		wantLabel    string
+		wantAttrPath string
 	}{
 		{
 			name:         "valid 3-segment path",
@@ -253,4 +254,31 @@ func TestBuildOutputs_EmptyWhenNoPaths(t *testing.T) {
 
 	outputs := buildOutputs([]string{}, result, logger)
 	assert.Empty(t, outputs)
+}
+
+// ---- writeResourceAddresses tests ----
+
+func TestWriteResourceAddresses(t *testing.T) {
+	result := &core.ExportResult{ResourcesByType: []*core.ExportedResourceData{
+		{ResourceType: "pingone_davinci_flow", Resources: []*core.ResourceData{
+			{Label: "pingcli__flow_a"},
+			{Label: "pingcli__flow_b"},
+		}},
+		{ResourceType: "pingone_davinci_variable", Resources: []*core.ResourceData{
+			{Label: "pingcli__DuplicateName"},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	require.NoError(t, writeResourceAddresses(&buf, result))
+	assert.Equal(t, `pingone_davinci_flow.pingcli__flow_a
+pingone_davinci_flow.pingcli__flow_b
+pingone_davinci_variable.pingcli__DuplicateName
+`, buf.String())
+}
+
+func TestWriteResourceAddresses_EmptyResult(t *testing.T) {
+	var buf bytes.Buffer
+	require.NoError(t, writeResourceAddresses(&buf, &core.ExportResult{}))
+	assert.Empty(t, buf.String())
 }
