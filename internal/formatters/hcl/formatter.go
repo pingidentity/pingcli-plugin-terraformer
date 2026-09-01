@@ -580,6 +580,8 @@ func scalarTokens(indent, name string, val interface{}) hclwrite.Tokens {
 		tokens = append(tokens, listTokens(v)...)
 	case core.RawHCLValue:
 		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte(string(v))})
+	case core.InterpolatedString:
+		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenQuotedLit, Bytes: []byte(quoteInterpolatedString(string(v)))})
 	default:
 		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte(fmt.Sprintf("%v", val))})
 	}
@@ -610,11 +612,56 @@ func writeRawAttribute(body *hclwrite.Body, name string, rv core.RawHCLValue) {
 	})
 }
 
+// writeInterpolatedString writes an InterpolatedString as a quoted HCL string
+// literal, Go-escaping everything except its single raw "${...}" expression
+// (which cty.StringVal / fmt.Sprintf("%q", ...) would otherwise double-escape
+// into a literal "$${...}", suppressing interpolation). The value must
+// contain exactly one "${" ... "}" span — the literal text before and after
+// it is escaped independently, and the expression itself is copied through
+// unescaped.
+func writeInterpolatedString(body *hclwrite.Body, name string, is core.InterpolatedString) {
+	body.SetAttributeRaw(name, hclwrite.Tokens{
+		{Type: hclsyntax.TokenQuotedLit, Bytes: []byte(quoteInterpolatedString(string(is)))},
+	})
+}
+
+// quoteInterpolatedString renders s as an HCL double-quoted string literal,
+// splitting on the first "${" ... "}" span so the literal segments before
+// and after are Go-escaped (via %q, then stripped of its own surrounding
+// quotes) while the "${...}" itself passes through verbatim.
+func quoteInterpolatedString(s string) string {
+	start := strings.Index(s, "${")
+	if start == -1 {
+		return fmt.Sprintf("%q", s)
+	}
+	end := strings.Index(s[start:], "}")
+	if end == -1 {
+		return fmt.Sprintf("%q", s)
+	}
+	end += start + 1 // include the closing brace
+
+	before := escapedInnerString(s[:start])
+	expr := s[start:end]
+	after := escapedInnerString(s[end:])
+
+	return `"` + before + expr + after + `"`
+}
+
+// escapedInnerString Go-escapes s the same way fmt.Sprintf("%q", s) would,
+// then strips the surrounding quotes %q adds — leaving a fragment safe to
+// splice inside a larger hand-built quoted string.
+func escapedInnerString(s string) string {
+	quoted := fmt.Sprintf("%q", s)
+	return quoted[1 : len(quoted)-1]
+}
+
 // writeScalarValue writes a single attribute using hclwrite SetAttributeValue or SetAttributeRaw.
 func writeScalarValue(body *hclwrite.Body, name string, val interface{}) {
 	switch v := val.(type) {
 	case core.RawHCLValue:
 		writeRawAttribute(body, name, v)
+	case core.InterpolatedString:
+		writeInterpolatedString(body, name, v)
 	case string:
 		body.SetAttributeValue(name, cty.StringVal(v))
 	case bool:

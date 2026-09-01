@@ -664,6 +664,34 @@ orch := core.NewExportOrchestrator(
 )
 ```
 
+#### Plain-String Mode (`PlainStringPattern`)
+
+Everything above addresses UUIDs embedded inside `jsonencode(...)`-wrapped `RawHCLValue` blobs. Some attributes embed a UUID inside an **ordinary string value** instead — e.g. `pingone_group.user_filter`, a SCIM filter like `population.id eq "<uuid>"`. Two problems make the JSON-blob machinery inapplicable here:
+
+1. There's no JSON to parse — `extractJSONFromRawHCL` expects a `jsonencode(...)` prefix and the attribute value is a plain Go `string`, not a `RawHCLValue`.
+2. Even if the UUID were found and replaced with `${...}`, writing it back via the normal scalar-string path (`cty.StringVal` / `fmt.Sprintf("%q", ...)`) escapes `$` to `$$`, producing a literal `$${...}` in the output HCL — Terraform would render that as a literal string, not evaluate the interpolation.
+
+Setting `EmbeddedReferenceRule.PlainStringPattern` switches a rule into plain-string mode: `AttributePath` addresses a plain string attribute directly (no wildcard-into-JSON walk — one string value, no `JSONKeyPath`/`UnwrapMode`/`PreconditionKeyPath`, which only apply to JSON-blob mode and are ignored here). The pattern must be a regex with **exactly one capture group** bounding the UUID (e.g. `` `population\.id eq "([0-9a-f-]+)"` ``); `compilePlainStringPattern` rejects (no-ops) any pattern that fails to compile or has zero/more-than-one capture groups — a malformed rule, caught at registration time, not malformed input data.
+
+Resolution walks every match of the pattern in the string (a SCIM filter can legitimately reference the same target type more than once, e.g. `population.id eq "u1" or population.id eq "u2"`), applying the same UUID-format guard and `Strategy` semantics (`"reference"` / `"reference_with_fallback"` / `"variable"`) as the JSON-blob path — but instead of re-marshaling JSON, it splices `"${...}"` directly into the original string at the matched span. Occurrences that don't resolve (non-UUID-shaped, or default strategy with the UUID not yet in the graph) are left untouched in place; only resolved occurrences are substituted.
+
+The result is a `core.InterpolatedString` — a new type distinct from `RawHCLValue` — wrapping the full string with resolved UUID(s) replaced by raw `${...}` expressions. Both formatters handle it:
+- **HCL**: `writeInterpolatedString`/`quoteInterpolatedString` split the string on its `${...}` span(s), Go-escape (`%q`) the literal segments independently, and splice the expression through unescaped — producing a valid quoted string literal with working interpolation (`"population.id eq \"${pingone_population.my_pop.id}\""`), unlike `cty.StringVal`, which would double-escape the `$`.
+- **tfjson**: no special escaping is needed — the tfjson wire format already represents interpolation as literal `${...}` text inside a JSON string, so `renderScalar` returns the value as-is (unlike `RawHCLValue`, which is a *bare unquoted* HCL expression and must be wrapped in `${...}` for tfjson).
+
+```go
+// internal/platform/pingone/resource_group.go
+registerEmbeddedReferenceRule(core.EmbeddedReferenceRule{
+    ResourceType:       "pingone_group",
+    AttributePath:      "user_filter",
+    TargetResourceType: "pingone_population",
+    ReferenceField:     "id",
+    PlainStringPattern: `population\.id eq "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"`,
+    Strategy:           "reference_with_fallback",
+    VariablePrefix:     "group_user_filter_population",
+})
+```
+
 ### Transforms
 
 Standard transforms are registered in `internal/core/transforms.go`:
@@ -777,6 +805,27 @@ type APIClient interface {
 The orchestrator calls **only** `ListResources`. It never calls `GetResource` directly. `ListResources` returns fully-populated SDK structs. When the underlying list API returns summary data, the implementation internally calls `GetResource` for each item (list-then-get pattern).
 
 Clients may collect non-fatal warnings during resource operations (e.g., 403 errors on certain endpoints). The cmd layer drains these via `Warnings()` after `orchestrator.Export()` and logs them for user visibility.
+
+### Two PingOne SDKs
+
+`internal/platform/pingone.Client` wraps **two** underlying PingOne SDKs, not one:
+
+| SDK | Field on `Client` | Covers |
+|---|---|---|
+| `github.com/pingidentity/pingone-go-client` | `apiClient *pingone.APIClient` | DaVinci, Environments, Connectors, ConfigurationManagement — 34 API paths total |
+| `github.com/patrickcping/pingone-go-sdk-v2/management` | `managementClient *management.APIClient` (built lazily, see below) | Everything else — Applications, Groups, Populations, Resources, and the bulk of the Platform/SSO/Authorize resource categories. This is the same SDK `terraform-provider-pingone` itself depends on. |
+
+The first SDK was the repo's only dependency through the initial DaVinci-focused build-out. It has no service for any resource outside DaVinci/Environments/Connectors — confirmable via `go doc github.com/pingidentity/pingone-go-client/pingone APIClient`. The second SDK was added specifically to unblock the ~90-resource Platform/SSO/Authorize/MFA/Protect/Verify backlog tracked in issue #119.
+
+**Resource handlers must pick the right SDK per resource**: DaVinci/Environment/Connector handlers use `c.apiClient` directly. Every other resource handler must call `c.management(ctx)` — never construct a `management.APIClient` directly, and never read `c.managementClient` directly from a handler. `c.management(ctx)` lazily builds and caches the client because `pingonesdkv2.Config.ManagementAPIClient(ctx)` performs a real OAuth token exchange the moment it's called (unlike the DaVinci SDK, which defers auth to the first request) — eager construction in `NewFromCredentials` would make every `Client` construction do a live network call and break tests that use fake/invalid credentials.
+
+The `management` SDK also has different shapes than `pingone-go-client` that affect how `source_path`/handlers are written:
+- IDs are `*string`, not `uuid.UUID` — no `.Id` sub-struct on relationship fields.
+- Every `ReadAll<Resource>` list method returns the same shared `EntityArray`/`EntityArrayEmbedded` type (one struct with ~40+ typed slice fields) rather than a per-resource typed collection.
+- Some response fields are discriminated unions (e.g. `ReadOneApplication200Response{ApplicationOIDC, ApplicationSAML, ...}`) requiring `.GetActualInstance()` to unwrap.
+- No typed `*ResponseLinks` HAL struct — `Links *map[string]LinksHATEOASValue` is a flat map.
+
+See `.claude/skills/new-resource-pingone/SKILL.md` for the full pattern reference (pagination, list/get code templates, gotchas) — that skill file is gitignored/local-only, so this section is the durable record of the two-SDK split for anyone reading the checked-in docs.
 
 ### Platform Package Structure
 

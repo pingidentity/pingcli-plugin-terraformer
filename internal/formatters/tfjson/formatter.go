@@ -423,6 +423,12 @@ func renderScalar(val interface{}) interface{} {
 	switch v := val.(type) {
 	case core.RawHCLValue:
 		return "${" + string(v) + "}"
+	case core.InterpolatedString:
+		// Already a plain string with a raw "${...}" expression embedded —
+		// the tfjson wire format represents interpolation as literal "${...}"
+		// text inside a JSON string, so no extra wrapping is needed here
+		// (unlike RawHCLValue, which is a bare unquoted HCL expression).
+		return string(v)
 	case core.ResolvedReference:
 		return "${" + v.Expression() + "}"
 	case string:

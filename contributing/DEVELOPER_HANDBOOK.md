@@ -127,6 +127,26 @@ Document:
 
 **Critical**: `source_path` uses **Go struct field names** (`Id`, `Environment.Id`), not JSON tags (`id`, `environment.id`). Always verify against the actual SDK type.
 
+### Step 1a: Check for system-managed and bootstrap resources
+
+Do not assume that every object returned by a list API represents user-authored configuration. PingOne environments commonly return objects that are created and maintained by the service itself:
+
+- Built-in system applications (for example, Admin Console, Portal, and Self Service)
+- CORE or PREDEFINED resource attributes whose values are provider/API defaults rather than user-authored mappings
+- Built-in resource scopes, password policies, populations, or other bootstrap objects whose provider schema cannot manage every API variant
+- Other objects identified by a `type`, `default`, name prefix, or provider-specific discriminator
+
+For every new resource, compare the **complete API list** with the Terraform provider's actual schema and CRUD behavior:
+
+1. Read the provider schema validators and resource implementation, not only the API model or documentation.
+2. Identify objects that the provider cannot create, update, import, or validate. A resource is not exportable merely because the API returns it.
+3. Determine whether the object is deterministic bootstrap data present in every environment, or an environment-specific object that may indicate a real problem.
+4. Filter deterministic, structurally unmanageable objects in the handler before processing them. Do not emit HCL that will fail `terraform validate`.
+5. Add a unit test containing both manageable and unmanageable list entries, asserting the latter are excluded.
+6. Document intentional silent exclusions in `README.md` and `contributing/RESOURCE_COVERAGE.md`. Reserve warnings for environment-specific conditions users can act on (for example, a permission failure or a failed read of an otherwise manageable object).
+
+Run a real export and `terraform validate` against an environment containing the resource. API list coverage and unit tests alone will not reveal provider-side validators that reject bootstrap objects.
+
 ### Step 2: Create the YAML Definition
 
 Create `definitions/pingone/{category}/{short_name}.yaml` (e.g., `base/` for PingOne base resources, `davinci/` for DaVinci resources):

@@ -1,0 +1,81 @@
+# PingOne Population Default Identity Provider Resource Definition
+#
+# Children of pingone_population. PopulationsApi.ReadOnePopulationDefaultIdp
+# is a per-population singleton read (no list variant, no separate ID field)
+# — the SDK's PopulationDefaultIdp struct only carries {Id, Type}, where Id
+# is the *identity provider's* ID, not a resource ID of its own. The Go
+# handler enumerates all populations, then reads each one's default IdP,
+# projecting the population ID onto a flat struct since it's the scoping
+# parameter of the API call, not part of the response body.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_population_default_identity_provider
+  api_type: PopulationDefaultIdp
+  name: PingOne Population Default Identity Provider
+  short_name: population_default_identity_provider
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: PopulationDefaultIdp
+  list_method: PopulationsApi.ReadOnePopulationDefaultIdp
+  get_method: PopulationsApi.ReadOnePopulationDefaultIdp
+  id_field: population_id
+  name_field: population_id
+  label_fields: [population_id]
+  pagination_type: none
+
+attributes:
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: EnvironmentID
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: PopulationID
+    terraform_name: population_id
+    type: string
+    source_path: PopulationID
+    required: true
+    references_type: pingone_population
+    reference_field: id
+
+  # IdentityProviderID - optional. pingone_identity_provider is not yet
+  # exported by this tool, so the reference resolver falls back to a
+  # Terraform variable until that resource type is added.
+  - name: IdentityProviderID
+    terraform_name: identity_provider_id
+    type: string
+    source_path: IdentityProviderID
+    references_type: pingone_identity_provider
+    reference_field: id
+
+  - name: Type
+    terraform_name: type
+    type: string
+    source_path: Type
+    computed: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_population
+      field_path: PopulationID
+      lookup_field: id
+      reference_format: "pingone_population.{name}.id"
+    - resource_type: pingone_identity_provider
+      field_path: IdentityProviderID
+      lookup_field: id
+      reference_format: "pingone_identity_provider.{name}.id"
+      optional: true
+
+  import_id_format: "{env_id}/{population_id}"
+
+variables:
+  eligible_attributes: []

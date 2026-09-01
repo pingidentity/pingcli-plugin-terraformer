@@ -1,0 +1,113 @@
+# PingOne Application Attribute Mapping Resource Definition
+#
+# Children of pingone_application. oidc_scopes holds resource-scope UUIDs
+# that may come from pingone_resource_scope, pingone_resource_scope_openid,
+# or pingone_resource_scope_pingone_api — the schema can't disambiguate
+# which type a given UUID belongs to from this side, so (consistent with
+# existing precedent for arbitrary-UUID sets elsewhere in this repo, e.g.
+# sp_verification.certificate_ids in application.yaml) it is left as a raw
+# string set rather than a resolved reference.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_application_attribute_mapping
+  api_type: ApplicationAttributeMapping
+  name: PingOne Application Attribute Mapping
+  short_name: application_attribute_mapping
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: ApplicationAttributeMapping
+  list_method: ApplicationAttributeMappingApi.ReadAllApplicationAttributeMappings
+  get_method: ApplicationAttributeMappingApi.ReadOneApplicationAttributeMapping
+  id_field: id
+  name_field: name
+  # Mapping names (e.g. the reserved "sub"/"saml_subject" core mappings) are
+  # only unique within a single application, not across the environment —
+  # label_fields disambiguates by including application_id.
+  label_fields: [name, application_id]
+  pagination_type: cursor
+  additional_id_fields:
+    - application_id
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: ApplicationID
+    terraform_name: application_id
+    type: string
+    source_path: Application.Id
+    required: true
+    references_type: pingone_application
+    reference_field: id
+
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  - name: Value
+    terraform_name: value
+    type: string
+    source_path: Value
+    required: true
+
+  - name: Required
+    terraform_name: required
+    type: bool
+    source_path: Required
+
+  - name: NameFormat
+    terraform_name: saml_subject_nameformat
+    type: string
+    source_path: NameFormat
+
+  - name: IdToken
+    terraform_name: oidc_id_token_enabled
+    type: bool
+    source_path: IdToken
+
+  - name: UserInfo
+    terraform_name: oidc_userinfo_enabled
+    type: bool
+    source_path: UserInfo
+
+  - name: OidcScopes
+    terraform_name: oidc_scopes
+    type: set
+    source_path: OidcScopes
+
+  - name: MappingType
+    terraform_name: mapping_type
+    type: string
+    source_path: MappingType
+    computed: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_application
+      field_path: Application.Id
+      lookup_field: id
+      reference_format: "pingone_application.{name}.id"
+
+  import_id_format: "{env_id}/{application_id}/{id}"
+
+variables:
+  eligible_attributes: []
