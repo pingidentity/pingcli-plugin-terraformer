@@ -25,6 +25,19 @@ const jsLinksLegacyHint = "one or more DaVinci flows contain a legacy jsLinks fo
 	"that the PingOne SDK cannot parse. To resolve this, update the affected flow's jsLinks via the DaVinci UI or API. " +
 	"See https://github.com/pingidentity/pingcli-plugin-terraformer/issues/10"
 
+// wrapFlowFetchError replaces the raw SDK unmarshal error with jsLinksLegacyHint
+// when the failure is caused by the legacy jsLinks format, otherwise returns err
+// unchanged. Both getFlow and listFlows route their GetFlowById error through
+// this single helper so the two call sites cannot drift out of sync again (see
+// https://github.com/pingidentity/pingcli-plugin-terraformer/issues/10, where a
+// later refactor of listFlows dropped this check while getFlow kept it).
+func wrapFlowFetchError(err error) error {
+	if strings.Contains(err.Error(), "jsLinks") {
+		return errors.New(jsLinksLegacyHint)
+	}
+	return err
+}
+
 // flowVariableDeps caches variable dependency info per flow ID.
 // Populated by listFlows/getFlow, consumed by the custom handler.
 var flowVariableDeps sync.Map // flowID (string) -> []core.RuntimeDependsOn
@@ -213,7 +226,7 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 	for _, stub := range stubs {
 		detail, _, err := c.apiClient.DaVinciFlowsApi.GetFlowById(ctx, c.environmentID, stub.ID).Execute()
 		if err != nil {
-			return nil, fmt.Errorf("get flow id=%s name=%q: %w", stub.ID, stub.Name, err)
+			return nil, fmt.Errorf("get flow id=%s name=%q: %w", stub.ID, stub.Name, wrapFlowFetchError(err))
 		}
 		clearInputSchemaIfAuthentication(detail)
 		// Fetch version details for variable dependencies.
@@ -236,10 +249,7 @@ func listFlows(ctx context.Context, c *Client, _ string) ([]interface{}, error) 
 func getFlow(ctx context.Context, c *Client, _ string, resourceID string) (interface{}, error) {
 	detail, _, err := c.apiClient.DaVinciFlowsApi.GetFlowById(ctx, c.environmentID, resourceID).Execute()
 	if err != nil {
-		if strings.Contains(err.Error(), "jsLinks") {
-			return nil, fmt.Errorf("get flow: %s", jsLinksLegacyHint)
-		}
-		return nil, fmt.Errorf("get flow: %w", err)
+		return nil, fmt.Errorf("get flow: %w", wrapFlowFetchError(err))
 	}
 	clearInputSchemaIfAuthentication(detail)
 

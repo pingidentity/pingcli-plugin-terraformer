@@ -3,6 +3,7 @@ package pingone
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -707,4 +708,34 @@ func extractPropertiesJSON(t *testing.T, value core.RawHCLValue) string {
 	const prefix = "jsonencode("
 	require.True(t, strings.HasPrefix(str, prefix), "expected jsonencode(...) wrapper, got: %s", str)
 	return str[len(prefix) : len(str)-1]
+}
+
+// TestWrapFlowFetchError verifies that both getFlow and listFlows route
+// GetFlowById errors through a single shared helper, so a legacy jsLinks
+// unmarshal failure always produces the actionable hint (issue #10) instead
+// of the raw SDK error, regardless of which call site hit it.
+func TestWrapFlowFetchError(t *testing.T) {
+	tests := []struct {
+		name    string
+		err     error
+		wantMsg string
+	}{
+		{
+			name:    "legacy jsLinks unmarshal error is replaced with the hint",
+			err:     errors.New(`json: cannot unmarshal string into Go struct field _DaVinciFlowResponse.settings.jsLinks of type map[string]interface {}`),
+			wantMsg: jsLinksLegacyHint,
+		},
+		{
+			name:    "unrelated error is passed through unchanged",
+			err:     errors.New("unexpected status 500"),
+			wantMsg: "unexpected status 500",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := wrapFlowFetchError(tt.err)
+			require.Error(t, got)
+			assert.Equal(t, tt.wantMsg, got.Error())
+		})
+	}
 }
