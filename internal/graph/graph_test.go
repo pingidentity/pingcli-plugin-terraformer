@@ -67,6 +67,82 @@ func TestUniqueNames(t *testing.T) {
 	assert.Equal(t, "name_3", n3)
 }
 
+func TestTypeAwareNameAllocation(t *testing.T) {
+	tests := []struct {
+		name  string
+		order []string
+	}{
+		{
+			name:  "type_a inserted first",
+			order: []string{"type_a", "type_b"},
+		},
+		{
+			name:  "type_b inserted first",
+			order: []string{"type_b", "type_a"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := New()
+			for i, resourceType := range tt.order {
+				g.AddResource(resourceType, fmt.Sprintf("%s-id", resourceType), "pingcli__DVA")
+				name, err := g.GetReferenceName(resourceType, fmt.Sprintf("%s-id", resourceType))
+				require.NoError(t, err)
+				assert.Equal(t, "pingcli__DVA", name)
+				assert.Equal(t, i+1, g.NodeCount())
+			}
+		})
+	}
+}
+
+func TestTypeAwareNameAllocation_PreservesSameTypeSuffixes(t *testing.T) {
+	g := New()
+	g.AddResource("type_a", "a-1", "name")
+	g.AddResource("type_a", "a-2", "name")
+	g.AddResource("type_a", "a-3", "name")
+	g.AddResource("type_b", "b-1", "name")
+
+	for _, test := range []struct {
+		resourceType string
+		id           string
+		expected     string
+	}{
+		{resourceType: "type_a", id: "a-1", expected: "name"},
+		{resourceType: "type_a", id: "a-2", expected: "name_2"},
+		{resourceType: "type_a", id: "a-3", expected: "name_3"},
+		{resourceType: "type_b", id: "b-1", expected: "name"},
+	} {
+		name, err := g.GetReferenceName(test.resourceType, test.id)
+		require.NoError(t, err)
+		assert.Equal(t, test.expected, name)
+	}
+}
+
+func TestTypeAwareLookupAndEdges(t *testing.T) {
+	g := New()
+	g.AddResource("type_a", "shared-id", "shared")
+	g.AddResource("type_b", "shared-id", "shared")
+	g.AddResource("source", "source-id", "source")
+
+	nameA, err := g.GetReferenceName("type_a", "shared-id")
+	require.NoError(t, err)
+	nameB, err := g.GetReferenceName("type_b", "shared-id")
+	require.NoError(t, err)
+	assert.Equal(t, "shared", nameA)
+	assert.Equal(t, "shared", nameB)
+
+	require.NoError(t, g.AddEdge("source", "source-id", "type_a", "shared-id", "ref", "a"))
+	require.NoError(t, g.AddEdge("source", "source-id", "type_b", "shared-id", "ref", "b"))
+
+	dependencies := g.GetDependencies("source", "source-id")
+	require.Len(t, dependencies, 2)
+	assert.Equal(t, "type_a", dependencies[0].To.ResourceType)
+	assert.Equal(t, "type_b", dependencies[1].To.ResourceType)
+	assert.Equal(t, "a", dependencies[0].Location)
+	assert.Equal(t, "b", dependencies[1].Location)
+}
+
 func TestAddDependencyAndQuery(t *testing.T) {
 	g := New()
 	g.AddResource("flow", "f1", "flow1")

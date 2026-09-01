@@ -135,6 +135,47 @@ func TestFormat_ComputedOnlySkipped(t *testing.T) {
 	assert.False(t, exists, "computed-only attribute should be omitted")
 }
 
+func TestFormat_EqualLabelsRemainTypeQualified(t *testing.T) {
+	targetDef := &schema.ResourceDefinition{Metadata: schema.ResourceMetadata{ResourceType: "target_type_b"}}
+	target := &core.ResourceData{ID: "target-raw-id", Name: "target-name", Label: "pingcli__DVA"}
+	targetOutput, err := NewFormatter().Format(target, targetDef, FormatOptions{})
+	require.NoError(t, err)
+	_ = unmarshalResource(t, targetOutput, "target_type_b", "pingcli__DVA")
+
+	sourceDef := baseDef(schema.AttributeDefinition{
+		Name: "target_id", TerraformName: "target_id", Type: "string",
+		ReferencesType: "target_type_b", ReferenceField: "id",
+	})
+	sourceDef.Metadata.ResourceType = "source_type"
+	source := baseData("source", "source-id", map[string]interface{}{
+		"target_id": core.ResolvedReference{ResourceType: "target_type_b", ResourceName: "pingcli__DVA", Field: "id"},
+	})
+	source.Label = "pingcli__source"
+	sourceOutput, err := NewFormatter().Format(source, sourceDef, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, sourceOutput, "source_type", "pingcli__source")
+	assert.Equal(t, "${target_type_b.pingcli__DVA.id}", attrs["target_id"])
+	assert.NotContains(t, sourceOutput, "pingcli__DVA_2")
+}
+
+func TestFormat_DependsOnEqualLabelsAndUnresolvedAreOmitted(t *testing.T) {
+	def := baseDef(schema.AttributeDefinition{Name: "val", TerraformName: "val", Type: "string"})
+	data := baseData("source", "source-id", map[string]interface{}{"val": "x"})
+	data.DependsOnResources = []core.RuntimeDependsOn{
+		{ResourceType: "target_type_a", ResourceID: "a-id", Label: "pingcli__DVA"},
+		{ResourceType: "target_type_b", ResourceID: "b-id", Label: "pingcli__DVA"},
+		{ResourceType: "target_type_c", ResourceID: "unknown-id", Label: ""},
+	}
+	output, err := NewFormatter().Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, output, "test_resource", "pingcli__source")
+	dependsOn, ok := attrs["depends_on"].([]interface{})
+	require.True(t, ok)
+	assert.Equal(t, []interface{}{"target_type_a.pingcli__DVA", "target_type_b.pingcli__DVA"}, dependsOn)
+	assert.NotContains(t, output, "target_type_c")
+	assert.NotContains(t, output, "unknown-id")
+}
+
 func TestFormat_ResolvedResourceReference(t *testing.T) {
 	f := NewFormatter()
 	def := baseDef(schema.AttributeDefinition{
@@ -484,6 +525,22 @@ func TestFormatList_SortedByName(t *testing.T) {
 	// Spot-check values.
 	alphaAttrs := byType["pingcli__alpha"].(map[string]interface{})
 	assert.Equal(t, "a", alphaAttrs["val"])
+}
+
+func TestFormatImportBlock_UsesCanonicalLabelAndRawIDs(t *testing.T) {
+	def := &schema.ResourceDefinition{
+		Metadata:     schema.ResourceMetadata{ResourceType: "target_type_b"},
+		Dependencies: schema.DependencyDefinition{ImportIDFormat: "{env_id}/{parent_id}/{resource_id}"},
+	}
+	data := baseData("derived-name", "resource-raw-id", map[string]interface{}{"parent_id": "parent-raw-id"})
+	data.Label = "pingcli__DVA"
+	output, err := NewFormatter().FormatImportBlock(data, def, "env-raw-id")
+	require.NoError(t, err)
+	var doc map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(output), &doc))
+	entry := doc["import"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "target_type_b.pingcli__DVA", entry["to"])
+	assert.Equal(t, "env-raw-id/parent-raw-id/resource-raw-id", entry["id"])
 }
 
 func TestFormatImportBlock_Basic(t *testing.T) {

@@ -138,6 +138,47 @@ func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 	}
 }
 
+// TestResolveEmbeddedReferences_EqualLabelsAcrossTypes verifies that an embedded
+// UUID resolves against the typed target node and creates an edge to that node,
+// even when another resource type has the same label and ID.
+func TestResolveEmbeddedReferences_EqualLabelsAcrossTypes(t *testing.T) {
+	const targetID = "aaaaaaaa-0000-4000-8000-000000000001"
+	const sourceID = "bbbbbbbb-0000-4000-8000-000000000001"
+
+	g := graph.New()
+	g.AddResource("type_target_a", targetID, "pingcli__DVA")
+	g.AddResource("type_target_b", targetID, "pingcli__DVA")
+	g.AddResource("type_source", sourceID, "pingcli__source")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "type_source",
+		AttributePath:      "config",
+		TargetResourceType: "type_target_b",
+		JSONKeyPath:        "targetId",
+		ReferenceField:     "id",
+	}
+	attrs := map[string]interface{}{
+		"config": RawHCLValue(`jsonencode({"targetId":"` + targetID + `"})`),
+	}
+	resource := &ResourceData{ResourceType: "type_source", ID: sourceID, Label: "pingcli__source", Attributes: attrs}
+
+	ResolveEmbeddedReferences([]*ExportedResourceData{{
+		ResourceType: "type_source",
+		Definition:   testResourceDef("type_source"),
+		Resources:    []*ResourceData{resource},
+	}}, g, []EmbeddedReferenceRule{rule})
+
+	resolved := attrs["config"].(RawHCLValue)
+	assert.Contains(t, string(resolved), "${type_target_b.pingcli__DVA.id}")
+	assert.NotContains(t, string(resolved), targetID)
+
+	deps := g.GetDependencies("type_source", sourceID)
+	require.Len(t, deps, 1)
+	assert.Equal(t, "type_target_b", deps[0].To.ResourceType)
+	assert.Equal(t, targetID, deps[0].To.ID)
+	assert.Equal(t, "pingcli__DVA", deps[0].To.Name)
+}
+
 // TestResolveEmbeddedReferences_MultipleNodes tests processing of multiple
 // nodes within a single flow, some with subFlowId and some without
 func TestResolveEmbeddedReferences_MultipleNodes(t *testing.T) {

@@ -1,0 +1,3 @@
+```release-note:bug
+Fixed Terraform references and filter fallback handling when different resource types share the same label or API resource ID.
+```
