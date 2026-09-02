@@ -153,8 +153,13 @@ resource "pingone_davinci_connector_instance" "pingcli__IDmission-0020---0020-OI
       })
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__IDmission-0020---0020-OIDC-0020---0020-test-0020-clone-0020-93b5" {
   environment_id = var.pingone_environment_id
@@ -191,8 +196,13 @@ resource "pingone_davinci_connector_instance" "pingcli__IDmission-0020---0020-OI
       })
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OAuth-0020-IdP-0020---0020-test" {
   environment_id = var.pingone_environment_id
@@ -251,8 +261,13 @@ resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OA
       })
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OAuth-0020-IdP-0020--testB" {
   environment_id = var.pingone_environment_id
@@ -331,8 +346,13 @@ resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OA
       })
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OAuth-0020-IdP-0020--testC" {
   environment_id = var.pingone_environment_id
@@ -411,8 +431,13 @@ resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OA
       })
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OAuth-0020-IdP-0020--testD" {
   environment_id = var.pingone_environment_id
@@ -491,8 +516,13 @@ resource "pingone_davinci_connector_instance" "pingcli__OIDC-0020--0026--0020-OA
       })
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__PingOne" {
   environment_id = var.pingone_environment_id
@@ -515,8 +545,13 @@ resource "pingone_davinci_connector_instance" "pingcli__PingOne" {
       "value" : "${var.davinci_connection_PingOne_region}"
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__PingOne-0020-Authentication" {
   environment_id = var.pingone_environment_id
@@ -552,8 +587,13 @@ resource "pingone_davinci_connector_instance" "pingcli__PingOne-0020-MFA" {
       "value" : "${var.davinci_connection_PingOne_0020_MFA_region}"
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__PingOne-0020-Notifications" {
   environment_id = var.pingone_environment_id
@@ -576,8 +616,13 @@ resource "pingone_davinci_connector_instance" "pingcli__PingOne-0020-Notificatio
       "value" : "${var.davinci_connection_PingOne_0020_Notifications_region}"
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__PingOne-0020-Protect" {
   environment_id = var.pingone_environment_id
@@ -600,8 +645,13 @@ resource "pingone_davinci_connector_instance" "pingcli__PingOne-0020-Protect" {
       "value" : "${var.davinci_connection_PingOne_0020_Protect_region}"
     }
   })
-}
+  # properties includes clientSecret fields the API cannot read back —
+  # any update would push an empty secret and wipe the live value.
+  lifecycle {
+    ignore_changes = [properties]
+  }
 
+}
 
 resource "pingone_davinci_connector_instance" "pingcli__String-0020-Manipulation" {
   environment_id = var.pingone_environment_id

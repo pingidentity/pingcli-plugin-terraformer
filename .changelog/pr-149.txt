@@ -1,0 +1,3 @@
+```release-note:note
+The static PingOne regression environment is now managed as Terraform: its config lives in `tests/regression/environment/` with remote S3 state, and a new manually-triggered `regression-env-apply` GitHub Actions workflow can repair environment drift on demand. Variable values are no longer committed (they ride in repo-level CI secrets); see `tests/regression/README.md`.
+```

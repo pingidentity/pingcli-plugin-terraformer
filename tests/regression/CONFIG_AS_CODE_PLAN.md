@@ -1,5 +1,14 @@
 # Config-as-Code Plan for the Regression Environment
 
+> **Status: SUPERSEDED (2026-09-02).** The "baseline, never applied" policy
+> below was replaced by the managed-environment design: the config in
+> `environment/` now has an S3 backend, the live resources are imported into
+> that state, and the `regression-env-apply` workflow applies drift repairs
+> from CI. See `environment/README.md` ("State and apply policy", "Adopting
+> state") and `tests/regression/README.md` ("Repairing the Environment") for
+> the current process. This document is kept as the historical record of the
+> original approach.
+
 Status: **plan only — not yet executed** (credentials not wired up at time of writing).
 
 ## Why

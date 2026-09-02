@@ -3,7 +3,6 @@
 *.tfstate.*
 *.tfplan
 .terraform/
-.terraform.lock.hcl
 override.tf
 override.tf.json
 *_override.tf
@@ -12,3 +11,11 @@ override.tf.json
 terraform.rc
 # Local filled-in values (never commit resolved secrets)
 *.local.tfvars
+
+# Variable values ride in the TERRAFORM_TFVARS_BASE64 CI secret (and
+# 1Password locally) — never commit them here. See README.md.
+ping-export-terraform.auto.tfvars
+
+# Ephemeral import file generated for one-time state adoption — contains
+# live resource IDs and must not be committed (public repo).
+ping-export-imports.tf
