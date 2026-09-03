@@ -585,7 +585,7 @@ resource "pingone_davinci_flow" "pingcli__-005B-cloned-005D--0020-1775670565498-
                     "label" : "testPW (string - flowInstance)",
                     "name" : "testPW",
                     "type" : "string",
-                    "value" : "[\n  {\n    \"children\": [\n      {\n        \"text\": \"<REDACTED-SET-VIA-UI>\"\n      }\n    ]\n  }\n]"
+                    "value" : "[\n  {\n    \"children\": [\n      {\n        \"text\": \"2FederateM0re!\"\n      }\n    ]\n  }\n]"
                   }
                 ]
               }
@@ -82908,7 +82908,7 @@ resource "pingone_davinci_flow" "pingcli__DaV-Flow-postman" {
                     "label" : "testPW (string - flowInstance)",
                     "name" : "testPW",
                     "type" : "string",
-                    "value" : "[\n  {\n    \"children\": [\n      {\n        \"text\": \"<REDACTED-SET-VIA-UI>\"\n      }\n    ]\n  }\n]"
+                    "value" : "[\n  {\n    \"children\": [\n      {\n        \"text\": \"2FederateM0re!\"\n      }\n    ]\n  }\n]"
                   }
                 ]
               }
@@ -84208,7 +84208,7 @@ resource "pingone_davinci_flow" "pingcli__DaV-Flow_1775670546" {
                     "label" : "testPW (string - flowInstance)",
                     "name" : "testPW",
                     "type" : "string",
-                    "value" : "[\n  {\n    \"children\": [\n      {\n        \"text\": \"<REDACTED-SET-VIA-UI>\"\n      }\n    ]\n  }\n]"
+                    "value" : "[\n  {\n    \"children\": [\n      {\n        \"text\": \"2FederateM0re!\"\n      }\n    ]\n  }\n]"
                   }
                 ]
               }
@@ -84921,8 +84921,8 @@ resource "pingone_davinci_flow" "pingcli__DaV-Flow_1775670546" {
 resource "pingone_davinci_flow" "pingcli__DuplicateName" {
   environment_id = var.pingone_environment_id
   name           = "DuplicateName"
-  # description omitted: empty in source environment (provider min-length 1)
-  color = "#AFD5FF"
+  description    = "abcd"
+  color          = "#AFD5FF"
 
   settings = {
     log_level = 4
@@ -84987,8 +84987,8 @@ resource "pingone_davinci_flow" "pingcli__DuplicateName" {
 resource "pingone_davinci_flow" "pingcli__flowContextVariable" {
   environment_id = var.pingone_environment_id
   name           = "flowContextVariable"
-  # description omitted: empty in source environment (provider min-length 1)
-  color = "#E3F0FF"
+  description    = "abcd"
+  color          = "#E3F0FF"
 
   settings = {
     log_level = 4
@@ -143654,8 +143654,8 @@ resource "pingone_davinci_flow" "pingcli__PingOne-0020-Sign-0020-On-0020-with-00
 resource "pingone_davinci_flow" "pingcli__pingoneFormsTest" {
   environment_id = var.pingone_environment_id
   name           = "pingoneFormsTest"
-  # description omitted: empty in source environment (provider min-length 1)
-  color = "#E3F0FF"
+  description    = "abcd"
+  color          = "#E3F0FF"
 
   settings = {
     log_level = 4
@@ -143827,8 +143827,8 @@ resource "pingone_davinci_flow" "pingcli__pingoneFormsTest" {
 resource "pingone_davinci_flow" "pingcli__testCodeSnippetConnector" {
   environment_id = var.pingone_environment_id
   name           = "testCodeSnippetConnector"
-  # description omitted: empty in source environment (provider min-length 1)
-  color = "#AFD5FF"
+  description    = "abcd"
+  color          = "#AFD5FF"
 
   settings = {
     log_level = 4

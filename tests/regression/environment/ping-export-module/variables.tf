@@ -394,6 +394,5 @@ variable "davinci_variable_registrationPopulationId_value" {
 }
 variable "davinci_variable_testPW_value" {
   type        = string
-  sensitive   = true
-  description = "Value for DaVinci variable testPW. A real password: supplied at plan/apply time from the TERRAFORM_TFVARS_BASE64 file (or the same file locally). Never committed."
+  description = "Value for DaVinci variable testPW"
 }
