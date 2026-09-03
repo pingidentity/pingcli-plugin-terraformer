@@ -9,6 +9,7 @@ resource "pingone_davinci_flow" "pingcli__-005B-cloned-005D--0020-1775670565498-
   settings = {
     csp                              = "worker-src 'self' blob:; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://devsdk.singularkey.com http://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval';"
     css                              = "body, .page {\n  background-color: #ededed !important;\n}\n\n.buttonLink {\n  background: none !important;\n  border: none;\n  cursor: pointer;\n  color: #2996cc;\n  font-size: 15px;\n}"
+    log_level                        = 4
     use_custom_css                   = true
     use_custom_script                = true
     intermediate_loading_screen_css  = ""
@@ -82330,6 +82331,7 @@ resource "pingone_davinci_flow" "pingcli__DaV-Flow-postman" {
   settings = {
     csp                              = "worker-src 'self' blob:; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://devsdk.singularkey.com http://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval';"
     css                              = "body, .page {\n  background-color: #ededed !important;\n}\n\n.buttonLink {\n  background: none !important;\n  border: none;\n  cursor: pointer;\n  color: #2996cc;\n  font-size: 15px;\n}"
+    log_level                        = 4
     use_custom_css                   = true
     use_custom_script                = true
     intermediate_loading_screen_css  = ""
@@ -83632,6 +83634,7 @@ resource "pingone_davinci_flow" "pingcli__DaV-Flow_1775670546" {
   settings = {
     csp                              = "worker-src 'self' blob:; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://devsdk.singularkey.com http://cdnjs.cloudflare.com 'unsafe-inline' 'unsafe-eval';"
     css                              = "body, .page {\n  background-color: #ededed !important;\n}\n\n.buttonLink {\n  background: none !important;\n  border: none;\n  cursor: pointer;\n  color: #2996cc;\n  font-size: 15px;\n}"
+    log_level                        = 4
     use_custom_css                   = true
     use_custom_script                = true
     intermediate_loading_screen_css  = ""
@@ -85165,8 +85168,8 @@ resource "pingone_davinci_flow" "pingcli__jsLinksTest" {
     intermediate_loading_screen_html = ""
     js_links = [
       {
-        value          = "https://example.com/js"
-        label          = "https://example.com/js"
+        value          = "https://abcd.com/js"
+        label          = "https://abcd.com/js"
         type           = ""
         crossorigin    = ""
         integrity      = ""
@@ -85174,8 +85177,8 @@ resource "pingone_davinci_flow" "pingcli__jsLinksTest" {
         defer          = false
       },
       {
-        value          = "https://abcd.com/js"
-        label          = "https://abcd.com/js"
+        value          = "https://example.com/js"
+        label          = "https://example.com/js"
         type           = ""
         crossorigin    = ""
         integrity      = ""
