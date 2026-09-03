@@ -47,6 +47,7 @@ dist/
 !tests/regression/matrix.json
 !**/testdata/**/*.tf
 localsecrets
+*.tfvars
 
 pingcli-terraformer
 
