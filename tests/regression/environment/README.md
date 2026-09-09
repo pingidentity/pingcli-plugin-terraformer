@@ -73,19 +73,28 @@ credential item `op://PingIdentity/terraformer-export-regression-read-only-US`
 file is git-ignored):
 
 ```bash
-# Full export into a scratch dir; copies the generated
-# ping-export-terraform.auto.tfvars here — the file to review and upload
-# base64-encoded as the TERRAFORM_TFVARS_BASE64 secret.
+# Refresh ONLY the tfvars values file (full export to a temp dir, only the
+# tfvars file is copied here — committed .tf files untouched).
 op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
   ./export.sh
 
-# Same, plus the one-time state-adoption import file (see "Adopting state").
+# Wholesale refresh: back up the committed config, then replace the .tf files
+# with a fresh full export (use when the environment's resource set changed,
+# e.g. after deliberate UI adjustments). Review the git diff before
+# committing; revert with ./export.sh --revert.
 op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
-  ./export.sh --imports
+  ./export.sh --full
+
+# Same as --full, plus the one-time state-adoption import file (see
+# "Adopting state").
+op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
+  ./export.sh --full --imports
 ```
 
-`export.sh` exports to a temp dir, copies only the tfvars (and import) files
-into this directory, and never touches the committed `.tf` files.
+Default mode exports to a temp dir and copies only the tfvars file here —
+the committed `.tf` files are never touched. `--full` replaces them (after
+backing the tracked config up to git-ignored `.config-backup/`; `--revert`
+restores it).
 
 - **`ping-export-terraform.auto.tfvars` is git-ignored.** Review it (scrub
   anything unintended), keep the master copy in 1Password, and upload it
