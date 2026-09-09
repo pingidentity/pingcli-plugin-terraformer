@@ -87,6 +87,8 @@ op inject -i .scratch/regression-env-localsecrets.env | base64 | \
   gh secret set TERRAFORM_PROVIDER_ENV_BASE64 --repo pingidentity/pingcli-plugin-terraformer
 ```
 
+Both secrets can also be managed through `environment/export.sh`: `--upload-only` uploads the reviewed tfvars as `TERRAFORM_TFVARS_BASE64` (export and upload are deliberately separate steps — always review the generated values first; requires a gh account with repository-secret write access, e.g. `gh auth switch --user samir-gandhi`).
+
 One-off setup:
 1. **AWS**: create a private, versioned S3 bucket with public access blocked, plus an IAM user whose keys can read/write that bucket. Store the keys in 1Password (the `platform-test-pingcli-terraformer-regression-env-US` item).
 2. **PingOne**: create a worker application `regression-env-tf-writer` in the regression environment with DaVinci read **and write** permissions. Store its client ID/secret in the same 1Password item.
