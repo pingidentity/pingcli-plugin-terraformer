@@ -80,7 +80,9 @@ jobs:
           printf '%s' "${TERRAFORM_PROVIDER_ENV_BASE64}" | base64 -d > "${_provider_env}"
           echo "_provider_env=${_provider_env}" >> "${GITHUB_ENV}"
           printf '%s' "${TERRAFORM_TFVARS_BASE64}" | base64 -d > ping-export-terraform.auto.tfvars
-          trap 'rm -f "${_provider_env}"' EXIT
+          # NOTE: no trap rm here — a step-local trap fires when THIS step's
+          # shell exits, before later steps source the file. Cleanup happens
+          # in the "Clean up secrets files" step (if: always()).
 
       - name: Terraform init
         working-directory: tests/regression/environment
