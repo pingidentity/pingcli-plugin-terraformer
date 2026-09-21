@@ -28,3 +28,18 @@ module "sso_population" {
   source         = "../sso/population"
   environment_id = pingone_environment.this.id
 }
+
+module "sso_group" {
+  source         = "../sso/group"
+  environment_id = pingone_environment.this.id
+}
+
+module "sso_sign_on_policy" {
+  source         = "../sso/sign_on_policy"
+  environment_id = pingone_environment.this.id
+}
+
+module "sso_resource" {
+  source         = "../sso/resource"
+  environment_id = pingone_environment.this.id
+}
