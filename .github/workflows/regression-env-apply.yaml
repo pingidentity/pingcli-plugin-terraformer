@@ -88,7 +88,12 @@ jobs:
         working-directory: tests/regression/environment
         run: |-
           umask 077
+          # set -a: auto-export sourced vars so the terraform subprocess
+          # inherits AWS_*/PINGONE_*/TF_VAR_* (the blob uses dotenv-style
+          # assignments, not export statements).
+          set -a
           . "${_provider_env}"
+          set +a
           # Key convention from the localsecrets prefix
           # (TF_VAR_tf_state_key_prefix/regression-environment/terraform.tfstate).
           : "${TF_VAR_tf_state_key_prefix:=regression-environment}"
@@ -101,7 +106,9 @@ jobs:
       - name: Terraform plan
         working-directory: tests/regression/environment
         run: |-
+          set -a
           . "${_provider_env}"
+          set +a
           set +e
           _args=(-input=false -detailed-exitcode -out=plan.tfplan)
           if [ -n "${{ inputs.target }}" ]; then
