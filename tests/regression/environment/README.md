@@ -73,8 +73,10 @@ credential item `op://PingIdentity/terraformer-export-regression-read-only-US`
 file is git-ignored):
 
 ```bash
-# Refresh ONLY the tfvars values file (full export to a temp dir, only the
-# tfvars file is copied here — committed .tf files untouched).
+# Refresh the tfvars values file: compares generated variable names against
+# the existing file — identical set ⇒ your reviewed values stay untouched;
+# new variables ⇒ old file backed up to ping-export-terraform.auto.tfvars.bak and the fresh export
+# replaces it, so you can diff the two and port values.
 op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
   ./export.sh
 
@@ -94,9 +96,12 @@ the committed `.tf` files are never touched. `--full` replaces them (after
 backing the tracked config up to git-ignored `.config-backup/`; `--revert`
 restores it).
 
-- **`ping-export-terraform.auto.tfvars` is git-ignored.** Review it (scrub
-  anything unintended), keep the master copy in 1Password, and upload it
-  base64-encoded as the `TERRAFORM_TFVARS_BASE64` GitHub secret.
+- **`ping-export-terraform.auto.tfvars` is git-ignored.** The default export
+  copies over it only when the generated export introduces new variable names
+  (backing the previous file up to `ping-export-terraform.auto.tfvars.bak`); a variable-set-identical
+  export leaves your reviewed values untouched. Review it (scrub anything
+  unintended), keep the master copy in 1Password, and upload it base64-encoded
+  as the `TERRAFORM_TFVARS_BASE64` GitHub secret.
 - For a local `terraform plan`/`apply`, leave the tfvars file in place (it is
   auto-loaded); for diffing, compare the scratch export's resource files
   against the committed ones.

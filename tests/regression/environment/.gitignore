@@ -15,6 +15,7 @@ terraform.rc
 # Variable values ride in the TERRAFORM_TFVARS_BASE64 CI secret (and
 # 1Password locally) — never commit them here. See README.md.
 ping-export-terraform.auto.tfvars
+ping-export-terraform.auto.tfvars.bak
 
 # Ephemeral import file generated for one-time state adoption — contains
 # live resource IDs and must not be committed (public repo).

@@ -7,10 +7,16 @@
 # TERRAFORM_TFVARS_BASE64 GitHub secret (and 1Password). This script has two
 # distinct jobs:
 #
-#   Default  — refresh ONLY the tfvars values file from the live environment
-#              (full --include-values export to a temp dir; only the tfvars
-#              file is copied out). The committed .tf files are untouched.
-#              Always review the generated values before uploading.
+#   Default  — compare the freshly generated tfvars variable names against
+#              the existing ping-export-terraform.auto.tfvars:
+#                • identical variable sets  → nothing copied; your reviewed
+#                  values file stays as-is (no churn, no re-review needed).
+#                • new variables present    → the existing file is backed up
+#                  (ping-export-terraform.auto.tfvars.bak, next to the new
+#                  file) and the fresh export replaces it, so you can diff
+#                  the two and port your values over.
+#              The committed .tf files are never touched.
+#              Always review before uploading.
 #
 #   --full   — replace the committed .tf config with a fresh export (after
 #              backing the current config up), for wholesale baseline
@@ -22,7 +28,8 @@
 #              lifecycle blocks. Reversible with --revert.
 #
 # Usage:
-#   ./export.sh                # refresh ping-export-terraform.auto.tfvars only
+#   ./export.sh                # compare generated tfvars vs existing; copy only
+#                              #  if new variables appeared (backs up the old file)
 #   ./export.sh --full         # back up current config, then replace the .tf
 #                              #  files with a fresh full export (import
 #                              #  file included)
@@ -143,15 +150,45 @@ else
     --include-values \
     --out "${SCRATCH}"
 
-  mkdir -p "${ENV_DIR}"
-  cp "${SCRATCH}/ping-export-terraform.auto.tfvars" "${ENV_DIR}/"
+  _generated="${SCRATCH}/ping-export-terraform.auto.tfvars"
+  var_names() { sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*=.*/\1/p' "$1" | sort -u; }
 
-  echo
-  echo "wrote ${TFVARS_FILE}"
-  echo "  -> review it, then upload with: ./export.sh --upload-only"
-  echo
-  echo "Review is mandatory: secret values export as empty strings marked"
-  echo "\"Secret value - provide manually\", but plain DaVinci variables holding"
-  echo "passwords (e.g. testPW) export verbatim — scrub anything you do not want"
-  echo "in the CI secret. There is no --upload that skips this step on purpose."
+  # Copy only when the generated file introduces variables the existing file
+  # lacks — a pure re-export with the same variable set would otherwise
+  # clobber user-maintained values and force an unnecessary re-review.
+  if [ ! -f "${TFVARS_FILE}" ]; then
+    mkdir -p "${ENV_DIR}"
+    cp "${_generated}" "${TFVARS_FILE}"
+    echo "no existing tfvars — wrote ${TFVARS_FILE}"
+  else
+    _new_vars="$(comm -13 <(var_names "${TFVARS_FILE}") <(var_names "${_generated}"))"
+    _gone_vars="$(comm -23 <(var_names "${TFVARS_FILE}") <(var_names "${_generated}"))"
+    if [ -z "${_new_vars}" ]; then
+      echo "tfvars variable set unchanged ($(var_names "${_generated}" | wc -l | tr -d ' ') variables; nothing new)"
+      [ -n "${_gone_vars}" ] && {
+        echo "note: $(echo "${_gone_vars}" | wc -l | tr -d ' ') variable(s) no longer generated (left in your file as-is):"
+        echo "${_gone_vars}" | sed 's/^/  - /'
+      }
+      echo "existing values preserved — nothing copied."
+    else
+      echo "generated tfvars contains $(echo "${_new_vars}" | wc -l | tr -d ' ') new variable(s):"
+      echo "${_new_vars}" | sed 's/^/  + /'
+      [ -n "${_gone_vars}" ] && {
+        echo "and $(echo "${_gone_vars}" | wc -l | tr -d ' ') variable(s) no longer generated:"
+        echo "${_gone_vars}" | sed 's/^/  - /'
+      }
+      mkdir -p "${ENV_DIR}"
+      cp "${TFVARS_FILE}" "${TFVARS_FILE}.bak"
+      cp "${_generated}" "${TFVARS_FILE}"
+      echo
+      echo "old file backed up to ${TFVARS_FILE}.bak (right next to the new one)"
+      echo "  -> diff the two, port your reviewed values into the new file, then"
+      echo "     upload with: ./export.sh --upload-only"
+    fi
+    echo
+    echo "Review is mandatory: secret values export as empty strings marked"
+    echo "\"Secret value - provide manually\", but plain DaVinci variables holding"
+    echo "passwords (e.g. testPW) export verbatim — scrub anything you do not want"
+    echo "in the CI secret. There is no --upload that skips this step on purpose."
+  fi
 fi
