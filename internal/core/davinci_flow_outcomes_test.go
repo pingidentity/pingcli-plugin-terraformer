@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -93,6 +94,61 @@ func buildFlowResponse() *pingone.DaVinciFlowResponse {
 	flow := pingone.NewDaVinciFlowResponse(*links, *environment, "flow-1", "Test Flow")
 	flow.SetGraphData(*graphData)
 	return flow
+}
+
+// buildFlowResponseWithTimeoutSettings mirrors buildFlowResponse but sets the
+// four flow settings fields added in pingone-go-client v0.13.0 (see #144):
+// customTimeoutErrorScreenCSS/HTML/Message and useCustomTimeoutErrorScreen.
+// The plain *bool on UseCustomTimeoutErrorScreen (no choice wrapper) is
+// deliberate coverage -- most other use* settings in v0.12.0 are choice
+// wrappers, and flow.yaml declares this one as a simple bool attribute.
+func buildFlowResponseWithTimeoutSettings() *pingone.DaVinciFlowResponse {
+	flow := buildFlowResponse()
+	settings := pingone.NewDaVinciFlowSettingsResponse()
+	settings.SetCustomTimeoutErrorScreenCSS("div#timeout { color: red; }")
+	settings.SetCustomTimeoutErrorScreenHTML(`<div id="pagetimeout"></div>`)
+	settings.SetCustomTimeoutErrorScreenMessage("Your session timed out")
+	settings.SetUseCustomTimeoutErrorScreen(true)
+	flow.SetSettings(*settings)
+	return flow
+}
+
+// TestDaVinciFlowTimeoutScreenSettings_ProcessorAndHCL drives the real
+// flow.yaml definition with a flow response carrying the custom timeout error
+// screen settings (SDK v0.13.0, #144) through ProcessResource and the HCL
+// formatter, proving the fields are exported as optional (non-computed)
+// attributes that render into the settings block rather than being skipped.
+func TestDaVinciFlowTimeoutScreenSettings_ProcessorAndHCL(t *testing.T) {
+	registry := davinciFlowRegistry(t)
+	p := core.NewProcessor(registry)
+
+	result, err := p.ProcessResource("pingone_davinci_flow", buildFlowResponseWithTimeoutSettings())
+	require.NoError(t, err)
+
+	settings, ok := result.Attributes["settings"].(map[string]interface{})
+	require.True(t, ok, "settings should be a map")
+	assert.Equal(t, "div#timeout { color: red; }", settings["custom_timeout_error_screen_css"])
+	assert.Equal(t, `<div id="pagetimeout"></div>`, settings["custom_timeout_error_screen_html"])
+	assert.Equal(t, "Your session timed out", settings["custom_timeout_error_screen_message"])
+	assert.Equal(t, true, settings["use_custom_timeout_error_screen"])
+
+	// HCL rendering: all four attributes must appear inside the settings
+	// block (they are optional on the provider, so the computed-skip guard
+	// must not drop them).
+	flowDef, err := registry.Get("pingone_davinci_flow")
+	require.NoError(t, err)
+	formatter := hclformatter.NewFormatter()
+	hcl, err := formatter.Format(result, flowDef, hclformatter.FormatOptions{SkipDependencies: true, EnvironmentID: "00000000-0000-0000-0000-000000000001"})
+	require.NoError(t, err)
+	assert.Contains(t, hcl, "custom_timeout_error_screen_css")
+	assert.Contains(t, hcl, "custom_timeout_error_screen_html")
+	assert.Contains(t, hcl, "custom_timeout_error_screen_message")
+	assert.Contains(t, hcl, "use_custom_timeout_error_screen")
+	// hclwrite aligns '=' within a block, so collapse whitespace before
+	// asserting the rendered value rather than pinning exact spacing.
+	assert.Contains(t,
+		regexp.MustCompile(`\s+`).ReplaceAllString(hcl, " "),
+		"use_custom_timeout_error_screen = true")
 }
 
 // TestDaVinciFlowOutcomes_ProcessorPresentAndAbsent exercises the full
