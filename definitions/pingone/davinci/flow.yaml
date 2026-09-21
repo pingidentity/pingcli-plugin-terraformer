@@ -114,6 +114,22 @@ attributes:
         type: string
         source_path: CustomErrorScreenBrandLogoUrl
 
+      # Added in SDK v0.13.0 (upstream: pingone-go-client#96)
+      - name: CustomTimeoutErrorScreenCSS
+        terraform_name: custom_timeout_error_screen_css
+        type: string
+        source_path: CustomTimeoutErrorScreenCSS
+
+      - name: CustomTimeoutErrorScreenHTML
+        terraform_name: custom_timeout_error_screen_html
+        type: string
+        source_path: CustomTimeoutErrorScreenHTML
+
+      - name: CustomTimeoutErrorScreenMessage
+        terraform_name: custom_timeout_error_screen_message
+        type: string
+        source_path: CustomTimeoutErrorScreenMessage
+
       - name: CustomFaviconLink
         terraform_name: custom_favicon_link
         type: string
@@ -175,6 +191,11 @@ attributes:
         terraform_name: use_csp
         type: bool
         source_path: UseCSP
+
+      - name: UseCustomTimeoutErrorScreen
+        terraform_name: use_custom_timeout_error_screen
+        type: bool
+        source_path: UseCustomTimeoutErrorScreen
 
       - name: UseCustomCSS
         terraform_name: use_custom_css
