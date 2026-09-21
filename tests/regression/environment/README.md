@@ -63,75 +63,49 @@ environment against this config, re-export into a scratch directory and compare.
   "Adopting state"). Re-exporting reproduces the invalid attribute until the
   exporter is fixed.
 
-## Regenerating (scratch only)
+## Regenerating
 
-Wholesale re-export over this directory is **retired** — the config is the
-source of truth for the managed environment, and re-exports clobber lifecycle
-blocks and hand-authored resources. Two helpers, both run with the read-only
+The export refreshes the whole directory — committed `.tf` config, the
+git-ignored tfvars values file, and the committed `ping-export-imports.tf` —
+with safeguards for user-maintained content. Run with the read-only
 credential item `op://PingIdentity/terraformer-export-regression-read-only-US`
 (see `.scratch/op-terraformer-export-env-read-only-US.env` template — that
 file is git-ignored):
 
 ```bash
-# Refresh the tfvars values file: compares generated variable names against
-# the existing file — identical set ⇒ your reviewed values stay untouched;
-# new variables ⇒ old file backed up to ping-export-terraform.auto.tfvars.bak and the fresh export
-# replaces it, so you can diff the two and port values.
+# Backs up the tracked config (.config-backup/) and tfvars (.bak), then
+# replaces both with a fresh export (import file included).
 op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
   ./export.sh
 
-# Wholesale refresh: back up the committed config, then replace the .tf files
-# with a fresh full export (use when the environment's resource set changed,
-# e.g. after deliberate UI adjustments). Review the git diff before
-# committing; revert with ./export.sh --revert.
-op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
-  ./export.sh --full
-
-# (--full also generates the git-ignored ping-export-imports.tf for the
-# one-time state adoption — see "Adopting state".)
+# Revert the config to the last backup (tfvars is not restored).
+./export.sh --revert
 ```
 
-Default mode exports to a temp dir and copies only the tfvars file here —
-the committed `.tf` files are never touched. `--full` replaces them (after
-backing the tracked config up to git-ignored `.config-backup/`; `--revert`
-restores it).
+Behavior per file:
 
-- **`ping-export-terraform.auto.tfvars` is git-ignored.** The default export
-  copies over it only when the generated export introduces new variable names
-  (backing the previous file up to `ping-export-terraform.auto.tfvars.bak`); a variable-set-identical
-  export leaves your reviewed values untouched. Review it (scrub anything
-  unintended), keep the master copy in 1Password, and upload it base64-encoded
-  as the `TERRAFORM_TFVARS_BASE64` GitHub secret.
-- For a local `terraform plan`/`apply`, leave the tfvars file in place (it is
-  auto-loaded); for diffing, compare the scratch export's resource files
-  against the committed ones.
-- An unexpected diff between the scratch export and this config means the live
-  environment drifted — repair it with the `regression-env-apply` workflow
-  (config is authoritative), not by copying exported files here.
+- **`.tf` config** — replaced (after backup). Review the git diff before
+  committing: the raw export carries embedded secrets from plain variables
+  and lacks hand-curated blocks.
+- **`ping-export-terraform.auto.tfvars`** (git-ignored) — value-protected: an
+  export with the same variable set restores your reviewed values
+  automatically; a changed set keeps the old file as
+  `ping-export-terraform.auto.tfvars.bak` for diffing. Review, keep the
+  master copy in 1Password, and upload base64-encoded as the
+  `TERRAFORM_TFVARS_BASE64` GitHub secret (`./export.sh --upload-only`).
+- **`ping-export-imports.tf`** (committed) — import blocks auto-import
+  resources absent from state (so a rebuilt environment self-imports on the
+  first apply) and are inert no-ops for resources already managed.
 
 ## Adopting state (one-time)
 
-The live environment's 198 resources must be imported into the S3 state before
-the first apply. This is a maintainer task done **locally** (import only reads
-— the read-only credential is sufficient), using import blocks the exporter
-generates in exactly the right `module.ping-export.<type>.<label>` address
-format:
+The live environment's resources are imported into the S3 state via the
+committed `ping-export-imports.tf` — its import blocks auto-import resources
+absent from state, so adoption is just an apply:
 
 ```bash
-make build
-
-# 1. Generate the import blocks: ./export.sh --full emits the full config
-#    AND the import file in one run (addresses match because the module
-#    name/dir are the exporter defaults).
-op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
-  ./export.sh --full
-
-# 2. The import file (ping-export-imports.tf) is already in this directory
-#    (git-ignored).
-
-# 3. Init with the real backend and provide variable values — locally,
-#    easiest as the git-ignored ping-export-terraform.auto.tfvars generated
-#    by ./export.sh (contains testPW too).
+# Init with the real backend; provide variable values locally as the
+# git-ignored ping-export-terraform.auto.tfvars (generated by ./export.sh).
 terraform init \
   -backend-config="bucket=${TF_VAR_tf_state_bucket}" \
   -backend-config="region=${TF_VAR_tf_state_region}" \
@@ -139,14 +113,13 @@ terraform init \
   -backend-config="encrypt=true"
 
 terraform plan -out=adopt.tfplan    # review; expect near-zero diffs
+terraform apply adopt.tfplan        # import blocks are consumed during apply
 
-# 4. Apply — import blocks are consumed during apply.
-terraform apply adopt.tfplan
-
-# 5. Remove the import file and confirm a clean plan.
-rm ping-export-imports.tf
 terraform plan                      # must show "No changes."
 ```
+
+The import file stays committed: it is inert for resources already in state
+and self-heals imports on rebuilt environments.
 
 **Iterate perma-diffs before the first apply.** Anything that diffs on every
 plan gets a targeted `lifecycle { ignore_changes = [...] }` with a comment

@@ -17,10 +17,6 @@ terraform.rc
 ping-export-terraform.auto.tfvars
 ping-export-terraform.auto.tfvars.bak
 
-# Ephemeral import file generated for one-time state adoption — contains
-# live resource IDs and must not be committed (public repo).
-ping-export-imports.tf
-
-# Backup of the committed config made by "export.sh --full" (restore with
+# Backup of the committed config made by "export.sh" (restore with
 # "export.sh --revert").
 .config-backup/
