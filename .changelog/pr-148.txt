@@ -1,0 +1,3 @@
+```release-note:bug
+Fixed `--list-resources` printing resource addresses to the logger (stderr) instead of stdout — addresses are now pipeable, matching the `list-outputs` command behaviour.
+```

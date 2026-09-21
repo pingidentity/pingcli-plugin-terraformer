@@ -1,0 +1,22 @@
+# Local state / plans — this directory stores config only, never state
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# Local filled-in values (never commit resolved secrets)
+*.local.tfvars
+
+# Variable values ride in the TERRAFORM_TFVARS_BASE64 CI secret (and
+# 1Password locally) — never commit them here. See README.md.
+ping-export-terraform.auto.tfvars
+ping-export-terraform.auto.tfvars.bak
+
+# Backup of the committed config made by "export.sh" (restore with
+# "export.sh --revert").
+.config-backup/

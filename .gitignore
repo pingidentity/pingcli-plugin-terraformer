@@ -35,6 +35,8 @@ Thumbs.db
 # Output files
 *.hcl
 *.tf
+# ...except the committed config-as-code snapshot of the regression environment
+!tests/regression/environment/**
 output/
 dist/
 
@@ -45,6 +47,7 @@ dist/
 !tests/regression/matrix.json
 !**/testdata/**/*.tf
 localsecrets
+*.tfvars
 
 pingcli-terraformer
 
