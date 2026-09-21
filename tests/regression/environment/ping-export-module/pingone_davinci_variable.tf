@@ -595,6 +595,22 @@ resource "pingone_davinci_variable" "pingcli__registrationPopulationId_flowInsta
 }
 
 
+resource "pingone_davinci_variable" "pingcli__testPassword_company" {
+  environment_id = var.pingone_environment_id
+  name           = "testPassword"
+  context        = "company"
+  data_type      = "string"
+  mutable        = false
+  display_name   = "hard code password only for testing"
+  min            = 0
+  max            = 2000
+
+  value = {
+    string = var.davinci_variable_testPassword_value
+  }
+}
+
+
 resource "pingone_davinci_variable" "pingcli__testPW_flowInstance" {
   environment_id = var.pingone_environment_id
   name           = "testPW"

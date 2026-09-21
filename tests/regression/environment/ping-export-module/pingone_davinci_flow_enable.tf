@@ -1,11 +1,4 @@
 
-
-resource "pingone_davinci_flow_enable" "pingcli__-005B-cloned-005D--0020-1775670565498-0020---0020-DaV-Flow_1775670546" {
-  environment_id = var.pingone_environment_id
-  flow_id        = pingone_davinci_flow.pingcli__-005B-cloned-005D--0020-1775670565498-0020---0020-DaV-Flow_1775670546.id
-  enabled        = true
-}
-
 resource "pingone_davinci_flow_enable" "pingcli__CIAM-0020-Plus-0020---0020-Account-0020-Recovery-0020---0020-Email-0020---0020-Subflow" {
   environment_id = var.pingone_environment_id
   flow_id        = pingone_davinci_flow.pingcli__CIAM-0020-Plus-0020---0020-Account-0020-Recovery-0020---0020-Email-0020---0020-Subflow.id
@@ -79,13 +72,6 @@ resource "pingone_davinci_flow_enable" "pingcli__CIAM-0020-Plus-0020---0020-Veri
 resource "pingone_davinci_flow_enable" "pingcli__CIAM-0020-Plus-0020---0020-Verify-0020-Email-0020-MFA-0020---0020-Subflow" {
   environment_id = var.pingone_environment_id
   flow_id        = pingone_davinci_flow.pingcli__CIAM-0020-Plus-0020---0020-Verify-0020-Email-0020-MFA-0020---0020-Subflow.id
-  enabled        = true
-}
-
-
-resource "pingone_davinci_flow_enable" "pingcli__DaV-Flow-postman" {
-  environment_id = var.pingone_environment_id
-  flow_id        = pingone_davinci_flow.pingcli__DaV-Flow-postman.id
   enabled        = true
 }
 

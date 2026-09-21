@@ -100,6 +100,7 @@ module "ping-export" {
   davinci_variable_name_value = var.davinci_variable_name_value
   davinci_variable_registrationAgreementId_value = var.davinci_variable_registrationAgreementId_value
   davinci_variable_registrationPopulationId_value = var.davinci_variable_registrationPopulationId_value
+  davinci_variable_testPassword_value = var.davinci_variable_testPassword_value
   davinci_variable_testPW_value = var.davinci_variable_testPW_value
 
 }

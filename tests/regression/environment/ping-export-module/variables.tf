@@ -392,6 +392,10 @@ variable "davinci_variable_registrationPopulationId_value" {
   type        = string
   description = "Value for DaVinci variable registrationPopulationId"
 }
+variable "davinci_variable_testPassword_value" {
+  type        = string
+  description = "Value for DaVinci variable testPassword"
+}
 variable "davinci_variable_testPW_value" {
   type        = string
   description = "Value for DaVinci variable testPW"
