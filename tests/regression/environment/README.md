@@ -85,10 +85,8 @@ op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
 op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
   ./export.sh --full
 
-# Same as --full, plus the one-time state-adoption import file (see
-# "Adopting state").
-op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
-  ./export.sh --full --imports
+# (--full also generates the git-ignored ping-export-imports.tf for the
+# one-time state adoption — see "Adopting state".)
 ```
 
 Default mode exports to a temp dir and copies only the tfvars file here —
@@ -117,14 +115,14 @@ format:
 ```bash
 make build
 
-# 1. Generate the import blocks (throwaway export; addresses match because
-#    module name/dir are the exporter defaults).
+# 1. Generate the import blocks: ./export.sh --full emits the full config
+#    AND the import file in one run (addresses match because the module
+#    name/dir are the exporter defaults).
 op run --env-file=.scratch/op-terraformer-export-env-read-only-US.env -- \
-  ./pingcli-terraformer export --output-format hcl --include-imports \
-  --out /tmp/env-import --module-name ping-export --module-dir ping-export-module
+  ./export.sh --full
 
-# 2. Copy ONLY the import file into this root module (it is git-ignored).
-cp /tmp/env-import/ping-export-imports.tf .
+# 2. The import file (ping-export-imports.tf) is already in this directory
+#    (git-ignored).
 
 # 3. Init with the real backend and provide variable values — locally,
 #    easiest as the git-ignored ping-export-terraform.auto.tfvars generated

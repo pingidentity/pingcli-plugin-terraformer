@@ -14,19 +14,18 @@
 #
 #   --full   — replace the committed .tf config with a fresh export (after
 #              backing the current config up), for wholesale baseline
-#              refreshes. Review before committing: the raw export carries
+#              refreshes. The export also generates the state-adoption
+#              import file (ping-export-imports.tf, git-ignored) for the
+#              one-time `terraform apply` import (README.md "Adopting
+#              state"). Review before committing: the raw export carries
 #              embedded secrets from plain variables and lacks hand-curated
 #              lifecycle blocks. Reversible with --revert.
-#
-#   --imports — additionally generate the ephemeral state-adoption import
-#              file (README.md "Adopting state"). Only valid with --full.
 #
 # Usage:
 #   ./export.sh                # refresh ping-export-terraform.auto.tfvars only
 #   ./export.sh --full         # back up current config, then replace the .tf
-#                              #  files with a fresh full export
-#   ./export.sh --full --imports
-#                              # same, plus the one-time state-adoption import file
+#                              #  files with a fresh full export (import
+#                              #  file included)
 #   ./export.sh --revert       # restore the config backup made by the last --full
 #   ./export.sh --upload-only  # upload the reviewed tfvars as TERRAFORM_TFVARS_BASE64
 #                              #  (export and upload are always separate steps: always
@@ -50,13 +49,11 @@ SCRATCH="$(mktemp -d /tmp/regression-env-export.XXXXXX)"
 trap 'rm -rf "${SCRATCH}"' EXIT
 
 FULL=0
-IMPORTS=0
 UPLOAD_ONLY=0
 REVERT=0
 for arg in "$@"; do
   case "${arg}" in
     --full) FULL=1 ;;
-    --imports) IMPORTS=1 ;;
     --revert) REVERT=1 ;;
     --upload-only) UPLOAD_ONLY=1 ;;
     -h|--help)
@@ -98,12 +95,6 @@ if [ "${REVERT:-0}" -eq 1 ]; then
   exit 0
 fi
 
-: "${FULL:=0}"
-if [ "${IMPORTS}" -eq 1 ] && [ "${FULL}" -ne 1 ]; then
-  printf -- '--imports is only valid with --full\n' >&2
-  exit 2
-fi
-
 for var in \
   PINGCLI_PINGONE_ENVIRONMENT_ID \
   PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID \
@@ -126,15 +117,20 @@ if [ "${FULL}" -eq 1 ]; then
   git -C . rev-parse HEAD > "${BACKUP}/manifest"
   echo "==> backed up committed config (revert with: ./export.sh --revert)"
 
+  # One export run produces the full config AND the state-adoption import
+  # file (--include-imports emits ping-export-imports.tf alongside).
   echo "==> exporting full config to ${ENV_DIR}"
   mkdir -p "${ENV_DIR}"
   "${BIN}" export \
     --output-format hcl \
     --include-values \
+    --include-imports \
     --out "${ENV_DIR}"
 
   echo
   echo "wrote fresh full config into ${ENV_DIR} (git will show the diff)"
+  echo "wrote ${ENV_DIR}/ping-export-imports.tf (git-ignored; for the one-time"
+  echo "  state adoption — delete after 'terraform apply' consumes it)"
   echo "  -> review before committing: plain DaVinci variables holding passwords"
   echo "     (e.g. testPW) export verbatim in BOTH the .tf graph_data and tfvars;"
   echo "     secret values export as empty strings marked"
@@ -158,17 +154,4 @@ else
   echo "\"Secret value - provide manually\", but plain DaVinci variables holding"
   echo "passwords (e.g. testPW) export verbatim — scrub anything you do not want"
   echo "in the CI secret. There is no --upload that skips this step on purpose."
-fi
-
-if [ "${IMPORTS}" -eq 1 ] && [ "${FULL}" -eq 1 ]; then
-  echo
-  echo "==> generating state-adoption import blocks"
-  "${BIN}" export \
-    --output-format hcl \
-    --include-imports \
-    --out "${SCRATCH}/imports" \
-    --module-name ping-export --module-dir ping-export-module
-  cp "${SCRATCH}/imports/ping-export-imports.tf" "${ENV_DIR}/"
-  echo "wrote ${ENV_DIR}/ping-export-imports.tf"
-  echo "  (git-ignored; delete after 'terraform apply' consumes it — see README.md)"
 fi
