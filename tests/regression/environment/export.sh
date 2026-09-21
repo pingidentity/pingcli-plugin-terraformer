@@ -124,6 +124,13 @@ if [ "${FULL}" -eq 1 ]; then
   git -C . rev-parse HEAD > "${BACKUP}/manifest"
   echo "==> backed up committed config (revert with: ./export.sh --revert)"
 
+  # The export overwrites the tfvars too — back it up so user-maintained
+  # values survive (same backup as the default path).
+  if [ -f "${TFVARS_FILE}" ]; then
+    cp "${TFVARS_FILE}" "${TFVARS_FILE}.bak"
+    echo "==> backed up existing tfvars to ping-export-terraform.auto.tfvars.bak"
+  fi
+
   # One export run produces the full config AND the state-adoption import
   # file (--include-imports emits ping-export-imports.tf alongside).
   echo "==> exporting full config to ${ENV_DIR}"
@@ -136,6 +143,8 @@ if [ "${FULL}" -eq 1 ]; then
 
   echo
   echo "wrote fresh full config into ${ENV_DIR} (git will show the diff)"
+  echo "  (previous tfvars saved as ping-export-terraform.auto.tfvars.bak —"
+  echo "   port your reviewed values into the fresh one)"
   echo "wrote ${ENV_DIR}/ping-export-imports.tf (git-ignored; for the one-time"
   echo "  state adoption — delete after 'terraform apply' consumes it)"
   echo "  -> review before committing: plain DaVinci variables holding passwords"
