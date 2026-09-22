@@ -102,6 +102,10 @@ tools/
 
 Adding a new PingOne resource requires **two files** and **zero edits** to existing code.
 
+> After landing a new resource type, add a representative live resource to the
+> shared regression environment so the regression matrix exercises it — see
+> "Adding a New Resource Type to the Environment" in `tests/regression/README.md`.
+
 ### Step 1: Analyze the SDK Type
 
 Find the Go SDK struct for the resource. The fields you see here are what `source_path` values reference.

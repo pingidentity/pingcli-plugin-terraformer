@@ -9,7 +9,7 @@ require (
 	github.com/patrickcping/pingone-go-sdk-v2 v0.14.14
 	github.com/patrickcping/pingone-go-sdk-v2/management v0.70.0
 	github.com/pingidentity/pingcli v0.8.0
-	github.com/pingidentity/pingone-go-client v0.12.0
+	github.com/pingidentity/pingone-go-client v0.13.0
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.18.0

@@ -78,6 +78,8 @@ github.com/pingidentity/pingcli v0.8.0 h1:KmUuzGliAtNlLz/okMRtT0vdRoiSAz3Kb+/FGt
 github.com/pingidentity/pingcli v0.8.0/go.mod h1:3fAj8w0kZtLU6DBLKdCLQnPCN+gbVjysnwGrgsJoSYY=
 github.com/pingidentity/pingone-go-client v0.12.0 h1:t9L18Qul3UXqqvi0578R7bzys54cEEl+oSJDT6rMdyM=
 github.com/pingidentity/pingone-go-client v0.12.0/go.mod h1:ZFGQiCdcLdhDMnNZrefNY86Mb2wHH7GTWMDqv/PWKBk=
+github.com/pingidentity/pingone-go-client v0.13.0 h1:IRDAcFhnrXuiQDfpgxIwcJq5HXrdbMvVZtv9kJghuns=
+github.com/pingidentity/pingone-go-client v0.13.0/go.mod h1:ZFGQiCdcLdhDMnNZrefNY86Mb2wHH7GTWMDqv/PWKBk=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

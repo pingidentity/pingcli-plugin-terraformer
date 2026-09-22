@@ -31,7 +31,7 @@ type Edge struct {
 type DependencyGraph struct {
 	nodes     map[string]ResourceNode // composite key -> node
 	edges     []Edge
-	nameUsage map[string]int
+	nameUsage map[nameUsageKey]int
 	mu        sync.RWMutex
 }
 
@@ -40,7 +40,7 @@ func New() *DependencyGraph {
 	return &DependencyGraph{
 		nodes:     make(map[string]ResourceNode),
 		edges:     make([]Edge, 0),
-		nameUsage: make(map[string]int),
+		nameUsage: make(map[nameUsageKey]int),
 	}
 }
 
@@ -50,7 +50,7 @@ func (g *DependencyGraph) AddResource(resourceType, id, name string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	uniqueName := g.ensureUniqueName(name)
+	uniqueName := g.ensureUniqueName(resourceType, name)
 	key := makeKey(resourceType, id)
 	g.nodes[key] = ResourceNode{
 		ResourceType: resourceType,
@@ -438,12 +438,18 @@ func makeKey(resourceType, id string) string {
 	return resourceType + ":" + id
 }
 
-func (g *DependencyGraph) ensureUniqueName(name string) string {
-	count, exists := g.nameUsage[name]
+type nameUsageKey struct {
+	resourceType string
+	name         string
+}
+
+func (g *DependencyGraph) ensureUniqueName(resourceType, name string) string {
+	key := nameUsageKey{resourceType: resourceType, name: name}
+	count, exists := g.nameUsage[key]
 	if !exists {
-		g.nameUsage[name] = 1
+		g.nameUsage[key] = 1
 		return name
 	}
-	g.nameUsage[name] = count + 1
+	g.nameUsage[key] = count + 1
 	return fmt.Sprintf("%s_%d", name, count+1)
 }

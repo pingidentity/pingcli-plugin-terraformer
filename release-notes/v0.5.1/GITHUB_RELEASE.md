@@ -1,0 +1,4 @@
+### ENHANCEMENTS
+
+[216948b](https://github.com/pingidentity/pingcli-plugin-terraformer/commit/216948b) `definitions/pingone`: Completed the computed-attribute audit of the 7 DaVinci resource definitions (see #125). Added `oauth.client_secret` (computed, sensitive) to `pingone_davinci_application` and the read-only `metadata` block (colors/logos/type/vendor) to `pingone_davinci_connector_instance`. These are now enumerable by `list-outputs` and exportable via `--output-attribute`; the computed-skip guard keeps them out of emitted resource configuration. Audit confirmed the remaining definitions match the provider: `pingone_davinci_flow` (id, connectors, current_version, enabled, published_version), `pingone_davinci_application_flow_policy`, `pingone_davinci_variable` (id). `pingone_davinci_flow_deploy`/`pingone_davinci_flow_enable` have no API-side id (id_field: flow_id). [#155](https://github.com/pingidentity/pingcli-plugin-terraformer/pull/155)
+

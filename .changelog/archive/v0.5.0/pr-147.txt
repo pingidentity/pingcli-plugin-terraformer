@@ -1,0 +1,3 @@
+```release-note:bug
+`resource/pingone_davinci_flow`: Fixed a regression where exporting an environment with a legacy `jsLinks` format flow showed a raw SDK unmarshal error instead of the actionable hint (see #10).
+```

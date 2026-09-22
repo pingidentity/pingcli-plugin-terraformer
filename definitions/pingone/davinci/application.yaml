@@ -98,6 +98,15 @@ attributes:
         type: string
         source_path: SpjwksUrl
 
+      # Computed + sensitive on the provider; SDK returns it in the oauth
+      # response. Exporter never writes it into config (computed-skip guard),
+      # but declaring it makes it visible to list-outputs/--output-attribute.
+      - name: ClientSecret
+        terraform_name: client_secret
+        type: string
+        source_path: ClientSecret
+        computed: true
+
 dependencies:
   depends_on:
     - resource_type: pingone_environment

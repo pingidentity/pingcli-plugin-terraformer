@@ -43,6 +43,19 @@ func TestGenerateImportBlock_Simple(t *testing.T) {
 	assert.Contains(t, result, `"env-456/var-123"`)
 }
 
+func TestGenerateImportBlock_UsesCanonicalLabelAndRawIDs(t *testing.T) {
+	g := NewGenerator()
+	def := testDef("target_type_b", "{env_id}/{parent_id}/{resource_id}", []string{"name"})
+	data := testData("resource-raw-id", "derived-name", map[string]interface{}{"name": "derived-name", "parent_id": "parent-raw-id"})
+	data.Label = "pingcli__DVA"
+
+	result, err := g.GenerateImportBlock(data, def, "env-raw-id")
+	require.NoError(t, err)
+	assert.Contains(t, result, "to = target_type_b.pingcli__DVA")
+	assert.Contains(t, result, `"env-raw-id/parent-raw-id/resource-raw-id"`)
+	assert.NotContains(t, result, "derived_name")
+}
+
 func TestGenerateImportBlock_LabelFields(t *testing.T) {
 	g := NewGenerator()
 	def := testDef("pingone_davinci_variable", "{env_id}/{resource_id}", []string{"name", "context"})

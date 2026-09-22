@@ -99,6 +99,21 @@ type ExportOrchestrator struct {
 	embeddedRefs *EmbeddedReferenceRegistry
 }
 
+// excludedResourceIdentity identifies a filtered resource by both its
+// Terraform resource type and API ID. API IDs are only unique within a
+// resource type, so filtering must not bleed across resource types that happen
+// to use the same ID.
+type excludedResourceIdentity struct {
+	resourceType string
+	id           string
+}
+
+type excludedResourceSet map[excludedResourceIdentity]bool
+
+func newExcludedResourceIdentity(resourceType, id string) excludedResourceIdentity {
+	return excludedResourceIdentity{resourceType: resourceType, id: id}
+}
+
 // OrchestratorOption configures optional ExportOrchestrator behaviour.
 type OrchestratorOption func(*ExportOrchestrator)
 
@@ -179,7 +194,7 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 	// 3. Process each resource type in dependency order.
 	depGraph := graph.New()
 	var results []*ExportedResourceData
-	excludedIDs := make(map[string]bool) // tracks IDs excluded by filter
+	excludedIDs := make(excludedResourceSet) // tracks type-qualified resources excluded by filter
 
 	for _, def := range ordered {
 		resourceType := def.Metadata.ResourceType
@@ -219,7 +234,7 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 				if opts.ResourceFilter.Allow(address) {
 					filtered = append(filtered, rd)
 				} else {
-					excludedIDs[rd.ID] = true
+					excludedIDs[newExcludedResourceIdentity(resourceType, rd.ID)] = true
 				}
 			}
 			processed = filtered
@@ -381,7 +396,7 @@ func (o *ExportOrchestrator) checkAttributeReferences(resourceType string, attrs
 // these produce variable fallbacks with label-derived names.
 //
 // Returns deduplicated FallbackVariable entries for variable declarations.
-func (o *ExportOrchestrator) resolveReferences(results []*ExportedResourceData, g *graph.DependencyGraph, environmentID string, excludedIDs map[string]bool) []FallbackVariable {
+func (o *ExportOrchestrator) resolveReferences(results []*ExportedResourceData, g *graph.DependencyGraph, environmentID string, excludedIDs excludedResourceSet) []FallbackVariable {
 	varSeen := make(map[string]bool)
 	var fallbackVars []FallbackVariable
 
@@ -569,7 +584,7 @@ func injectEnvIDAttrs(attrs map[string]interface{}, defs []schema.AttributeDefin
 
 // resolveAttrs recursively resolves reference attributes in an attribute map
 // against the corresponding schema attribute definitions.
-func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinition, g *graph.DependencyGraph, environmentID string, excludedIDs map[string]bool) {
+func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinition, g *graph.DependencyGraph, environmentID string, excludedIDs excludedResourceSet) {
 	for _, attrDef := range defs {
 		tName := attrDef.TerraformName
 		if tName == "" {
@@ -648,7 +663,7 @@ func resolveAttrs(attrs map[string]interface{}, defs []schema.AttributeDefinitio
 // When a resource is found in the graph but its ID is in excludedIDs (removed
 // by filtering), a variable reference is produced using the resource label for
 // a unique, human-readable variable name.
-func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *graph.DependencyGraph, excludedIDs map[string]bool) ResolvedReference {
+func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *graph.DependencyGraph, excludedIDs excludedResourceSet) ResolvedReference {
 	field := "id"
 	if attrDef.ReferenceField != "" {
 		field = attrDef.ReferenceField
@@ -662,7 +677,7 @@ func resolveOneReference(attrDef schema.AttributeDefinition, uuid string, g *gra
 			// reference with a label-derived name instead of a resource ref.
 			// Exception: pingone_environment always uses the canonical
 			// "pingone_environment_id" variable for backward compatibility.
-			if excludedIDs[uuid] {
+			if excludedIDs[newExcludedResourceIdentity(attrDef.ReferencesType, uuid)] {
 				var varName string
 				if attrDef.ReferencesType == "pingone_environment" {
 					varName = "pingone_environment_id"
@@ -1028,7 +1043,7 @@ func (o *ExportOrchestrator) applyUpstreamExpansion(
 	results []*ExportedResourceData,
 	depGraph *graph.DependencyGraph,
 	resourceFilter *filter.ResourceFilter,
-	excludedIDs map[string]bool,
+	excludedIDs excludedResourceSet,
 ) []*ExportedResourceData {
 	// Build edges from all processed (unfiltered) resources so the graph is complete
 	// before we apply filtering.
@@ -1085,10 +1100,10 @@ func (o *ExportOrchestrator) applyUpstreamExpansion(
 				kept = append(kept, rd)
 			} else if !expandedSet[key] {
 				// Mark as excluded if not in expanded set
-				excludedIDs[rd.ID] = true
+				excludedIDs[newExcludedResourceIdentity(erd.ResourceType, rd.ID)] = true
 			} else if explicitExcludes[key] {
 				// Explicitly excluded (but might be referenced): mark for fallback variables
-				excludedIDs[rd.ID] = true
+				excludedIDs[newExcludedResourceIdentity(erd.ResourceType, rd.ID)] = true
 			}
 		}
 

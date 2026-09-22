@@ -132,6 +132,62 @@ func TestFormatter_Format_DisplayNameOptional(t *testing.T) {
 	assert.Contains(t, output, `"My Variable"`)
 }
 
+func TestFormatter_Format_EqualLabelsRemainTypeQualified(t *testing.T) {
+	targetDef := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{ResourceType: "target_type_b"},
+	}
+	target := &core.ResourceData{
+		ID:    "target-raw-id",
+		Name:  "target-name-derived-label",
+		Label: "pingcli__DVA",
+	}
+	targetOutput, err := hclformatter.NewFormatter().Format(target, targetDef, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, targetOutput, `resource "target_type_b" "pingcli__DVA" {`)
+
+	sourceDef := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{ResourceType: "source_type"},
+		Attributes: []schema.AttributeDefinition{{
+			Name: "TargetID", TerraformName: "target_id", Type: "string",
+			ReferencesType: "target_type_b", ReferenceField: "id",
+		}},
+	}
+	source := &core.ResourceData{
+		ID:    "source-id",
+		Name:  "source-name",
+		Label: "pingcli__source",
+		Attributes: map[string]interface{}{
+			"target_id": core.ResolvedReference{
+				ResourceType: "target_type_b", ResourceName: "pingcli__DVA", Field: "id",
+			},
+		},
+	}
+	sourceOutput, err := hclformatter.NewFormatter().Format(source, sourceDef, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, sourceOutput, `resource "source_type" "pingcli__source" {`)
+	assert.Contains(t, sourceOutput, "target_id = target_type_b.pingcli__DVA.id")
+	assert.NotContains(t, sourceOutput, "target_type_b.pingcli__DVA_2")
+}
+
+func TestFormatter_Format_DependsOnEqualLabelsAndUnresolvedAreOmitted(t *testing.T) {
+	def := &schema.ResourceDefinition{Metadata: schema.ResourceMetadata{ResourceType: "source_type"}}
+	data := &core.ResourceData{
+		ID: "source-id", Label: "pingcli__source",
+		DependsOnResources: []core.RuntimeDependsOn{
+			{ResourceType: "target_type_a", ResourceID: "a-id", Label: "pingcli__DVA"},
+			{ResourceType: "target_type_b", ResourceID: "b-id", Label: "pingcli__DVA"},
+			{ResourceType: "target_type_c", ResourceID: "unknown-id", Label: ""},
+		},
+	}
+
+	output, err := hclformatter.NewFormatter().Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, output, "target_type_a.pingcli__DVA")
+	assert.Contains(t, output, "target_type_b.pingcli__DVA")
+	assert.NotContains(t, output, "target_type_c")
+	assert.NotContains(t, output, "unknown-id")
+}
+
 func TestFormatter_FormatImportBlock(t *testing.T) {
 	f := hclformatter.NewFormatter()
 	def := minimalVariableDef()
@@ -143,6 +199,20 @@ func TestFormatter_FormatImportBlock(t *testing.T) {
 	assert.Contains(t, output, "import {")
 	assert.Contains(t, output, "to = pingone_davinci_variable.pingcli__my_var_company")
 	assert.Contains(t, output, `"env-xyz789/var-abc123"`)
+}
+
+func TestFormatter_FormatImportBlock_UsesCanonicalLabelAndRawIDs(t *testing.T) {
+	data := resourceData()
+	data.Label = "pingcli__DVA"
+	data.Attributes["parent_id"] = "parent-raw-id"
+	def := minimalVariableDef()
+	def.Dependencies.ImportIDFormat = "{env_id}/{parent_id}/{resource_id}"
+
+	output, err := hclformatter.NewFormatter().FormatImportBlock(data, def, "env-raw-id")
+	require.NoError(t, err)
+	assert.Contains(t, output, "to = pingone_davinci_variable.pingcli__DVA")
+	assert.Contains(t, output, `"env-raw-id/parent-raw-id/var-abc123"`)
+	assert.NotContains(t, output, "my_var_company")
 }
 
 func TestFormatter_FormatList_Sorted(t *testing.T) {
