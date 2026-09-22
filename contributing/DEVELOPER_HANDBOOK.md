@@ -137,6 +137,8 @@ Create `definitions/pingone/{category}/{short_name}.yaml` (e.g., `base/` for Pin
 
 **Naming Strategy**: The YAML `label_fields` list combines attributes to form a unique resource label. This label is automatically sanitized via `utils.SanitizeResourceName()` (or `utils.SanitizeMultiKeyResourceName()` for composites) to produce a valid Terraform resource name. You do not specify sanitization in the YAML; the processing engine handles it.
 
+**Computed-attribute rule** (from the #125 audit): declare every attribute the Terraform provider marks `Computed` that is present in the API response, with `computed: true` and a `source_path` — including nested attributes inside optional blocks. Mark `sensitive: true` as well when the provider marks the attribute Sensitive. Undeclared computed attributes are invisible to `list-outputs` and `--output-attribute`; declared ones are safely excluded from emitted configuration by the formatters' computed-skip guard. Only provider-computed fields the API does *not* return take `computed: true` without a `source_path`.
+
 ```yaml
 metadata:
   platform: pingone
@@ -975,8 +977,8 @@ attributes:
     type: <type>                         # string|number|bool|object|list|map|set|type_discriminated_block
     source_path: <Go.Struct.Path>        # Dot-notation, Go field names
     required: true|false
-    computed: true|false
-    sensitive: true|false
+    computed: true|false                  # true for every provider-Computed attribute; WITH source_path if the API returns it, WITHOUT if it doesn't
+    sensitive: true|false                 # mirror the provider's Sensitive marking (output propagation tracked in #156)
     variable_eligible: true|false
     variable_default: <value>            # Optional default for extracted variable
     references_type: <other_resource>    # Target resource type for reference resolution

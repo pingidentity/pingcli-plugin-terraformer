@@ -258,6 +258,8 @@ type AttributeDefinition struct {
 
 **Available transforms**: `passthrough`, `base64_encode`, `base64_decode`, `json_encode`, `json_decode`, `jsonencode_raw`, `to_string`, `value_map`, `custom`
 
+**Computed-attribute semantics**: `Computed: true` serves two distinct purposes depending on whether `SourcePath` is set. With a `SourcePath` (provider-Computed and returned by the API), the processor extracts the value so output-path enumeration (`list-outputs`, `--output-attribute`) can surface it — computed attributes are frequently the ones users want as outputs (e.g. `api_key.value`, `oauth.client_secret`). Without a `SourcePath` (provider-Computed but absent from the API), the attribute is declaration-only. In both cases the formatters' computed-skip guard (`Computed && !Required && ReferencesType == ""`) excludes the attribute from emitted resource configuration, including suppressing an entirely-computed object block. Every definition must declare all provider-Computed attributes the API returns — the #125 audit established this as the standard, and `Sensitive: true` should mirror the provider's Sensitive marking.
+
 **Key fields**:
 - `SourcePath`: Dot-notation path to the Go struct field (uses Go field names, not JSON tags)
 - `MapKeyPath`: Sub-field path used to key slice elements when converting an API slice to a Terraform map
