@@ -64,6 +64,69 @@ attributes:
     transform: custom
     custom_transform: handleConnectorProperties
 
+  # Metadata - computed-only display block (colors/logos/type/vendor), entirely
+  # read-only on the provider. Declared so list-outputs/--output-attribute can
+  # enumerate it; the computed-skip guard keeps it out of emitted config.
+  - name: Metadata
+    terraform_name: metadata
+    type: object
+    source_path: Metadata
+    computed: true
+    nested_attributes:
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+        computed: true
+
+      - name: Vendor
+        terraform_name: vendor
+        type: string
+        source_path: Vendor
+        computed: true
+
+      - name: Colors
+        terraform_name: colors
+        type: object
+        source_path: Colors
+        computed: true
+        nested_attributes:
+          - name: Canvas
+            terraform_name: canvas
+            type: string
+            source_path: Canvas
+            computed: true
+
+          - name: CanvasText
+            terraform_name: canvas_text
+            type: string
+            source_path: CanvasText
+            computed: true
+
+          - name: Dark
+            terraform_name: dark
+            type: string
+            source_path: Dark
+            computed: true
+
+      - name: Logos
+        terraform_name: logos
+        type: object
+        source_path: Logos
+        computed: true
+        nested_attributes:
+          - name: Canvas
+            terraform_name: canvas
+            type: object
+            source_path: Canvas
+            computed: true
+            nested_attributes:
+              - name: ImageFileName
+                terraform_name: image_file_name
+                type: string
+                source_path: ImageFileName
+                computed: true
+
 dependencies:
   depends_on:
     - resource_type: pingone_environment
