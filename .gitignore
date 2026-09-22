@@ -5,6 +5,7 @@
 *.so
 *.dylib
 davinci-convert
+/tf-regression-provision
 
 # Test binary, built with `go test -c`
 *.test
@@ -44,7 +45,18 @@ dist/
 !**/testdata/**/*.json
 !tests/regression/matrix.json
 !**/testdata/**/*.tf
+!terraform-test-data/**/*.tf
 localsecrets
+
+# Terraform working directories (terraform-test-data/ is applied by
+# tools/tf-regression-provision; these are always local/ephemeral)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+terraform.tfvars.json
+crash.log
+crash.*.log
 
 pingcli-terraformer
 

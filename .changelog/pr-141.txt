@@ -1,0 +1,3 @@
+```release-note:internal
+Added a provisioned-environment E2E test tier (`terraform-test-data/`, `tools/tf-regression-provision`, `make e2e`) that provisions a throwaway PingOne environment via Terraform, applies hand-authored fixture resources, and runs the existing base-vs-PR export/compare pipeline against it. Additive to the existing `tests/regression/` tier; not yet wired into CI.
+```
