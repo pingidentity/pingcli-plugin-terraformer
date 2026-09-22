@@ -188,6 +188,12 @@ Enumerates all possible output attribute paths for exported resources without wr
 | DaVinci Application | `pingone_davinci_application` |
 | DaVinci Flow Policy | `pingone_davinci_application_flow_policy` |
 
+See [`contributing/RESOURCE_COVERAGE.md`](contributing/RESOURCE_COVERAGE.md) for the full, up-to-date list.
+
+**Note**: two categories of API-returned data are silently excluded from every export, since they are identical across all PingOne environments and not something you would ever author yourself:
+- The three built-in system applications (Admin Console, Portal, Self Service) have no `pingone_application` schema representation.
+- Built-in PingOne API resource scopes outside the `p1:read:user`/`p1:update:user` family (e.g. `p1:read:device`) aren't manageable via `pingone_resource_scope_pingone_api` — the provider's own schema validator rejects them.
+
 ## Resource Filtering
 
 Export only specific resources using glob or regex patterns:

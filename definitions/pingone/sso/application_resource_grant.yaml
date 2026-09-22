@@ -1,0 +1,101 @@
+# PingOne Application Resource Grant Resource Definition
+#
+# Children of pingone_application. The SDK's ApplicationResourceGrant.Resource
+# only carries {Id} — no resource_type discriminator — but the provider
+# schema requires resource_type (CUSTOM/OPENID_CONNECT/PINGONE_API) and,
+# only for CUSTOM, custom_resource_id. The Go handler performs a supplemental
+# ResourcesApi.ReadOneResource lookup per grant to resolve the resource's
+# Type and project custom_resource_id (only set for CUSTOM).
+#
+# scopes holds scope UUIDs that may come from pingone_resource_scope,
+# pingone_resource_scope_openid, or pingone_resource_scope_pingone_api
+# depending on resource_type — left as a raw string set, consistent with
+# oidc_scopes in application_attribute_mapping.yaml.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_application_resource_grant
+  api_type: ApplicationResourceGrant
+  name: PingOne Application Resource Grant
+  short_name: application_resource_grant
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: ApplicationResourceGrant
+  list_method: ApplicationResourceGrantsApi.ReadAllApplicationGrants
+  get_method: ApplicationResourceGrantsApi.ReadOneApplicationGrant
+  id_field: id
+  name_field: id
+  pagination_type: cursor
+  additional_id_fields:
+    - application_id
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: ID
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: EnvironmentID
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: ApplicationID
+    terraform_name: application_id
+    type: string
+    source_path: ApplicationID
+    required: true
+    references_type: pingone_application
+    reference_field: id
+
+  - name: ResourceType
+    terraform_name: resource_type
+    type: string
+    source_path: ResourceType
+    required: true
+
+  - name: CustomResourceID
+    terraform_name: custom_resource_id
+    type: string
+    source_path: CustomResourceID
+    references_type: pingone_resource
+    reference_field: id
+
+  - name: ResourceID
+    terraform_name: resource_id
+    type: string
+    source_path: ResourceID
+    computed: true
+
+  - name: Scopes
+    terraform_name: scopes
+    type: set
+    source_path: Scopes
+    required: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_application
+      field_path: ApplicationID
+      lookup_field: id
+      reference_format: "pingone_application.{name}.id"
+    - resource_type: pingone_resource
+      field_path: CustomResourceID
+      lookup_field: id
+      reference_format: "pingone_resource.{name}.id"
+      optional: true
+
+  import_id_format: "{env_id}/{application_id}/{id}"
+
+variables:
+  eligible_attributes: []

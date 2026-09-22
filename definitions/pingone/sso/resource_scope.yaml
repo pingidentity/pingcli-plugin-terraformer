@@ -1,0 +1,89 @@
+# PingOne Resource Scope Definition
+#
+# Scopes on CUSTOM pingone_resource instances only (the provider docs state
+# this resource "cannot manage PingOne API or OpenID Connect scopes" — those
+# are pingone_resource_scope_pingone_api / pingone_resource_scope_openid).
+# The Go handler enumerates CUSTOM resources (mirroring the filtering already
+# done by listResources in resource_resource.go) and lists scopes per
+# resource, since ResourceScopesApi is scoped by resourceID.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_resource_scope
+  api_type: ResourceScope
+  name: PingOne Resource Scope
+  short_name: resource_scope
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: ResourceScope
+  list_method: ResourceScopesApi.ReadAllResourceScopes
+  get_method: ResourceScopesApi.ReadOneResourceScope
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+  additional_id_fields:
+    - resource_id
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  - name: ResourceID
+    terraform_name: resource_id
+    type: string
+    source_path: Resource.Id
+    required: true
+    references_type: pingone_resource
+    reference_field: id
+
+  # Shadow of ResourceID under a non-colliding terraform_name, purely so
+  # import_id_format can reference the parent resource's raw UUID —
+  # "{resource_id}" is an engine-reserved placeholder that always means
+  # "this resource's own ID" (data.ID), so it cannot be reused to mean the
+  # resource_id *attribute* here. Never rendered into the resource block
+  # (computed, not required, no references_type).
+  - name: ParentResourceID
+    terraform_name: parent_resource_id_for_import
+    type: string
+    source_path: Resource.Id
+    computed: true
+
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_resource
+      field_path: Resource.Id
+      lookup_field: id
+      reference_format: "pingone_resource.{name}.id"
+
+  import_id_format: "{env_id}/{parent_resource_id_for_import}/{id}"
+
+variables:
+  eligible_attributes: []

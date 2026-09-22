@@ -1,0 +1,113 @@
+# PingOne Application Resource Definition
+#
+# Children of pingone_resource, NOT pingone_application — the provider's
+# own import format confirms this: <environment_id>/<resource_id>/<application_resource_id>.
+# ApplicationResourcesApi is scoped by resourceID, so listing requires
+# enumerating CUSTOM resources first (same as pingone_resource_scope), then
+# listing application resources per resource.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_application_resource
+  api_type: ResourceApplicationResource
+  name: PingOne Application Resource
+  short_name: application_resource
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: ResourceApplicationResource
+  list_method: ApplicationResourcesApi.ReadAllApplicationResources
+  get_method: ApplicationResourcesApi.ReadOneApplicationResource
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+  additional_id_fields:
+    - resource_id
+
+attributes:
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # resource_name (write-only lookup key, required input) and resource_id
+  # (read-only resolved UUID) both come from the same API field, Parent.Id —
+  # modeled as two separate attributes since the provider schema exposes
+  # them as two separate Terraform attributes with different roles.
+  - name: ResourceName
+    terraform_name: resource_name
+    type: string
+    source_path: Parent.Id
+    required: true
+    references_type: pingone_resource
+    reference_field: name
+
+  - name: ResourceID
+    terraform_name: resource_id
+    type: string
+    source_path: Parent.Id
+    computed: true
+
+  # Shadow of ResourceID under a non-colliding terraform_name, purely so
+  # import_id_format can reference the parent resource's raw UUID —
+  # "{resource_id}" is an engine-reserved placeholder that always means
+  # "this resource's own ID" (data.ID), so it cannot be reused to mean the
+  # resource_id attribute above. Never rendered into the resource block.
+  - name: ParentResourceID
+    terraform_name: parent_resource_id_for_import
+    type: string
+    source_path: Parent.Id
+    computed: true
+
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  - name: Parent
+    terraform_name: parent
+    type: object
+    source_path: Parent
+    computed: true
+    nested_attributes:
+      - name: Id
+        terraform_name: id
+        type: string
+        source_path: Id
+        computed: true
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+        computed: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_resource
+      field_path: Parent.Id
+      lookup_field: name
+      reference_format: "pingone_resource.{name}.name"
+
+  import_id_format: "{env_id}/{parent_resource_id_for_import}/{id}"
+
+variables:
+  eligible_attributes: []

@@ -1,0 +1,3 @@
+```release-note:new-resource
+`resource/pingone_group`: Added export support for PingOne groups, including `name`, `description`, `population_id` (referencing `pingone_population`), `user_filter`, `external_id`, and `custom_data`.
+```

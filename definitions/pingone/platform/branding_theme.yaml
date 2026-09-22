@@ -1,0 +1,189 @@
+# PingOne Branding Theme Resource Definition
+
+metadata:
+  platform: pingone
+  resource_type: pingone_branding_theme
+  api_type: BrandingTheme
+  name: PingOne Branding Theme
+  short_name: branding_theme
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: BrandingTheme
+  list_method: BrandingThemesApi.ReadBrandingThemes
+  get_method: BrandingThemesApi.ReadOneBrandingTheme
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only (resource identifier, not written to HCL as an argument)
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string, nested in Configuration
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Configuration.Name
+    required: true
+
+  # Template - required string enum (default, focus, mural, slate, split)
+  - name: Template
+    terraform_name: template
+    type: string
+    source_path: Template
+    required: true
+
+  # Default - computed only, whether this theme is the environment default
+  - name: Default
+    terraform_name: default
+    type: bool
+    source_path: Default
+    computed: true
+
+  # BodyTextColor - required hex color
+  - name: BodyTextColor
+    terraform_name: body_text_color
+    type: string
+    source_path: Configuration.BodyTextColor
+    required: true
+
+  # ButtonColor - required hex color
+  - name: ButtonColor
+    terraform_name: button_color
+    type: string
+    source_path: Configuration.ButtonColor
+    required: true
+
+  # ButtonTextColor - required hex color
+  - name: ButtonTextColor
+    terraform_name: button_text_color
+    type: string
+    source_path: Configuration.ButtonTextColor
+    required: true
+
+  # CardColor - required hex color
+  - name: CardColor
+    terraform_name: card_color
+    type: string
+    source_path: Configuration.CardColor
+    required: true
+
+  # HeadingTextColor - required hex color
+  - name: HeadingTextColor
+    terraform_name: heading_text_color
+    type: string
+    source_path: Configuration.HeadingTextColor
+    required: true
+
+  # LinkTextColor - required hex color
+  - name: LinkTextColor
+    terraform_name: link_text_color
+    type: string
+    source_path: Configuration.LinkTextColor
+    required: true
+
+  # FooterText - optional string
+  - name: Footer
+    terraform_name: footer_text
+    type: string
+    source_path: Configuration.Footer
+
+  # BackgroundColor - optional hex color. The API omits this field
+  # (*string, omitempty) unless Configuration.BackgroundType == COLOR.
+  - name: BackgroundColor
+    terraform_name: background_color
+    type: string
+    source_path: Configuration.BackgroundColor
+
+  # UseDefaultBackground - optional bool, derived from Configuration.BackgroundType
+  # == DEFAULT. The API has no direct field for this; the provider schema
+  # attribute exists purely as a write-side toggle mapping to that enum value.
+  # Extracted as string (the enum's underlying Go type) so the processor's
+  # convertValue succeeds; the custom transform converts to bool.
+  - name: BackgroundType
+    terraform_name: use_default_background
+    type: string
+    source_path: Configuration.BackgroundType
+    transform: custom
+    custom_transform: handleBrandingThemeUseDefaultBackground
+
+  # BackgroundImage - optional nested object. The API omits this field
+  # unless Configuration.BackgroundType == IMAGE.
+  - name: BackgroundImage
+    terraform_name: background_image
+    type: object
+    source_path: Configuration.BackgroundImage
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        required: true
+        references_type: pingone_image
+        reference_field: id
+
+      - name: Href
+        terraform_name: href
+        type: string
+        source_path: Href
+        required: true
+
+  # Logo - optional nested object. The API omits this field unless
+  # Configuration.LogoType == IMAGE.
+  - name: Logo
+    terraform_name: logo
+    type: object
+    source_path: Configuration.Logo
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        required: true
+        references_type: pingone_image
+        reference_field: id
+
+      - name: Href
+        terraform_name: href
+        type: string
+        source_path: Href
+        required: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+    - resource_type: pingone_image
+      field_path: Configuration.BackgroundImage.Id
+      lookup_field: id
+      reference_format: "pingone_image.{resource_name}.id"
+      optional: true
+
+    - resource_type: pingone_image
+      field_path: Configuration.Logo.Id
+      lookup_field: id
+      reference_format: "pingone_image.{resource_name}.id"
+      optional: true
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

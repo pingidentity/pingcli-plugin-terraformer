@@ -1,0 +1,3 @@
+```release-note:new-resource
+`resource/pingone_application`: Added export support for OIDC, SAML, External Link, and WS-Fed applications. The three built-in PingOne system application types (Admin Console, Portal, Self Service) have no corresponding Terraform schema block in `pingone_application` and are skipped with a warning rather than exported incorrectly.
+```
