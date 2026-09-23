@@ -21,11 +21,25 @@ const bareRefSentinel = "@@TFREF@@"
 // and dots, and variable names are sanitized to [a-zA-Z0-9_] by
 // utils.SanitizeVariableName — so the token never contains quotes,
 // backslashes, or control characters, and the quoted result is a valid JSON
-// string with no escaping. Producers that marshal a blob from Go data (e.g.
-// json.MarshalIndent) store this placeholder in place of the bare token and
-// run MaterializeBareRefs on the marshaled text afterwards.
+// string with no escaping. Producers writing directly into blob text use
+// this quoted form; producers whose value passes through encoding/json
+// (e.g. json.MarshalIndent) must use BareRefSentinelCore instead — the
+// marshaler supplies the surrounding quotes, and this quoted form would be
+// double-encoded.
 func BareRefPlaceholder(token string) string {
 	return `"` + bareRefSentinel + token + bareRefSentinel + `"`
+}
+
+// BareRefSentinelCore returns the unquoted sentinel marker wrapping token:
+// @@TFREF@@<token>@@. It is the marshal-safe form for producers that store a
+// value into a Go map which encoding/json later marshals (e.g.
+// json.MarshalIndent in a blob builder): the marshaler supplies the
+// surrounding quotes, so the marshaled text contains the full quoted
+// placeholder BareRefPlaceholder(token) — wrapping BareRefPlaceholder's
+// already-quoted form in a marshal pass would double-encode its quotes and
+// defeat MaterializeBareRefs.
+func BareRefSentinelCore(token string) string {
+	return bareRefSentinel + token + bareRefSentinel
 }
 
 // MaterializeBareRefs replaces every quoted bare-ref placeholder in blob with
@@ -34,7 +48,12 @@ func BareRefPlaceholder(token string) string {
 // contains no quotes, so the first `@@"` after the opening marker closes the
 // placeholder. Blobs containing no placeholder opening marker are returned
 // unchanged. A bare @@TFREF@@ appearing inside unrelated string data is left
-// as-is — only the full quoted placeholder form is rewritten.
+// as-is — only the full quoted placeholder form is rewritten. Residual risk
+// accepted by design: a string value that happens to be exactly
+// `"@@TFREF@@<token>@@"` (token from [A-Za-z0-9_.-]) would be rewritten; real
+// PingOne data cannot produce that form because both sanitizers eliminate '@'
+// from generated tokens and no producer emits the marker into user-visible
+// strings.
 func MaterializeBareRefs(blob string) string {
 	prefix := `"` + bareRefSentinel
 	suffix := bareRefSentinel + `"`

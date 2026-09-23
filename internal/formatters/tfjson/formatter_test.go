@@ -2,6 +2,7 @@ package tfjson
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
@@ -265,6 +266,45 @@ func TestFormat_RawHCLValue_DynamicObject(t *testing.T) {
 	require.NoError(t, err)
 	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
 	assert.Equal(t, "${some_expression()}", attrs["dynamic"])
+}
+
+// TestFormat_RawHCLValue_BareVarBlob_WrapsAsTemplate verifies that a blob
+// containing bare Terraform traversals (the post-#158 producer form) still
+// wraps into a valid .tf.json template expression "${jsonencode(...)}" — the
+// tfjson formatter is untouched by #158 and continues to wrap every
+// RawHCLValue, with bare blobs remaining valid expressions inside the wrap.
+func TestFormat_RawHCLValue_BareVarBlob_WrapsAsTemplate(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name: "properties", TerraformName: "properties", Type: "map",
+		// No NestedAttributes → scalar path renderScalar → "${" + blob + "}"
+	})
+	data := baseData("res1", "id1", map[string]interface{}{
+		"properties": core.RawHCLValue(`jsonencode({
+      "clientId" : {
+          "type": "string",
+          "value": var.davinci_connection_Test_0020_Connector_clientId
+      }
+  })`),
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+
+	want := "${jsonencode({\n      \"clientId\" : {\n          \"type\": \"string\",\n          \"value\": var.davinci_connection_Test_0020_Connector_clientId\n      }\n  })}"
+	assert.Equal(t, want, attrs["properties"])
+	assert.NotContains(t, attrs["properties"], "@@TFREF@@")
+
+	// The rendered document must remain valid .tf.json: unmarshal (done by
+	// unmarshalResource) already proves JSON validity; the wrap must place
+	// the bare traversal inside the template expression, not inside a string
+	// literal.
+	props, ok := attrs["properties"].(string)
+	require.True(t, ok, "properties attribute should remain a template-expression string")
+	assert.True(t, strings.HasPrefix(props, "${jsonencode("),
+		"bare-var blob must wrap as ${jsonencode(...)}")
+	assert.True(t, strings.HasSuffix(props, ")}"),
+		"wrap must close the jsonencode and the template expression")
 }
 
 func TestFormat_NestedObject(t *testing.T) {

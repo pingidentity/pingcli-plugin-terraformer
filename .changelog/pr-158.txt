@@ -1,0 +1,3 @@
+```release-note:enhancement
+`resource/pingone_davinci_connector_instance` and `resource/pingone_davinci_flow`: Variable and resource references inside `jsonencode({...})` blobs in HCL output now render as bare Terraform traversals (`var.X`, `type.label.field`) instead of interpolation-only quoted strings (`"${var.X}"`). The deprecated interpolation form triggered tflint's `terraform_deprecated_interpolation` rule on exported modules. Re-exporting your configuration is recommended; the evaluated Terraform output is identical (bare traversals and interpolation-only strings are equivalent), and `.tf.json` output keeps its existing `"${jsonencode(...)}"` wrapping form.
+```

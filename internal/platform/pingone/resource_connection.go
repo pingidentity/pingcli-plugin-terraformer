@@ -159,13 +159,17 @@ func inferPropertyVariableType(value interface{}) string {
 }
 
 // formatPropertyValue renders a single property value for use inside
-// a jsonencode expression. All non-nil values are replaced with variable refs.
+// a jsonencode expression. All non-nil values are replaced with variable
+// references, emitted as bare Terraform traversals (var.X) — interpolation-only
+// "${var.X}" strings trip tflint's terraform_deprecated_interpolation rule
+// (issue #158). This is a direct strings.Builder write, so the bare token is
+// written verbatim.
 func formatPropertyValue(value interface{}, prefix, resourceName, propertyName string) string {
 	if value == nil {
 		return "null"
 	}
 	varName := connectorVariableName(prefix, resourceName, propertyName)
-	return fmt.Sprintf("\"${var.%s}\"", varName)
+	return "var." + varName
 }
 
 // extractResourceName retrieves the Name field from an API data struct via
@@ -338,7 +342,12 @@ func formatComplexPropertyValue(propMap map[string]interface{}, prefix, resource
 		entry := make(map[string]interface{})
 		if secret {
 			varName := connectorVariableName(prefix, resourceName, parentKey+"_"+nk)
-			entry["value"] = fmt.Sprintf("${var.%s}", varName)
+			// Marshal-safe bare-ref placeholder: json.MarshalIndent supplies the
+			// quotes, and MaterializeBareRefs below swaps the quoted placeholder
+			// for the bare traversal token. A plain "var.X" string would marshal
+			// as the literal `"var.X"`; the "${var.X}" form trips tflint's
+			// terraform_deprecated_interpolation rule (issue #158).
+			entry["value"] = core.BareRefSentinelCore("var." + varName)
 			entry["secure"] = true
 
 			extractedVars = append(extractedVars, core.ExtractedVariable{
@@ -362,7 +371,8 @@ func formatComplexPropertyValue(propMap map[string]interface{}, prefix, resource
 
 			// For scalar values, use variable reference; for arrays/objects, preserve structure
 			if isScalarValue(rawValue) {
-				entry["value"] = fmt.Sprintf("${var.%s}", varName)
+				// Marshal-safe bare-ref placeholder — see the secret branch above.
+				entry["value"] = core.BareRefSentinelCore("var." + varName)
 			} else {
 				entry["value"] = rawValue
 			}
@@ -398,7 +408,11 @@ func formatComplexPropertyValue(propMap map[string]interface{}, prefix, resource
 		return "null", extractedVars
 	}
 
-	return fmt.Sprintf("jsonencode(%s)", string(jsonBytes)), extractedVars
+	// Swap each quoted bare-ref placeholder for its bare traversal token —
+	// the bare form is not representable as a Go string through the marshal
+	// above, so placeholders are materialized post-marshal, before the
+	// jsonencode(...) wrap.
+	return fmt.Sprintf("jsonencode(%s)", core.MaterializeBareRefs(string(jsonBytes))), extractedVars
 }
 
 // listConnectorInstances implements list-then-get: lists all connector instances

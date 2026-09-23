@@ -349,16 +349,7 @@ func replaceExtractedValue(value RawHCLValue, rule EmbeddedReferenceRule, wrappe
 	if rule.UnwrapMode == richTextUnwrapMode {
 		return replaceRichTextInRawHCL(value, wrapper, uuidStr, "${"+tfRef+"}")
 	}
-	return RawHCLValue(replaceUUIDInRawHCL(value, uuidStr, bareRefSentinelCore(tfRef)))
-}
-
-// bareRefSentinelCore returns the unquoted sentinel marker wrapping token:
-// @@TFREF@@<token>@@. replaceUUIDInRawHCL quotes its replacement, so passing
-// this core yields the full quoted placeholder BareRefPlaceholder(token)
-// inside the blob text while keeping the sentinel detail out of the call
-// sites.
-func bareRefSentinelCore(token string) string {
-	return bareRefSentinel + token + bareRefSentinel
+	return RawHCLValue(replaceUUIDInRawHCL(value, uuidStr, BareRefSentinelCore(tfRef)))
 }
 
 // unwrapRichText extracts the inner "text" value from a Slate-style

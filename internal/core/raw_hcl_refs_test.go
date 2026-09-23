@@ -75,7 +75,7 @@ func TestMaterializeBareRefs(t *testing.T) {
 // double-encoded by marshaling.
 func TestMaterializeBareRefs_MarshalRoundTrip(t *testing.T) {
 	props := map[string]interface{}{
-		"clientId": map[string]interface{}{"value": bareRefSentinelCore("var.davinci_connection_Test_clientId")},
+		"clientId": map[string]interface{}{"value": BareRefSentinelCore("var.davinci_connection_Test_clientId")},
 		"issuer":   "https://example.com",
 	}
 

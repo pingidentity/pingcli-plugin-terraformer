@@ -50,7 +50,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			contains: []string{
 				`"clientId"`,
 				`"type": "string"`,
-				`${var.davinci_connection_Test_0020_Connector_clientId}`,
+				`var.davinci_connection_Test_0020_Connector_clientId`,
 				"jsonencode(",
 			},
 		},
@@ -65,7 +65,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			apiData: &mockAPIData{Name: "PingOne Protect"},
 			contains: []string{
 				`"clientSecret"`,
-				`${var.davinci_connection_PingOne_0020_Protect_clientSecret}`,
+				`var.davinci_connection_PingOne_0020_Protect_clientSecret`,
 			},
 		},
 		{
@@ -78,7 +78,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			},
 			apiData: &mockAPIData{Name: "test"},
 			contains: []string{
-				`${var.davinci_connection_test_enabled}`,
+				`var.davinci_connection_test_enabled`,
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			},
 			apiData: &mockAPIData{Name: "test"},
 			contains: []string{
-				`${var.davinci_connection_test_timeout}`,
+				`var.davinci_connection_test_timeout`,
 			},
 		},
 		{
@@ -104,7 +104,7 @@ func TestHandleConnectorProperties(t *testing.T) {
 			},
 			apiData: &mockAPIData{Name: "test"},
 			contains: []string{
-				`${var.davinci_connection_test_noType}`,
+				`var.davinci_connection_test_noType`,
 			},
 		},
 		{
@@ -164,6 +164,11 @@ func TestHandleConnectorProperties(t *testing.T) {
 			for _, s := range tt.contains {
 				assert.Contains(t, string(rawHCL), s)
 			}
+			// Negative assertions for every run: the bare-rendering change
+			// (issue #158) must leave no interpolation-only form and no
+			// un-materialized sentinel placeholder in the blob.
+			assert.NotContains(t, string(rawHCL), `"${var.`)
+			assert.NotContains(t, string(rawHCL), "@@TFREF@@")
 		})
 	}
 }
@@ -503,8 +508,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				"jsonencode(",
 				`"properties"`,
 				`"providerName"`,
-				`${var.davinci_connection_Apple_0020_Login_customAuth_providerName}`,
-				`${var.davinci_connection_Apple_0020_Login_customAuth_clientSecret}`,
+				`var.davinci_connection_Apple_0020_Login_customAuth_providerName`,
+				`var.davinci_connection_Apple_0020_Login_customAuth_clientSecret`,
 				`"secure": true`,
 			},
 			notContains: []string{
@@ -533,10 +538,10 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 			contains: []string{
 				`"clientId"`,
 				`"type": "string"`,
-				`${var.davinci_connection_Mixed_clientId}`,
+				`var.davinci_connection_Mixed_clientId`,
 				`"customAuth"`,
 				`"type": "json"`,
-				`${var.davinci_connection_Mixed_customAuth_providerName}`,
+				`var.davinci_connection_Mixed_customAuth_providerName`,
 			},
 		},
 		{
@@ -623,8 +628,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 			apiData: &mockAPIData{Name: "Google"},
 			contains: []string{
 				`"type": "json"`,
-				`${var.davinci_connection_Google_oauth2_providerName}`,
-				`${var.davinci_connection_Google_oauth2_issuerUrl}`,
+				`var.davinci_connection_Google_oauth2_providerName`,
+				`var.davinci_connection_Google_oauth2_issuerUrl`,
 			},
 			notContains: []string{
 				`"secure"`,
@@ -657,8 +662,8 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				"jsonencode(",
 				`"properties"`,
 				`"providerName"`,
-				`${var.davinci_connection_Apple_0020_Login_customAuth_providerName}`,
-				`${var.davinci_connection_Apple_0020_Login_customAuth_clientSecret}`,
+				`var.davinci_connection_Apple_0020_Login_customAuth_providerName`,
+				`var.davinci_connection_Apple_0020_Login_customAuth_clientSecret`,
 				`"secure": true`,
 			},
 			notContains: []string{
@@ -680,7 +685,7 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 				"jsonencode(",
 				`"properties"`,
 				`"providerName"`,
-				`${var.davinci_connection_Apple_0020_Login_customAuth_providerName}`,
+				`var.davinci_connection_Apple_0020_Login_customAuth_providerName`,
 			},
 			notContains: []string{
 				`"displayName"`,
@@ -709,6 +714,11 @@ func TestHandleConnectorPropertiesComplex(t *testing.T) {
 			for _, s := range tt.notContains {
 				assert.NotContains(t, string(rawHCL), s)
 			}
+			// Negative assertions for every run: the bare-rendering change
+			// (issue #158) must leave no interpolation-only form and no
+			// un-materialized sentinel placeholder in the blob.
+			assert.NotContains(t, string(rawHCL), `"${var.`)
+			assert.NotContains(t, string(rawHCL), "@@TFREF@@")
 		})
 	}
 }
