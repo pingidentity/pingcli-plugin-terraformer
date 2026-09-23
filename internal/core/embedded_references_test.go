@@ -117,8 +117,11 @@ func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
-	if !strings.Contains(string(resolvedValue), "${pingone_davinci_flow.pingcli__My-0020-Flow.id}") {
-		t.Errorf("expected UUID to be replaced with reference in RawHCLValue, got: %s", resolvedValue)
+	if !strings.Contains(string(resolvedValue), "pingone_davinci_flow.pingcli__My-0020-Flow.id") {
+		t.Errorf("expected UUID to be replaced with bare reference in RawHCLValue, got: %s", resolvedValue)
+	}
+	if strings.Contains(string(resolvedValue), "${pingone_davinci_flow.pingcli__My-0020-Flow.id}") {
+		t.Errorf("expected bare traversal (no interpolation wrapper), got: %s", resolvedValue)
 	}
 
 	// UUID string itself should no longer appear
@@ -144,6 +147,8 @@ func TestResolveEmbeddedReferences_SingleSubFlow(t *testing.T) {
 func TestResolveEmbeddedReferences_EqualLabelsAcrossTypes(t *testing.T) {
 	const targetID = "aaaaaaaa-0000-4000-8000-000000000001"
 	const sourceID = "bbbbbbbb-0000-4000-8000-000000000001"
+	// Bare traversal form — substitutions must not be wrapped in ${...}.
+	const type_target_bRef = "type_target_b.pingcli__DVA.id"
 
 	g := graph.New()
 	g.AddResource("type_target_a", targetID, "pingcli__DVA")
@@ -169,7 +174,7 @@ func TestResolveEmbeddedReferences_EqualLabelsAcrossTypes(t *testing.T) {
 	}}, g, []EmbeddedReferenceRule{rule})
 
 	resolved := attrs["config"].(RawHCLValue)
-	assert.Contains(t, string(resolved), "${type_target_b.pingcli__DVA.id}")
+	assert.Contains(t, string(resolved), type_target_bRef)
 	assert.NotContains(t, string(resolved), targetID)
 
 	deps := g.GetDependencies("type_source", sourceID)
@@ -238,8 +243,11 @@ func TestResolveEmbeddedReferences_MultipleNodes(t *testing.T) {
 	node2Props := nodes["node2"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
 	// node1 should have subFlowId replaced
-	if !strings.Contains(string(node1Props), "${pingone_davinci_flow.pingcli__Sub-0020-Flow-1.id}") {
+	if !strings.Contains(string(node1Props), "pingone_davinci_flow.pingcli__Sub-0020-Flow-1.id") {
 		t.Errorf("node1 should have subFlowId replaced, got: %s", node1Props)
+	}
+	if strings.Contains(string(node1Props), "${pingone_davinci_flow.pingcli__Sub-0020-Flow-1.id}") {
+		t.Errorf("node1 should use bare traversal (no interpolation wrapper), got: %s", node1Props)
 	}
 
 	// node2 should be unchanged (no subFlowId)
@@ -418,11 +426,11 @@ func TestResolveEmbeddedReferences_WildcardTraversal(t *testing.T) {
 
 	nodes := resourceData.Attributes["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})
 
-	// Verify all three nodes were processed
+	// Verify all three nodes were processed (bare traversal form)
 	expected := map[string]string{
-		"nodeA": "${pingone_davinci_flow.pingcli__Flow-A.id}",
-		"nodeB": "${pingone_davinci_flow.pingcli__Flow-B.id}",
-		"nodeC": "${pingone_davinci_flow.pingcli__Flow-C.id}",
+		"nodeA": "pingone_davinci_flow.pingcli__Flow-A.id",
+		"nodeB": "pingone_davinci_flow.pingcli__Flow-B.id",
+		"nodeC": "pingone_davinci_flow.pingcli__Flow-C.id",
 	}
 	for nodeKey, ref := range expected {
 		props := nodes[nodeKey].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
@@ -584,7 +592,7 @@ func TestResolveEmbeddedReferences_ExtensibleNewRule(t *testing.T) {
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
 	// Verify: custom key path was replaced
-	if !strings.Contains(string(resolvedValue), "${pingone_davinci_connector.pingcli__Custom-Connector.id}") {
+	if !strings.Contains(string(resolvedValue), "pingone_davinci_connector.pingcli__Custom-Connector.id") {
 		t.Errorf("expected custom key path to be replaced, got: %s", resolvedValue)
 	}
 }
@@ -655,7 +663,7 @@ func TestResolveEmbeddedReferences_PreservesOtherAttributes(t *testing.T) {
 
 	// Verify: graph_data.elements.nodes.*.data.properties WAS modified
 	targetProps := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
-	if !strings.Contains(string(targetProps), "${pingone_davinci_flow.pingcli__Sub-Flow.id}") {
+	if !strings.Contains(string(targetProps), "pingone_davinci_flow.pingcli__Sub-Flow.id") {
 		t.Error("expected targeted properties to be modified")
 	}
 }
@@ -713,10 +721,13 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDNotInGraph(
 
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
-	// UUID should be replaced with var reference; "Example - Sign On" → toLower → sanitize = "example___sign_on"
-	const expectedVarRef = "${var.davinci_form_example___sign_on}"
+	// UUID should be replaced with bare var reference; "Example - Sign On" → toLower → sanitize = "example___sign_on"
+	const expectedVarRef = "var.davinci_form_example___sign_on"
 	if !strings.Contains(string(resolvedValue), expectedVarRef) {
 		t.Errorf("expected UUID replaced with %q, got: %s", expectedVarRef, resolvedValue)
+	}
+	if strings.Contains(string(resolvedValue), `"${var.davinci_form_example___sign_on}"`) {
+		t.Errorf("expected bare var traversal (no quotes, no interpolation), got: %s", resolvedValue)
 	}
 
 	// Raw UUID string should no longer appear
@@ -794,15 +805,20 @@ func TestResolveEmbeddedReferences_StrategyReferenceWithFallback_UUIDInGraph(t *
 
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
-	// UUID should be replaced with a resource reference, not a variable
-	const expectedRef = "${pingone_davinci_form.pingcli__Example_Sign_On.id}"
+	// UUID should be replaced with a bare resource reference, not a variable
+	const expectedRef = "pingone_davinci_form.pingcli__Example_Sign_On.id"
 	if !strings.Contains(string(resolvedValue), expectedRef) {
-		t.Errorf("expected UUID replaced with resource reference %q, got: %s", expectedRef, resolvedValue)
+		t.Errorf("expected UUID replaced with bare resource reference %q, got: %s", expectedRef, resolvedValue)
 	}
 
-	// Should NOT contain a var reference
-	if strings.Contains(string(resolvedValue), "${var.") {
+	// Should NOT contain a var reference, bare or interpolated
+	if strings.Contains(string(resolvedValue), "${var.") || strings.Contains(string(resolvedValue), "var.davinci_form") {
 		t.Errorf("expected no var reference when UUID is in graph, got: %s", resolvedValue)
+	}
+
+	// No sentinel marker may leak into the final blob
+	if strings.Contains(string(resolvedValue), "@@TFREF@@") {
+		t.Errorf("expected no bare-ref sentinel marker in final blob, got: %s", resolvedValue)
 	}
 
 	// No FallbackVariable should be returned
@@ -865,13 +881,13 @@ func TestResolveEmbeddedReferences_StrategyVariable_AlwaysEmitsVariable(t *testi
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
 	// "Sign On Node" → toLower → "sign on node" → sanitize → "sign_on_node"
-	const expectedVarRef = "${var.external_id_sign_on_node}"
+	const expectedVarRef = "var.external_id_sign_on_node"
 	if !strings.Contains(string(resolvedValue), expectedVarRef) {
-		t.Errorf("expected var reference %q for strategy=variable, got: %s", expectedVarRef, resolvedValue)
+		t.Errorf("expected bare var reference %q for strategy=variable, got: %s", expectedVarRef, resolvedValue)
 	}
 
 	// Should NOT contain a direct resource reference
-	if strings.Contains(string(resolvedValue), "${pingone_davinci_form.") {
+	if strings.Contains(string(resolvedValue), "${pingone_davinci_form.") || strings.Contains(string(resolvedValue), "pingone_davinci_form.pingcli__Some_Form") {
 		t.Errorf("expected no resource reference for strategy=variable, got: %s", resolvedValue)
 	}
 
@@ -945,9 +961,9 @@ func TestResolveEmbeddedReferences_StrategyDefault_BackwardCompatible(t *testing
 	knownProps := nodes["node-known"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 	unknownProps := nodes["node-unknown"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
-	// UUID in graph → resource reference
-	if !strings.Contains(string(knownProps), "${pingone_davinci_flow.pingcli__In-Graph-Flow.id}") {
-		t.Errorf("expected in-graph UUID to be resolved to reference, got: %s", knownProps)
+	// UUID in graph → bare resource reference
+	if !strings.Contains(string(knownProps), "pingone_davinci_flow.pingcli__In-Graph-Flow.id") {
+		t.Errorf("expected in-graph UUID to be resolved to bare reference, got: %s", knownProps)
 	}
 
 	// UUID not in graph → left unchanged (no variable emitted)
@@ -1017,7 +1033,7 @@ func TestResolveEmbeddedReferences_VariableNamingPath_Missing(t *testing.T) {
 
 	// UUID "abcde123-0000-4000-8000-000000000000": first 8 chars = "abcde123", SanitizeVariableName = "abcde123"
 	// Variable name = "davinci_form_abcde123"
-	const expectedVarRef = "${var.davinci_form_abcde123}"
+	const expectedVarRef = "var.davinci_form_abcde123"
 	if !strings.Contains(string(resolvedValue), expectedVarRef) {
 		t.Errorf("expected UUID-prefix fallback var reference %q, got: %s", expectedVarRef, resolvedValue)
 	}
@@ -1091,13 +1107,13 @@ func TestResolveEmbeddedReferences_MultipleNodesDistinctVariables(t *testing.T) 
 	node2Props := nodes["node2"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
 	// "Login Form" → "login_form" → "davinci_form_login_form"
-	if !strings.Contains(string(node1Props), "${var.davinci_form_login_form}") {
-		t.Errorf("expected node1 to contain ${var.davinci_form_login_form}, got: %s", node1Props)
+	if !strings.Contains(string(node1Props), "var.davinci_form_login_form") {
+		t.Errorf("expected node1 to contain var.davinci_form_login_form, got: %s", node1Props)
 	}
 
 	// "Signup Form" → "signup_form" → "davinci_form_signup_form"
-	if !strings.Contains(string(node2Props), "${var.davinci_form_signup_form}") {
-		t.Errorf("expected node2 to contain ${var.davinci_form_signup_form}, got: %s", node2Props)
+	if !strings.Contains(string(node2Props), "var.davinci_form_signup_form") {
+		t.Errorf("expected node2 to contain var.davinci_form_signup_form, got: %s", node2Props)
 	}
 
 	// Two distinct FallbackVariables must be returned
@@ -1176,8 +1192,8 @@ func TestResolveEmbeddedReferences_DuplicateUUIDs_Deduplicated(t *testing.T) {
 	nodes := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})
 	for _, nodeKey := range []string{"node1", "node2"} {
 		props := nodes[nodeKey].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
-		if !strings.Contains(string(props), "${var.davinci_form_shared_form}") {
-			t.Errorf("expected %s to contain ${var.davinci_form_shared_form}, got: %s", nodeKey, props)
+		if !strings.Contains(string(props), "var.davinci_form_shared_form") {
+			t.Errorf("expected %s to contain var.davinci_form_shared_form, got: %s", nodeKey, props)
 		}
 	}
 
@@ -1261,11 +1277,13 @@ func TestResolveEmbeddedReferences_DistinctUUIDsSameTitle_NoCollision(t *testing
 	props2 := string(nodes["node2"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue))
 
 	// The two rewritten HCL blobs must NOT reference the same variable name.
-	varRefPattern := regexp.MustCompile(`\$\{var\.([a-zA-Z0-9_]+)\}`)
+	// Substitutions render as bare traversals: "value": var.<name> — no ${}
+	// wrapper, no surrounding quotes.
+	varRefPattern := regexp.MustCompile(`"value" ?: ?var\.([a-zA-Z0-9_]+)`)
 	m1 := varRefPattern.FindStringSubmatch(props1)
 	m2 := varRefPattern.FindStringSubmatch(props2)
-	require.Len(t, m1, 2, "node1 properties must contain a var reference, got: %s", props1)
-	require.Len(t, m2, 2, "node2 properties must contain a var reference, got: %s", props2)
+	require.Len(t, m1, 2, "node1 properties must contain a bare var reference, got: %s", props1)
+	require.Len(t, m2, 2, "node2 properties must contain a bare var reference, got: %s", props2)
 	assert.NotEqual(t, m1[1], m2[1], "node1 and node2 must not be rewritten to reference the same variable")
 
 	// Each FallbackVariable's Default must match the UUID actually embedded
@@ -1440,9 +1458,9 @@ func TestResolveEmbeddedReferences_Precondition_Match(t *testing.T) {
 
 	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
 
-	const expectedRef = "${pingone_branding_theme.pingcli__My_Theme.id}"
+	const expectedRef = "pingone_branding_theme.pingcli__My_Theme.id"
 	if !strings.Contains(string(resolvedValue), expectedRef) {
-		t.Errorf("expected precondition-satisfied rule to resolve to %q, got: %s", expectedRef, resolvedValue)
+		t.Errorf("expected precondition-satisfied rule to resolve to bare %q, got: %s", expectedRef, resolvedValue)
 	}
 
 	// theme.value (the precondition key itself) must remain unchanged
@@ -1931,4 +1949,230 @@ func TestResolveEmbeddedReferences_UUIDFormatGuard_NoOpPerStrategy(t *testing.T)
 			}
 		})
 	}
+}
+
+// TestResolveEmbeddedReferences_MultiRule_SingleBlob proves that two rules
+// targeting the same flow node blob (form.value fallback and a resolved
+// resource reference) BOTH land as bare tokens. This validates the sentinel
+// mechanism: substitutions must keep the blob parseable JSON so the second
+// rule's re-parse (extractJSONFromRawHCL + json.Unmarshal) still succeeds —
+// a bare token substituted directly would break that re-parse and silently
+// no-op the second rule.
+func TestResolveEmbeddedReferences_MultiRule_SingleBlob(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_flow", "aaaaaaaa-0000-4000-8000-00000000000f", "pingcli__Sub-0020-Flow-1")
+	// pingone_davinci_form deliberately absent — form.value falls back to a var.
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	subFlowRule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_flow",
+		JSONKeyPath:        "subFlowId.value.value",
+		ReferenceField:     "id",
+	}
+	formRule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_form",
+		JSONKeyPath:        "form.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_form",
+		VariableNamingPath: "nodeTitle.value",
+	}
+
+	propertiesJSON := `jsonencode({"subFlowId": {"value": {"label": "Sub Flow", "value": "aaaaaaaa-0000-4000-8000-00000000000f"}}, "form": {"value": "bbbbbbbb-0000-4000-8000-000000000001"}, "nodeTitle": {"value": "Multi Rule Node"}})`
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	fallbackVars := ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{subFlowRule, formRule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	// BOTH substitutions must land as bare tokens.
+	assert.Contains(t, string(resolvedValue), "pingone_davinci_flow.pingcli__Sub-0020-Flow-1.id",
+		"subFlowId rule substitution must survive the second rule's re-parse")
+	assert.Contains(t, string(resolvedValue), "var.davinci_form_multi_rule_node",
+		"form.value fallback substitution must survive the other rule's re-parse")
+
+	// Neither may remain in the deprecated interpolation-only form.
+	assert.NotContains(t, string(resolvedValue), `"${pingone_davinci_flow.pingcli__Sub-0020-Flow-1.id}"`)
+	assert.NotContains(t, string(resolvedValue), `"${var.davinci_form_multi_rule_node}"`)
+
+	// No sentinel marker may leak into the final blob.
+	assert.NotContains(t, string(resolvedValue), "@@TFREF@@")
+
+	// The form fallback variable must still be produced.
+	require.Len(t, fallbackVars, 1)
+	assert.Equal(t, "davinci_form_multi_rule_node", fallbackVars[0].Name)
+
+	// The blob must remain valid HCL-expressible JSON structure: after
+	// materialization the labels/UUIDs are gone, so verify the parsed shape
+	// before bare substitution would have happened is not re-assertable —
+	// instead confirm the exact quoted values survived unchanged.
+	assert.Contains(t, string(resolvedValue), `"label": "Sub Flow"`)
+	assert.Contains(t, string(resolvedValue), `"nodeTitle": {"value": "Multi Rule Node"}`)
+}
+
+// TestResolveEmbeddedReferences_NoSentinelLeak_MaterializedOnce verifies the
+// end-of-resolution sweep leaves no @@TFREF@@ marker in any final blob, even
+// when a node required no substitution at all (markers never present) and
+// when several substitutions occurred on the same blob.
+func TestResolveEmbeddedReferences_NoSentinelLeak_Materialized(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_form",
+		JSONKeyPath:        "form.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_form",
+		VariableNamingPath: "nodeTitle.value",
+	}
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(`jsonencode({"form": {"value": "bbbbbbbb-0000-4000-8000-0000000000aa"}, "nodeTitle": {"value": "Leak Check"}})`),
+						},
+					},
+					"node2": map[string]interface{}{
+						"data": map[string]interface{}{
+							// Non-UUID sentinel — rule no-ops, blob must be untouched.
+							"properties": RawHCLValue(`jsonencode({"form": {"value": "useThemeId"}, "nodeTitle": {"value": "Untouched"}})`),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	nodes := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})
+	for _, nodeKey := range []string{"node1", "node2"} {
+		props := string(nodes[nodeKey].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue))
+		assert.NotContains(t, props, "@@TFREF@@", "node %s must not leak the bare-ref sentinel marker", nodeKey)
+		assert.NotContains(t, props, `"${var.`, "node %s must not contain an interpolation-only var form", nodeKey)
+	}
+
+	// The substituted node's blob must render the bare token.
+	node1Props := string(nodes["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue))
+	assert.Contains(t, node1Props, "var.davinci_form_leak_check")
+}
+
+// TestResolveEmbeddedReferences_FirstMatchSemantics_Preserved verifies that
+// when the target UUID also appears earlier in the blob (e.g. inside a label
+// string), the substitution still lands on the JSONKeyPath occurrence —
+// first-match semantics of replaceUUIDInRawHCL are unchanged by the sentinel
+// mechanism. The label occurrence is replaced because it appears FIRST in
+// blob text; the key insight is the quoted `"uuid"` substring matches only
+// once overall and the blob stays consistent.
+func TestResolveEmbeddedReferences_FirstMatchSemantics_Preserved(t *testing.T) {
+	g := graph.New()
+	g.AddResource("pingone_davinci_flow", "parent-flow-id", "pingcli__Parent-Flow")
+
+	const targetUUID = "bbbbbbbb-0000-4000-8000-000000000099"
+
+	rule := EmbeddedReferenceRule{
+		ResourceType:       "pingone_davinci_flow",
+		AttributePath:      "graph_data.elements.nodes.*.data.properties",
+		TargetResourceType: "pingone_davinci_form",
+		JSONKeyPath:        "form.value",
+		ReferenceField:     "id",
+		Strategy:           "reference_with_fallback",
+		VariablePrefix:     "davinci_form",
+		VariableNamingPath: "nodeTitle.value",
+	}
+
+	// The UUID appears twice: first inside "label", then at form.value.
+	// The first quoted occurrence (label) is the substitution site, exactly
+	// as before the bare-rendering change.
+	propertiesJSON := `jsonencode({"form": {"label": "` + targetUUID + `", "value": "` + targetUUID + `"}, "nodeTitle": {"value": "First Match"}})`
+
+	attrs := map[string]interface{}{
+		"graph_data": map[string]interface{}{
+			"elements": map[string]interface{}{
+				"nodes": map[string]interface{}{
+					"node1": map[string]interface{}{
+						"data": map[string]interface{}{
+							"properties": RawHCLValue(propertiesJSON),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resourceData := &ResourceData{
+		ResourceType: "pingone_davinci_flow",
+		ID:           "parent-flow-id",
+		Label:        "pingcli__Parent-Flow",
+		Attributes:   attrs,
+	}
+
+	exportedData := &ExportedResourceData{
+		ResourceType: "pingone_davinci_flow",
+		Definition:   testResourceDef("pingone_davinci_flow"),
+		Resources:    []*ResourceData{resourceData},
+	}
+
+	ResolveEmbeddedReferences([]*ExportedResourceData{exportedData}, g, []EmbeddedReferenceRule{rule})
+
+	resolvedValue := attrs["graph_data"].(map[string]interface{})["elements"].(map[string]interface{})["nodes"].(map[string]interface{})["node1"].(map[string]interface{})["data"].(map[string]interface{})["properties"].(RawHCLValue)
+
+	props := string(resolvedValue)
+
+	// Exactly one bare substitution happened (only the first quoted occurrence
+	// was rewritten), and the second occurrence of the UUID remains untouched.
+	assert.Contains(t, props, "var.davinci_form_first_match")
+	assert.Contains(t, props, `"`+targetUUID+`"`, "only the first occurrence may be replaced; the second UUID occurrence must remain")
+	assert.Equal(t, 1, strings.Count(props, "var.davinci_form_first_match"), "exactly one substitution must occur")
+	assert.NotContains(t, props, "@@TFREF@@")
+	assert.NotContains(t, props, `"${var.`)
 }

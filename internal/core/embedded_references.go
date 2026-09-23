@@ -131,6 +131,18 @@ func ResolveEmbeddedReferences(
 		}
 	}
 
+	// Materialize sentinels: every bare-reference substitution above left a
+	// quoted, JSON-safe placeholder ("@@TFREF@@<token>@@") so that later rule
+	// applications could keep re-parsing the same blob. Now that every rule
+	// has run, swap each placeholder for the bare Terraform token (var.X /
+	// type.label.field) in one sweep. Rich-text wrappers keep their ${...}
+	// form and carry no sentinels, so they pass through untouched.
+	for _, exportedData := range results {
+		for _, resource := range exportedData.Resources {
+			materializeBareRefsInAttributes(resource.Attributes)
+		}
+	}
+
 	return fallbackVars
 }
 
@@ -283,7 +295,7 @@ func processRawHCLValue(
 	// Strategy: "variable" — always emit a variable, skip graph lookup
 	if rule.Strategy == "variable" {
 		varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
-		tfRef := fmt.Sprintf("${var.%s}", varName)
+		tfRef := "var." + varName
 		newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
 		return newValue
@@ -295,7 +307,7 @@ func processRawHCLValue(
 		// UUID not found in graph
 		if rule.Strategy == "reference_with_fallback" {
 			varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
-			tfRef := fmt.Sprintf("${var.%s}", varName)
+			tfRef := "var." + varName
 			newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
 			return newValue
@@ -305,7 +317,7 @@ func processRawHCLValue(
 	}
 
 	// Build the terraform reference string
-	tfRef := fmt.Sprintf("${%s.%s.%s}", rule.TargetResourceType, refName, rule.ReferenceField)
+	tfRef := fmt.Sprintf("%s.%s.%s", rule.TargetResourceType, refName, rule.ReferenceField)
 
 	// Replace the UUID string in the RawHCLValue with the terraform reference
 	newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
@@ -316,15 +328,37 @@ func processRawHCLValue(
 	return newValue
 }
 
-// replaceExtractedValue re-embeds a resolved reference/variable string in
-// place of the originally extracted value. It chooses the escaping-aware
-// rich-text rewrap path when the rule uses UnwrapMode == "rich_text", and
-// falls back to the plain substring replace (replaceUUIDInRawHCL) otherwise.
+// replaceExtractedValue re-embeds a resolved reference/variable token in
+// place of the originally extracted value. tfRef is the bare Terraform
+// traversal (e.g. "var.davinci_form_login_form" or
+// "pingone_davinci_flow.my_label.id").
+//
+// It chooses the escaping-aware rich-text rewrap path when the rule uses
+// UnwrapMode == "rich_text": the reference is re-embedded mid-string inside
+// a Slate wrapper, where a bare traversal would be inert template text, so
+// the quoted "${token}" form is used there (unchanged from before this
+// rendering change).
+//
+// The plain path substitutes via replaceUUIDInRawHCL, whose replacement must
+// remain valid JSON because later rule applications re-parse the same blob.
+// A bare traversal is not valid JSON, so the bare token is wrapped in a
+// quoted, JSON-safe sentinel (BareRefPlaceholder); ResolveEmbeddedReferences
+// materializes every sentinel to the bare token in a single sweep once all
+// rules have run.
 func replaceExtractedValue(value RawHCLValue, rule EmbeddedReferenceRule, wrapper string, uuidStr string, tfRef string) RawHCLValue {
 	if rule.UnwrapMode == richTextUnwrapMode {
-		return replaceRichTextInRawHCL(value, wrapper, uuidStr, tfRef)
+		return replaceRichTextInRawHCL(value, wrapper, uuidStr, "${"+tfRef+"}")
 	}
-	return RawHCLValue(replaceUUIDInRawHCL(value, uuidStr, tfRef))
+	return RawHCLValue(replaceUUIDInRawHCL(value, uuidStr, bareRefSentinelCore(tfRef)))
+}
+
+// bareRefSentinelCore returns the unquoted sentinel marker wrapping token:
+// @@TFREF@@<token>@@. replaceUUIDInRawHCL quotes its replacement, so passing
+// this core yields the full quoted placeholder BareRefPlaceholder(token)
+// inside the blob text while keeping the sentinel detail out of the call
+// sites.
+func bareRefSentinelCore(token string) string {
+	return bareRefSentinel + token + bareRefSentinel
 }
 
 // unwrapRichText extracts the inner "text" value from a Slate-style
@@ -518,9 +552,12 @@ func walkJSONPath(jsonData interface{}, path string) string {
 }
 
 // replaceUUIDInRawHCL replaces the first occurrence of the quoted UUID
-// string with a quoted Terraform reference. Only the first match is
-// replaced to avoid over-replacement when the same UUID appears in
-// other JSON fields (labels, metadata, etc.).
+// string with a quoted replacement. Only the first match is replaced to
+// avoid over-replacement when the same UUID appears in other JSON fields
+// (labels, metadata, etc.). The replacement text is quoted to keep the blob
+// valid JSON: for bare-reference substitution the caller passes the
+// JSON-safe sentinel core (@@TFREF@@<token>@@, materialized to the bare
+// token at the end of resolution), never the raw bare token itself.
 func replaceUUIDInRawHCL(value RawHCLValue, uuid string, tfRef string) string {
 	quotedUUID := fmt.Sprintf(`"%s"`, uuid)
 	quotedRef := fmt.Sprintf(`"%s"`, tfRef)
