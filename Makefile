@@ -52,6 +52,14 @@ golangcilint:
 	@echo "==> Checking source code with golangci-lint..."
 	@golangci-lint run ./...
 
+tflint:
+	@echo "==> Running tflint against the sample export module..."
+	@if ! command -v tflint >/dev/null 2>&1; then \
+		echo "tflint not found. Install it: https://github.com/terraform-linters/tflint#installation"; \
+		exit 1; \
+	fi
+	@tflint --chdir tests/testdata/tflint-sample --config "$(CURDIR)/.tflint.hcl"
+
 fmt:
 	@echo "==> Formatting Go code..."
 	@go fmt ./...
@@ -87,4 +95,4 @@ devcheck: build vet fmt lint test testacc
 
 devchecknotest: build vet fmt lint test
 
-.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint fmt clean regression-local devcheck devchecknotest
+.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint tflint fmt clean regression-local devcheck devchecknotest
