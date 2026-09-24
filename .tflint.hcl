@@ -7,7 +7,10 @@
 #
 # Invoked by:
 #   make tflint            — runs against tests/testdata/tflint-sample/
-#   .github/workflows/regression.yaml — runs against the fresh HCL export
+#   .github/workflows/regression.yaml — runs against the fresh HCL export at
+#                             output-pr/regression-module (the workflow's export
+#                             step passes --module-dir regression-module; keep
+#                             the two paths in sync)
 #
 # The bundled terraform ruleset is enabled (no --init required for it), and
 # the deprecated-interpolation rule is explicitly enabled so the guard

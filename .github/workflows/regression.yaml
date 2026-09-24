@@ -189,7 +189,11 @@ jobs:
       - name: Run tflint on PR export
         if: matrix.output-format == 'hcl'
         run: |
-          tflint --chdir ./output-pr/ping-export-module --config "${{ github.workspace }}/pr-source/.tflint.hcl"
+          # The exports above pass --module-dir regression-module, so the child
+          # module lands at ./output-pr/regression-module (see
+          # internal/module/generator.go). .tflint.hcl's header documents this
+          # path too — keep the two in sync.
+          tflint --chdir ./output-pr/regression-module --config "${{ github.workspace }}/pr-source/.tflint.hcl"
 
       - name: Compare outputs
         id: compare
