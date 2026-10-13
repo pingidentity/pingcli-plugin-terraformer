@@ -1067,11 +1067,39 @@ func unwrapUnionStruct(val reflect.Value) (interface{}, bool) {
 // evaluateConditionalDefaults applies declarative post-processing overrides
 // to the processed attributes. Each rule's WhenAll conditions must all be true
 // for the override to apply.
+//
+// SetValue values that are maps are deep-copied per resource: the parsed YAML
+// rule is shared across every resource of a type, and assigning the map
+// directly would alias one underlying map into every Attributes map — later
+// per-resource mutations (e.g. the variable extractor's ResolvedReference
+// injection into a single-key block) would then leak across resources.
 func (p *Processor) evaluateConditionalDefaults(attrs map[string]interface{}, defaults []schema.ConditionalDefault) {
 	for _, cd := range defaults {
 		if schema.EvaluateConditions(attrs, cd.WhenAll) {
-			attrs[cd.TargetAttribute] = cd.SetValue
+			attrs[cd.TargetAttribute] = deepCopyValue(cd.SetValue)
 		}
+	}
+}
+
+// deepCopyValue recursively copies maps and slices so a shared schema-derived
+// value can be safely mutated per resource. Scalars and type-asserted special
+// values are returned unchanged.
+func deepCopyValue(v interface{}) interface{} {
+	switch typed := v.(type) {
+	case map[string]interface{}:
+		copied := make(map[string]interface{}, len(typed))
+		for k, val := range typed {
+			copied[k] = deepCopyValue(val)
+		}
+		return copied
+	case []interface{}:
+		copied := make([]interface{}, len(typed))
+		for i, val := range typed {
+			copied[i] = deepCopyValue(val)
+		}
+		return copied
+	default:
+		return v
 	}
 }
 
