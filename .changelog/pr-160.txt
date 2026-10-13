@@ -1,0 +1,3 @@
+```release-note:enhancement
+`resource/pingone_davinci_variable`: Secret variables (`data_type = "secret"`) now export with a `value` block referencing a generated Terraform variable (`sensitive = true`) instead of being exported without a value. The generated variable's tfvars entry is empty — set it manually before applying; Terraform plan fails on an empty secret by design (the provider requires a non-empty `secret_string`), matching connector `clientSecret` handling. Non-secret variables are unchanged. Re-export your configuration to pick up the new blocks.
+```

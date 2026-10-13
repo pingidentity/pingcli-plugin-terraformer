@@ -125,6 +125,18 @@ type VariableRule struct {
 	IsSecret       bool        `yaml:"is_secret"`
 	DefaultValue   interface{} `yaml:"default_value,omitempty"`
 	Description    string      `yaml:"description,omitempty"`
+
+	// IsSecretWhenAll marks the variable as secret (empty tfvars value) only
+	// when all conditions hold against the processed attribute map. Evaluated
+	// in addition to the unconditional IsSecret flag — use it when secretness
+	// depends on resource data, e.g. DaVinci variables whose value is secret
+	// only for data_type == "secret".
+	IsSecretWhenAll []DefaultCondition `yaml:"is_secret_when_all,omitempty"`
+
+	// SensitiveWhenAll marks the variable as sensitive (sensitive = true in
+	// variables.tf) only when all conditions hold against the processed
+	// attribute map.
+	SensitiveWhenAll []DefaultCondition `yaml:"sensitive_when_all,omitempty"`
 }
 
 // CustomHandlerDefinition defines optional custom processing

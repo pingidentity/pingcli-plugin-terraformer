@@ -969,6 +969,58 @@ func TestFormatter_Format_TypeDiscriminatedBlockVariableReference(t *testing.T) 
 		"variable references inside type_discriminated_block must render as var.X")
 }
 
+// Secret DaVinci variables export a value block keyed secret_string (the
+// provider-required key) whose value is a sensitive Terraform variable
+// reference. See definitions/pingone/davinci/variable.yaml conditional_defaults.
+func TestFormatter_Format_TypeDiscriminatedBlock_SecretStringKey(t *testing.T) {
+	f := hclformatter.NewFormatter()
+
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			ResourceType: "pingone_davinci_variable",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "ID", TerraformName: "id", Type: "string", Computed: true},
+			{Name: "Name", TerraformName: "name", Type: "string"},
+			{Name: "DataType", TerraformName: "data_type", Type: "string"},
+			{
+				Name:          "Value",
+				TerraformName: "value",
+				Type:          "type_discriminated_block",
+				TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
+					TypeKeyMap: map[string]string{
+						"string": "string",
+					},
+				},
+			},
+		},
+	}
+
+	data := &core.ResourceData{
+		Name: "secret-a",
+		ID:   "var-123",
+		Attributes: map[string]interface{}{
+			"id":        "var-123",
+			"name":      "secret-a",
+			"data_type": "secret",
+			"value": map[string]interface{}{
+				"secret_string": core.ResolvedReference{
+					IsVariable:   true,
+					VariableName: "davinci_variable_secret_a_value",
+				},
+			},
+		},
+	}
+
+	output, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+
+	assert.Contains(t, output, "secret_string = var.davinci_variable_secret_a_value",
+		"secret_string must render as an unquoted var.X reference")
+	assert.NotContains(t, output, `"secret_string"`,
+		"secret_string must not be rendered as a quoted JSON-style key")
+}
+
 // ── nil_value: keep_empty on collection types formatter tests ────
 
 // TestFormatter_Format_SetWithNestedAttributesKeepEmpty verifies that an empty

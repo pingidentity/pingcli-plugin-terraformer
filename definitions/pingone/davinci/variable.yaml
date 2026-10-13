@@ -96,7 +96,10 @@ attributes:
 
   # Value - optional, variable-eligible
   # Uses type_discriminated_block to map Go runtime type to Terraform block key.
-  # Skip conditions suppress the block for secret data types.
+  # Skip conditions suppress the block for secret data types (the API returns
+  # no readable value); conditional_defaults below re-emits it with the
+  # provider-required secret_string key so secret variables export like other
+  # types, backed by an empty sensitive Terraform variable.
   - name: Value
     terraform_name: value
     type: type_discriminated_block
@@ -130,9 +133,24 @@ dependencies:
   import_id_format: "{env_id}/{resource_id}"
 
 # Post-processing attribute overrides
-# When no value will be written and mutable is false, the Terraform provider
-# requires mutable = true. This replaces the Go handleVariableMutableOverride handler.
+# Secret variables: the API never returns a readable value (suppressed by the
+# skip condition above), so emit the block with the provider-required
+# secret_string key. The string placeholder is replaced by the variable
+# extractor with a var.X reference (see variables.eligible_attributes below).
+# This rule must precede the mutable rule so secret variables keep their
+# API-provided mutable value instead of being forced to true.
 conditional_defaults:
+  - target_attribute: value
+    set_value:
+      secret_string: "REPLACED_BY_VARIABLE_EXTRACTOR"
+    when_all:
+      - attribute_empty: value
+      - attribute_equals:
+          name: data_type
+          value: secret
+
+  # When no value will be written and mutable is false, the Terraform provider
+  # requires mutable = true. This replaces the Go handleVariableMutableOverride handler.
   - target_attribute: mutable
     set_value: true
     when_all:
@@ -146,4 +164,15 @@ variables:
     - attribute_path: value
       variable_prefix: davinci_variable_
       is_secret: false
+      # Secret variables: value becomes sensitive, and its tfvars entry stays
+      # empty (the API value is not exportable). Conditional flags — applies
+      # only when data_type is secret, leaving other variable types untouched.
+      sensitive_when_all:
+        - attribute_equals:
+            name: data_type
+            value: secret
+      is_secret_when_all:
+        - attribute_equals:
+            name: data_type
+            value: secret
       description: "Value for DaVinci variable {name}"

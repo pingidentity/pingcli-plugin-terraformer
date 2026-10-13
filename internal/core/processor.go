@@ -1069,55 +1069,10 @@ func unwrapUnionStruct(val reflect.Value) (interface{}, bool) {
 // for the override to apply.
 func (p *Processor) evaluateConditionalDefaults(attrs map[string]interface{}, defaults []schema.ConditionalDefault) {
 	for _, cd := range defaults {
-		if p.allConditionsMet(attrs, cd.WhenAll) {
+		if schema.EvaluateConditions(attrs, cd.WhenAll) {
 			attrs[cd.TargetAttribute] = cd.SetValue
 		}
 	}
-}
-
-// allConditionsMet checks whether all conditions in a ConditionalDefault rule
-// are satisfied by the current attribute map.
-func (p *Processor) allConditionsMet(attrs map[string]interface{}, conditions []schema.DefaultCondition) bool {
-	for _, cond := range conditions {
-		if cond.AttributeEmpty != "" {
-			val, exists := attrs[cond.AttributeEmpty]
-			if exists && val != nil {
-				if s, ok := val.(string); ok && s == "" {
-					// empty string counts as empty
-				} else {
-					return false
-				}
-			}
-			// nil or not-present counts as empty — condition passes
-		}
-
-		if cond.AttributeEquals != nil {
-			val, exists := attrs[cond.AttributeEquals.Name]
-			if !exists {
-				return false
-			}
-			if !valuesEqual(val, cond.AttributeEquals.Value) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// valuesEqual compares two values for equality, handling type coercion between
-// bool and interface{} from YAML unmarshaling.
-func valuesEqual(a, b interface{}) bool {
-	if a == b {
-		return true
-	}
-	// YAML unmarshals booleans as bool, but processor may store them differently.
-	if ab, ok := a.(bool); ok {
-		if bb, ok := b.(bool); ok {
-			return ab == bb
-		}
-	}
-	// Compare as strings for mixed-type edge cases.
-	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }
 
 // ProcessResourceList processes a list of API resources
