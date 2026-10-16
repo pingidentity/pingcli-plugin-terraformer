@@ -292,6 +292,8 @@ Some Terraform provider attributes expect a block with exactly one type-specific
 
 The processor reads the runtime type of the extracted value, looks up the block key in `type_key_map`, and emits the appropriate single-key map. Values for keys listed in `json_encode_keys` are `json.Marshal`'d and emitted as `RawHCLValue`.
 
+`skip_conditions` suppresses the whole block when matched (OR'd). A suppressed block can be re-emitted by a `conditional_defaults` rule — used by the DaVinci variable definition, where the API returns no readable value for `data_type = "secret"`, so the definition suppresses the block and re-emits it with the provider-required `secret_string` key holding a placeholder that the variable extractor swaps for a `var.X` reference.
+
 #### Conditional Defaults
 
 Post-processing attribute overrides based on the state of other processed attributes:
@@ -307,7 +309,7 @@ conditional_defaults:
           value: false
 ```
 
-Evaluated after all attributes are processed and before formatting.
+Evaluated after all attributes are processed and before formatting. Rules apply in declaration order — a rule that emits an attribute (e.g. the secret `value` block) must be declared before rules whose conditions reference that attribute's emptiness.
 
 ### Schema Registry
 
@@ -895,6 +897,7 @@ The `VariableExtractor` (`internal/variables/extractor.go`) evaluates schema-dri
 - Applies `variables.eligible_attributes` rules for naming and descriptions
 - Handles `type_discriminated_block` value unwrapping for tfvars output
 - Custom transforms can also produce variables via `TransformResultWithVariables`
+- Applies rule-level `is_secret` / `sensitive` flags and their conditional forms (`is_secret_when_all`, `sensitive_when_all`) — a secret variable renders with `sensitive = true` and its tfvars entry stays empty
 - **Variable names are sanitized via `utils.SanitizeVariableName()` to ensure valid Terraform identifiers**
 
 ### HCL Template Character Escaping in tfvars
@@ -1027,6 +1030,16 @@ variables:
     - attribute_path: value
       variable_prefix: davinci_variable_
       is_secret: false
+      # Conditional flags — secretness/sensitivity that depends on resource
+      # data. Uses the same condition vocabulary as conditional_defaults.
+      sensitive_when_all:
+        - attribute_equals:
+            name: data_type
+            value: secret
+      is_secret_when_all:
+        - attribute_equals:
+            name: data_type
+            value: secret
       description: "Value for DaVinci variable {name}"
 ```
 

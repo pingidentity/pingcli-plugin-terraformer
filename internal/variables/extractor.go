@@ -92,6 +92,23 @@ func (e *VariableExtractor) Extract(
 		// Apply rule overrides.
 		if hasRule {
 			ev.IsSecret = rule.IsSecret
+			if rule.IsSecret {
+				ev.Sensitive = true
+			}
+			// Conditional rule flags: secretness/sensitivity that depends on
+			// resource data (e.g. DaVinci variable values, secret only for
+			// data_type == "secret"). Evaluated against the processed
+			// attribute map with the same semantics as conditional_defaults.
+			// Absent condition lists never fire — unlike conditional_defaults,
+			// an empty condition set here means "no conditional flag", not
+			// "always apply" (EvaluateConditions alone is vacuously true).
+			if len(rule.IsSecretWhenAll) > 0 && schema.EvaluateConditions(data, rule.IsSecretWhenAll) {
+				ev.IsSecret = true
+				ev.Sensitive = true
+			}
+			if len(rule.SensitiveWhenAll) > 0 && schema.EvaluateConditions(data, rule.SensitiveWhenAll) {
+				ev.Sensitive = true
+			}
 			if rule.Description != "" {
 				ev.Description = expandDescription(rule.Description, resourceName)
 			}

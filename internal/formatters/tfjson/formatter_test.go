@@ -986,3 +986,36 @@ func TestFormat_TypeDiscriminatedBlock_ResolvedVariableReference(t *testing.T) {
 	assert.Equal(t, "${var.davinci_variable_test_value}", value["string"],
 		"variable references inside type_discriminated_block must render as ${var.X}")
 }
+
+// Secret DaVinci variables export a value block keyed secret_string (the
+// provider-required key) whose value is a sensitive Terraform variable
+// reference. See definitions/pingone/davinci/variable.yaml conditional_defaults.
+func TestFormat_TypeDiscriminatedBlock_SecretStringKey(t *testing.T) {
+	f := NewFormatter()
+	def := baseDef(schema.AttributeDefinition{
+		Name:          "Value",
+		TerraformName: "value",
+		Type:          "type_discriminated_block",
+		TypeDiscriminatedBlock: &schema.TypeDiscriminatedBlockConfig{
+			TypeKeyMap: map[string]string{
+				"string": "string",
+			},
+		},
+	})
+	data := baseData("res1", "id1", map[string]interface{}{
+		"value": map[string]interface{}{
+			"secret_string": core.ResolvedReference{
+				IsVariable:   true,
+				VariableName: "davinci_variable_secret_a_value",
+			},
+		},
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+
+	attrs := unmarshalResource(t, out, "test_resource", "pingcli__res1")
+	value, ok := attrs["value"].(map[string]interface{})
+	require.True(t, ok, "value should be a map object")
+	assert.Equal(t, "${var.davinci_variable_secret_a_value}", value["secret_string"],
+		"secret_string must render as ${var.X} in tfjson output")
+}
