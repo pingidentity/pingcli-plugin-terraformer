@@ -469,7 +469,8 @@ func TestThemeRule_Case1_UUIDNotInGraph_FallsBackToVariable(t *testing.T) {
 
 	resolved, fallbackVars := resolveShowFormNode(t, g, properties)
 
-	assert.Contains(t, string(resolved), "${var.davinci_theme_sign_on}")
+	assert.Contains(t, string(resolved), "var.davinci_theme_sign_on")
+	assert.NotContains(t, string(resolved), `"${var.davinci_theme_sign_on}"`, "substitution must render bare, not interpolation-only")
 	assert.NotContains(t, string(resolved), themeUUID)
 	require.Len(t, fallbackVars, 1)
 	assert.Equal(t, "davinci_theme_sign_on", fallbackVars[0].Name)
@@ -496,7 +497,8 @@ func TestThemeRule_Case1_UUIDInGraph_ResolvesToReference(t *testing.T) {
 
 	resolved, fallbackVars := resolveShowFormNode(t, g, properties)
 
-	assert.Contains(t, string(resolved), "${pingone_branding_theme.pingcli__My_Theme.id}")
+	assert.Contains(t, string(resolved), "pingone_branding_theme.pingcli__My_Theme.id")
+	assert.NotContains(t, string(resolved), `"${pingone_branding_theme.pingcli__My_Theme.id}"`, "substitution must render bare, not interpolation-only")
 	assert.NotContains(t, string(resolved), themeUUID)
 	assert.Empty(t, fallbackVars)
 
@@ -668,7 +670,8 @@ func TestThemeRule_FormValueUnaffectedByThemeCase(t *testing.T) {
 
 			resolved, _ := resolveShowFormNode(t, g, properties)
 
-			assert.Contains(t, string(resolved), "${pingone_davinci_form.pingcli__Example_Sign_On.id}")
+			assert.Contains(t, string(resolved), "pingone_davinci_form.pingcli__Example_Sign_On.id")
+			assert.NotContains(t, string(resolved), `"${pingone_davinci_form.pingcli__Example_Sign_On.id}"`, "substitution must render bare, not interpolation-only")
 			assert.NotContains(t, string(resolved), formUUID)
 		})
 	}
@@ -694,7 +697,7 @@ func TestThemeRule_CustomFormCapability_Unchanged(t *testing.T) {
 
 	// form.value still resolves (unrelated to the theme rules); theme rules
 	// simply never fire because theme/themeId keys don't exist.
-	assert.Contains(t, string(resolved), "${pingone_davinci_form.pingcli__Legacy_Form.id}")
+	assert.Contains(t, string(resolved), "pingone_davinci_form.pingcli__Legacy_Form.id")
 	assert.NotContains(t, string(resolved), "davinci_theme")
 	assert.NotContains(t, string(resolved), "pingone_branding_theme")
 	assert.Empty(t, fallbackVars)

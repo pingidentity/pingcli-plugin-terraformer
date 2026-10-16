@@ -313,7 +313,118 @@ func compareResource(result *Result, key string, exp, act *parsedResource) {
 	}
 }
 
-// ── helpers ──
+// deinterpolateValue rewrites an interpolation-only reference to its bare
+// traversal form: `"${var.x}"` → `var.x`, `"${type.label.field}"` →
+// `type.label.field`.
+//
+// The de-interpolation equivalence exists because issue #158 intentionally
+// changed the exporter to render bare traversals inside jsonencode blobs where
+// it previously rendered quoted interpolation-only strings; the two forms
+// evaluate identically in Terraform, so the compare tool must treat them as
+// equivalent. The rule is deliberately narrow: it applies only when the
+// entire (attribute) value is one interpolation of a traversal-shaped token.
+// Partial interpolations and non-traversal expressions are left untouched so
+// genuine value changes still compare as mismatches.
+func deinterpolateValue(v string) string {
+	if inner, ok := interpolationOnlyBody(v); ok {
+		return inner
+	}
+	return v
+}
+
+// deinterpolateBlobText applies whole-value de-interpolation inside jsonencode
+// blob text: every quoted `"${X}"` whose content is one traversal-shaped
+// interpolation becomes bare `X`. Blob text is hand-built by the exporters, so
+// the scan is plain quote-to-quote; unquoted text (bare traversals, keys,
+// numbers) passes through untouched. Strings that merely contain a reference
+// among other text — e.g. rich-text Slate wrappers like "<p>${var.x}</p>" —
+// are not whole-value interpolations and are left untouched.
+func deinterpolateBlobText(s string) string {
+	const quote = '"'
+	var sb strings.Builder
+	for i := 0; i < len(s); {
+		j := strings.IndexByte(s[i:], quote)
+		if j < 0 {
+			sb.WriteString(s[i:])
+			break
+		}
+		start := i + j
+		sb.WriteString(s[i:start])
+		end := strings.IndexByte(s[start+1:], quote)
+		if end < 0 {
+			// Unterminated quote: emit the rest unchanged.
+			sb.WriteString(s[start:])
+			break
+		}
+		end = start + 1 + end
+		if inner, ok := interpolationOnlyBody(s[start+1 : end]); ok {
+			sb.WriteString(inner)
+		} else {
+			sb.WriteString(s[start : end+1])
+		}
+		i = end + 1
+	}
+	return sb.String()
+}
+
+// interpolationOnlyBody reports whether s consists of exactly one
+// interpolation whose content is a traversal-shaped token, returning the bare
+// token.
+func interpolationOnlyBody(s string) (string, bool) {
+	if len(s) < 4 || !strings.HasPrefix(s, "${") || !strings.HasSuffix(s, "}") {
+		return "", false
+	}
+	inner := s[2 : len(s)-1]
+	if !traversalShaped(inner) {
+		return "", false
+	}
+	return inner, true
+}
+
+// traversalShaped reports whether s is identifier segments separated by dots —
+// the shape of a Terraform traversal (var.x, type.label.field).
+func traversalShaped(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, seg := range strings.Split(s, ".") {
+		if seg == "" {
+			return false
+		}
+		for _, r := range seg {
+			if !isTraversalRune(r) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isTraversalRune(r rune) bool {
+	switch {
+	case r >= 'a' && r <= 'z':
+		return true
+	case r >= 'A' && r <= 'Z':
+		return true
+	case r >= '0' && r <= '9':
+		return true
+	case r == '_' || r == '-':
+		return true
+	default:
+		return false
+	}
+}
+
+// normalizeDeinterpolate applies de-interpolation normalization to a compare
+// value: jsonencode blob text gets per-quoted-string de-interpolation; other
+// values are de-interpolated only when the whole value is one
+// interpolation-only expression.
+func normalizeDeinterpolate(v string) string {
+	if strings.Contains(v, "jsonencode(") {
+		return deinterpolateBlobText(v)
+	}
+	return deinterpolateValue(v)
+}
 
 func tokensToString(tokens hclwrite.Tokens) string {
 	var sb strings.Builder
@@ -328,7 +439,12 @@ func normalizeValue(v string) string {
 	if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
 		v = v[1 : len(v)-1]
 	}
-	return v
+	// De-interpolation equivalence (issue #158): the exporter renders bare
+	// traversals where older output rendered quoted interpolation-only refs;
+	// the two forms evaluate identically. Applied after quote-stripping so a
+	// plain quoted "${var.x}" attribute and a bare var.x attribute compare
+	// equal, and inside jsonencode blobs so the blob bodies match too.
+	return normalizeDeinterpolate(v)
 }
 
 func isObjectLiteral(s string) bool {
@@ -350,7 +466,11 @@ func normalizeObjectLiteral(s string) string {
 		p := strings.SplitN(t, "=", 2)
 		if len(p) == 2 {
 			key := normalizeValue(strings.TrimSpace(p[0]))
-			parts = append(parts, key+" = "+strings.TrimSpace(p[1]))
+			// De-interpolate values too (issue #158): object-literal values
+			// can carry exporter jsonencode blobs whose interpolation-only
+			// form changed to bare traversals between compared revisions.
+			val := deinterpolateBlobText(strings.TrimSpace(p[1]))
+			parts = append(parts, key+" = "+val)
 		}
 	}
 	sort.Strings(parts)

@@ -167,6 +167,34 @@ jobs:
           echo "Running PR export with: $ARGS"
           artifacts/binary-pr/binary-pr export $ARGS
 
+      # Guard against a regression of tflint's terraform_deprecated_interpolation
+      # rule on exported HCL (issue #158). Runs only for hcl matrix entries: the
+      # rule does not apply to .tf.json output. Fails the job if any deprecated
+      # interpolation-only "${...}" expression appears in the fresh export.
+      # Checked out into a subdirectory: the workspace root already holds the
+      # downloaded artifacts and the export directories.
+      - name: Checkout PR branch (for .tflint.hcl)
+        if: matrix.output-format == 'hcl'
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr-source
+
+      - name: Install tflint
+        if: matrix.output-format == 'hcl'
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.64.0
+
+      - name: Run tflint on PR export
+        if: matrix.output-format == 'hcl'
+        run: |
+          # The exports above pass --module-dir regression-module, so the child
+          # module lands at ./output-pr/regression-module (see
+          # internal/module/generator.go). .tflint.hcl's header documents this
+          # path too — keep the two in sync.
+          tflint --chdir ./output-pr/regression-module --config "${{ github.workspace }}/pr-source/.tflint.hcl"
+
       - name: Compare outputs
         id: compare
         shell: bash {0}
