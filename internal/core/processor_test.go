@@ -657,6 +657,88 @@ func TestProcessorConditionalDefaults_NoOverrideWhenMutableTrue(t *testing.T) {
 	assert.Equal(t, true, result.Attributes["mutable"])
 }
 
+// secretVariableDef builds a DaVinci-variable-shaped definition: a
+// type_discriminated_block value with the secret skip condition, a mutable
+// bool, a data_type string, and the two conditional_defaults rules from
+// definitions/pingone/davinci/variable.yaml in the same order (secret value
+// emission must precede the mutable override).
+func secretVariableDef() *schema.ResourceDefinition {
+	def := tdbDef([]schema.SkipCondition{
+		{SourceField: "DataType", Equals: "secret"},
+	})
+	def.Attributes = append(def.Attributes,
+		schema.AttributeDefinition{Name: "DataType", TerraformName: "data_type", Type: "string", SourcePath: "DataType"},
+	)
+	def.ConditionalDefaults = []schema.ConditionalDefault{
+		{
+			TargetAttribute: "value",
+			SetValue:        map[string]interface{}{"secret_string": "REPLACED_BY_VARIABLE_EXTRACTOR"},
+			WhenAll: []schema.DefaultCondition{
+				{AttributeEmpty: "value"},
+				{AttributeEquals: &schema.AttributeValueCondition{Name: "data_type", Value: "secret"}},
+			},
+		},
+		{
+			TargetAttribute: "mutable",
+			SetValue:        true,
+			WhenAll: []schema.DefaultCondition{
+				{AttributeEmpty: "value"},
+				{AttributeEquals: &schema.AttributeValueCondition{Name: "mutable", Value: false}},
+			},
+		},
+	}
+	return def
+}
+
+func TestProcessorConditionalDefaults_SecretValueBlockEmitted(t *testing.T) {
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(secretVariableDef()))
+	p := core.NewProcessor(registry)
+
+	// Secret variable: API returns no readable value (nil) — skip condition
+	// suppresses the tdb block, then the conditional default re-emits it with
+	// the provider-required secret_string key.
+	mock := &MockTDB{ID: "1", Name: "v", DataType: "secret", Mutable: true, Value: nil}
+	result, err := p.ProcessResource("test_tdb", mock)
+	require.NoError(t, err)
+
+	m, ok := result.Attributes["value"].(map[string]interface{})
+	require.True(t, ok, "secret variable must have a value block")
+	assert.Equal(t, "REPLACED_BY_VARIABLE_EXTRACTOR", m["secret_string"])
+}
+
+func TestProcessorConditionalDefaults_SecretMutablePassesThrough(t *testing.T) {
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(secretVariableDef()))
+	p := core.NewProcessor(registry)
+
+	// With the value block emitted for secrets, the mutable override must not
+	// fire — the API-provided mutable value passes through. Rule ordering in
+	// the YAML (secret rule before mutable rule) is what makes this hold.
+	mock := &MockTDB{ID: "1", Name: "v", DataType: "secret", Mutable: false, Value: nil}
+	result, err := p.ProcessResource("test_tdb", mock)
+	require.NoError(t, err)
+	assert.Equal(t, false, result.Attributes["mutable"], "secret variable keeps API-provided mutable")
+	assert.Contains(t, result.Attributes, "value")
+}
+
+func TestProcessorConditionalDefaults_SecretRuleNotFiredForStringType(t *testing.T) {
+	registry := schema.NewRegistry()
+	require.NoError(t, registry.Register(secretVariableDef()))
+	p := core.NewProcessor(registry)
+
+	// Plain string variable: tdb emits {"string": ...}, the secret rule does
+	// not fire (data_type mismatch), and the mutable rule still applies when
+	// the value is absent.
+	mock := &MockTDB{ID: "1", Name: "v", DataType: "string", Mutable: false, Value: "hello"}
+	result, err := p.ProcessResource("test_tdb", mock)
+	require.NoError(t, err)
+
+	m := result.Attributes["value"].(map[string]interface{})
+	assert.Equal(t, "hello", m["string"])
+	assert.Nil(t, m["secret_string"], "secret_string key must not leak into non-secret variables")
+}
+
 // ── Choice wrapper unwrapping tests ──────────────────────────────
 
 // MockChoiceWrapper mimics PingOne SDK choice types like

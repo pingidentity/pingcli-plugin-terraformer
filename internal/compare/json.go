@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // CompareJSON parses two Terraform JSON strings and returns content differences.
@@ -91,8 +92,8 @@ func compareJSONResource(result *Result, key string, exp, act map[string]interfa
 			})
 			continue
 		}
-		expStr := jsonValueString(expVal)
-		actStr := jsonValueString(actVal)
+		expStr := deinterpolateJSONValue(jsonValueString(expVal))
+		actStr := deinterpolateJSONValue(jsonValueString(actVal))
 		if expStr != actStr {
 			// Check if both are nested objects for block mismatch.
 			_, expIsObj := expVal.(map[string]interface{})
@@ -128,6 +129,38 @@ func compareJSONResource(result *Result, key string, exp, act map[string]interfa
 			})
 		}
 	}
+}
+
+// deinterpolateJSONValue normalizes a .tf.json compare value for the
+// de-interpolation equivalence (issue #158): a RawHCL blob that older output
+// rendered as a quoted interpolation-only ref and newer output renders as a
+// bare traversal compare equal. The shapes reaching this function after
+// jsonValueString:
+//   - "${var.x}" / "${type.label.field}" (new tfjson wrap of a bare blob, and
+//     plain template attributes)
+//   - "${"${var.x}"}" (old tfjson wrap: the blob itself was the quoted
+//     interpolation-only string, wrapped again by the formatter)
+//   - "${jsonencode({... "value" : "${var.x}" ...})}" (jsonencode blob; old
+//     side carries the quoted ref inside, new side the bare token)
+//
+// As in the HCL path, partial interpolations and non-traversal expressions are
+// left untouched so genuine value changes still compare as mismatches.
+func deinterpolateJSONValue(v string) string {
+	// Old output wrapped a quoted interpolation-only blob in the template
+	// wrapper: "${"${var.x}"}". Strip the wrapper and the blob's quotes, then
+	// de-interpolate what is inside.
+	if strings.HasPrefix(v, "${\"") && strings.HasSuffix(v, "\"}") {
+		quoted := v[2 : len(v)-1]
+		if len(quoted) >= 2 && quoted[0] == '"' && quoted[len(quoted)-1] == '"' {
+			if inner, ok := interpolationOnlyBody(quoted[1 : len(quoted)-1]); ok {
+				return inner
+			}
+		}
+	}
+	if strings.Contains(v, "jsonencode(") {
+		return deinterpolateBlobText(v)
+	}
+	return deinterpolateValue(v)
 }
 
 func sortedJSONKeys(m map[string]interface{}) []string {

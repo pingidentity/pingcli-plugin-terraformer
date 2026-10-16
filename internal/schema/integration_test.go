@@ -62,8 +62,26 @@ func TestLoadVariableDefinition(t *testing.T) {
 
 	// Verify variable extraction rules
 	assert.Len(t, def.Variables.EligibleAttributes, 1)
-	assert.Equal(t, "value", def.Variables.EligibleAttributes[0].AttributePath)
-	assert.Equal(t, "davinci_variable_", def.Variables.EligibleAttributes[0].VariablePrefix)
+	valueRule := def.Variables.EligibleAttributes[0]
+	assert.Equal(t, "value", valueRule.AttributePath)
+	assert.Equal(t, "davinci_variable_", valueRule.VariablePrefix)
+	// Secret variables: secretness/sensitivity are conditional on data_type,
+	// never unconditional (plain variables keep their exportable values).
+	assert.False(t, valueRule.IsSecret, "secretness must be conditional, not blanket")
+	assert.Len(t, valueRule.IsSecretWhenAll, 1)
+	assert.Equal(t, "data_type", valueRule.IsSecretWhenAll[0].AttributeEquals.Name)
+	assert.Equal(t, "secret", valueRule.IsSecretWhenAll[0].AttributeEquals.Value)
+	assert.Len(t, valueRule.SensitiveWhenAll, 1)
+
+	// Verify conditional_defaults: the secret value emission rule must
+	// precede the mutable override so secret variables keep their
+	// API-provided mutable value.
+	require.Len(t, def.ConditionalDefaults, 2)
+	assert.Equal(t, "value", def.ConditionalDefaults[0].TargetAttribute,
+		"secret value rule must be first")
+	assert.Equal(t, map[string]interface{}{"secret_string": "REPLACED_BY_VARIABLE_EXTRACTOR"},
+		def.ConditionalDefaults[0].SetValue)
+	assert.Equal(t, "mutable", def.ConditionalDefaults[1].TargetAttribute)
 }
 
 func TestRegistryLoadPlatform(t *testing.T) {

@@ -292,6 +292,8 @@ Some Terraform provider attributes expect a block with exactly one type-specific
 
 The processor reads the runtime type of the extracted value, looks up the block key in `type_key_map`, and emits the appropriate single-key map. Values for keys listed in `json_encode_keys` are `json.Marshal`'d and emitted as `RawHCLValue`.
 
+`skip_conditions` suppresses the whole block when matched (OR'd). A suppressed block can be re-emitted by a `conditional_defaults` rule — used by the DaVinci variable definition, where the API returns no readable value for `data_type = "secret"`, so the definition suppresses the block and re-emits it with the provider-required `secret_string` key holding a placeholder that the variable extractor swaps for a `var.X` reference.
+
 #### Conditional Defaults
 
 Post-processing attribute overrides based on the state of other processed attributes:
@@ -307,7 +309,7 @@ conditional_defaults:
           value: false
 ```
 
-Evaluated after all attributes are processed and before formatting.
+Evaluated after all attributes are processed and before formatting. Rules apply in declaration order — a rule that emits an attribute (e.g. the secret `value` block) must be declared before rules whose conditions reference that attribute's emptiness.
 
 ### Schema Registry
 
@@ -540,7 +542,7 @@ type EmbeddedReferenceRegistry struct { ... }
 5. **Unwrap** (if `UnwrapMode == "rich_text"`): parse the wrapper `[{"children":[{"text":"<value>"}]}]` and extract the inner `text` value. Any shape mismatch (not an array, empty array, missing `children`, missing/non-string `text`) results in a no-op, mirroring `walkJSONPath`'s "return empty on mismatch" convention — never a panic.
 6. **UUID-format guard** (unconditional): the extracted (or unwrapped) string is validated via `looksLikeUUID` (backed by `github.com/google/uuid`'s `Validate`). Only a UUID-shaped string is treated as a resolvable reference/fallback-variable target — anything else (a sentinel/mode-flag string such as `"useThemeId"` or `"activeTheme"`, or any future sentinel) no-ops exactly like "no value found," **regardless of `Strategy`**. This is a single check point applied uniformly, not a per-rule opt-in, so no enumerated skip-list is needed and no future rule registration can accidentally reintroduce the bug this guard closes.
 7. **Lookup**: Query the dependency graph for a resource matching `TargetResourceType` with the extracted UUID.
-8. **Replace**: Update the JSON blob, replacing the UUID with `${resource_type.label.reference_field}` (Terraform interpolation syntax with single `$`) or a fallback `${var.name}` reference, depending on `Strategy`. For `UnwrapMode == "rich_text"`, the replacement happens *inside* the wrapper (see below) rather than as a bare substring swap.
+8. **Replace**: Update the JSON blob, replacing the UUID with a bare `resource_type.label.reference_field` traversal or a bare `var.name` fallback reference, depending on `Strategy` (full-string substitutions render without quotes or `${...}` so tflint's `terraform_deprecated_interpolation` rule stays clean). Substitution is two-phase: the UUID is first swapped for a quoted, JSON-safe sentinel (`"@@TFREF@@<token>@@"`) so subsequent rule applications can keep re-parsing the same blob, and a final sweep in `ResolveEmbeddedReferences` materializes every sentinel into the bare token once all rules have run. For `UnwrapMode == "rich_text"`, the replacement happens *inside* the wrapper (see below) rather than as a bare substring swap, and keeps the `${resource_type.label.reference_field}` / `${var.name}` form — the reference is re-embedded mid-string, not as an interpolation-only expression.
 9. **Serialize**: Re-marshal the JSON and update the `RawHCLValue` in the attributes map.
 10. **Add Graph Edge**: Record the dependency in the graph so `--include-upstream` and cycle detection work correctly (skipped for `Strategy: "variable"` or when only a fallback variable is emitted).
 
@@ -944,6 +946,7 @@ The `VariableExtractor` (`internal/variables/extractor.go`) evaluates schema-dri
 - Applies `variables.eligible_attributes` rules for naming and descriptions
 - Handles `type_discriminated_block` value unwrapping for tfvars output
 - Custom transforms can also produce variables via `TransformResultWithVariables`
+- Applies rule-level `is_secret` / `sensitive` flags and their conditional forms (`is_secret_when_all`, `sensitive_when_all`) — a secret variable renders with `sensitive = true` and its tfvars entry stays empty
 - **Variable names are sanitized via `utils.SanitizeVariableName()` to ensure valid Terraform identifiers**
 
 ### HCL Template Character Escaping in tfvars
@@ -1076,6 +1079,16 @@ variables:
     - attribute_path: value
       variable_prefix: davinci_variable_
       is_secret: false
+      # Conditional flags — secretness/sensitivity that depends on resource
+      # data. Uses the same condition vocabulary as conditional_defaults.
+      sensitive_when_all:
+        - attribute_equals:
+            name: data_type
+            value: secret
+      is_secret_when_all:
+        - attribute_equals:
+            name: data_type
+            value: secret
       description: "Value for DaVinci variable {name}"
 ```
 

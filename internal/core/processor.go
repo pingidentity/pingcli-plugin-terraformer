@@ -1081,57 +1081,40 @@ func unwrapUnionStruct(val reflect.Value) (interface{}, bool) {
 // evaluateConditionalDefaults applies declarative post-processing overrides
 // to the processed attributes. Each rule's WhenAll conditions must all be true
 // for the override to apply.
+//
+// SetValue values that are maps are deep-copied per resource: the parsed YAML
+// rule is shared across every resource of a type, and assigning the map
+// directly would alias one underlying map into every Attributes map — later
+// per-resource mutations (e.g. the variable extractor's ResolvedReference
+// injection into a single-key block) would then leak across resources.
 func (p *Processor) evaluateConditionalDefaults(attrs map[string]interface{}, defaults []schema.ConditionalDefault) {
 	for _, cd := range defaults {
-		if p.allConditionsMet(attrs, cd.WhenAll) {
-			attrs[cd.TargetAttribute] = cd.SetValue
+		if schema.EvaluateConditions(attrs, cd.WhenAll) {
+			attrs[cd.TargetAttribute] = deepCopyValue(cd.SetValue)
 		}
 	}
 }
 
-// allConditionsMet checks whether all conditions in a ConditionalDefault rule
-// are satisfied by the current attribute map.
-func (p *Processor) allConditionsMet(attrs map[string]interface{}, conditions []schema.DefaultCondition) bool {
-	for _, cond := range conditions {
-		if cond.AttributeEmpty != "" {
-			val, exists := attrs[cond.AttributeEmpty]
-			if exists && val != nil {
-				if s, ok := val.(string); ok && s == "" {
-					// empty string counts as empty
-				} else {
-					return false
-				}
-			}
-			// nil or not-present counts as empty — condition passes
+// deepCopyValue recursively copies maps and slices so a shared schema-derived
+// value can be safely mutated per resource. Scalars and type-asserted special
+// values are returned unchanged.
+func deepCopyValue(v interface{}) interface{} {
+	switch typed := v.(type) {
+	case map[string]interface{}:
+		copied := make(map[string]interface{}, len(typed))
+		for k, val := range typed {
+			copied[k] = deepCopyValue(val)
 		}
-
-		if cond.AttributeEquals != nil {
-			val, exists := attrs[cond.AttributeEquals.Name]
-			if !exists {
-				return false
-			}
-			if !valuesEqual(val, cond.AttributeEquals.Value) {
-				return false
-			}
+		return copied
+	case []interface{}:
+		copied := make([]interface{}, len(typed))
+		for i, val := range typed {
+			copied[i] = deepCopyValue(val)
 		}
+		return copied
+	default:
+		return v
 	}
-	return true
-}
-
-// valuesEqual compares two values for equality, handling type coercion between
-// bool and interface{} from YAML unmarshaling.
-func valuesEqual(a, b interface{}) bool {
-	if a == b {
-		return true
-	}
-	// YAML unmarshals booleans as bool, but processor may store them differently.
-	if ab, ok := a.(bool); ok {
-		if bb, ok := b.(bool); ok {
-			return ab == bb
-		}
-	}
-	// Compare as strings for mixed-type edge cases.
-	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 }
 
 // ProcessResourceList processes a list of API resources
