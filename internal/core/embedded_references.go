@@ -323,40 +323,12 @@ func processRawHCLValue(
 		return value
 	}
 
-	// Strategy: "variable" — always emit a variable, skip graph lookup
-	if rule.Strategy == "variable" {
-		varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
-		tfRef := "var." + varName
-		newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
-		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
-		return newValue
-	}
-
-	// Strategy: "reference" (default) or "reference_with_fallback" — try graph lookup
-	refName, err := g.GetReferenceName(rule.TargetResourceType, uuidStr)
-	if err != nil {
-		// UUID not found in graph
-		if rule.Strategy == "reference_with_fallback" {
-			varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
-			tfRef := "var." + varName
-			newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
-			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
-			return newValue
-		}
-		// Default strategy: leave unchanged
+	tfRef, resolved := resolveReferenceToTFRef(rule, resource, uuidStr, jsonData, "properties."+rule.JSONKeyPath, g, allocator, traversalKey, varSeen, fallbackVars)
+	if !resolved {
 		return value
 	}
 
-	// Build the terraform reference string
-	tfRef := fmt.Sprintf("%s.%s.%s", rule.TargetResourceType, refName, rule.ReferenceField)
-
-	// Replace the UUID string in the RawHCLValue with the terraform reference
-	newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
-
-	// Add graph edge
-	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, "properties."+rule.JSONKeyPath, "")
-
-	return newValue
+	return replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
 }
 
 // plainStringPatternCache memoizes compiled PlainStringPattern regexes so
@@ -425,7 +397,7 @@ func processPlainString(
 		start, end := match[2], match[3]
 		uuidStr := value[start:end]
 
-		tfRef, resolved := resolvePlainStringReference(rule, resource, uuidStr, g, allocator, traversalKey, varSeen, fallbackVars)
+		tfRef, resolved := resolveReferenceToTFRef(rule, resource, uuidStr, nil, rule.AttributePath, g, allocator, traversalKey, varSeen, fallbackVars)
 		if !resolved {
 			continue
 		}
@@ -445,16 +417,30 @@ func processPlainString(
 	return InterpolatedString(sb.String()), true
 }
 
-// resolvePlainStringReference resolves a single UUID occurrence found by
-// processPlainString to a Terraform expression string (a resource traversal
-// like "pingone_population.my_pop.id", or a variable reference like
-// "var.pingone_population_id"), applying the same UUID-format guard and
-// Strategy semantics as processRawHCLValue's JSON-blob path. Returns
-// ("", false) when the occurrence should be left unresolved in place.
-func resolvePlainStringReference(
+// resolveReferenceToTFRef resolves a single extracted UUID to a Terraform
+// expression (a resource traversal like "pingone_population.my_pop.id", or a
+// variable reference like "var.pingone_population_id") per the rule's
+// Strategy, applying the unconditional UUID-format guard. Shared by the
+// JSON-blob path (processRawHCLValue) and the plain-string path
+// (processPlainString); the caller owns how the returned token is embedded
+// (sentinel-substitution into the blob vs "${...}" splicing into a string).
+//
+// jsonData is the enclosing JSON blob's parsed data — the source for
+// VariableNamingPath-derived fallback-variable names — or nil when the
+// occurrence was found in a plain string (no blob context; naming falls back
+// to the traversal key). edgePath is the graph-edge annotation path
+// ("properties.<keypath>" for blobs, rule.AttributePath for plain strings).
+//
+// Returns (tfRef, true) on a resolved reference or fallback variable, or
+// ("", false) when the occurrence should stay unresolved in place
+// (non-UUID-shaped value, or a graph miss under the default "reference"
+// strategy).
+func resolveReferenceToTFRef(
 	rule EmbeddedReferenceRule,
 	resource *ResourceData,
 	uuidStr string,
+	jsonData interface{},
+	edgePath string,
 	g *graph.DependencyGraph,
 	allocator *fallbackVariableAllocator,
 	traversalKey string,
@@ -468,7 +454,7 @@ func resolvePlainStringReference(
 
 	// Strategy: "variable" — always emit a variable, skip graph lookup.
 	if rule.Strategy == "variable" {
-		varName := allocatedVariableName(rule, nil, uuidStr, traversalKey, allocator)
+		varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
 		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
 		return "var." + varName, true
 	}
@@ -477,14 +463,14 @@ func resolvePlainStringReference(
 	refName, err := g.GetReferenceName(rule.TargetResourceType, uuidStr)
 	if err != nil {
 		if rule.Strategy == "reference_with_fallback" {
-			varName := allocatedVariableName(rule, nil, uuidStr, traversalKey, allocator)
+			varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
 			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
 			return "var." + varName, true
 		}
 		return "", false
 	}
 
-	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, rule.AttributePath, "")
+	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, edgePath, "")
 	return fmt.Sprintf("%s.%s.%s", rule.TargetResourceType, refName, rule.ReferenceField), true
 }
 
