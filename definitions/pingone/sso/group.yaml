@@ -1,0 +1,92 @@
+# PingOne Group Resource Definition
+#
+# SDK: github.com/patrickcping/pingone-go-sdk-v2/management, type Group.
+# Schema-driven definition: no custom handlers are needed beyond the
+# list/get dispatch (see resource_group.go), which is required because this
+# resource uses the management SDK (list-then-iterate pagination, no
+# per-resource typed HAL links).
+
+metadata:
+  platform: pingone
+  resource_type: pingone_group
+  api_type: Group
+  name: PingOne Group
+  short_name: group
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: Group
+  list_method: GroupsApi.ReadAllGroups
+  get_method: GroupsApi.ReadOneGroup
+  id_field: id
+  name_field: name
+  label_fields: [name]
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment. No source_path: the
+  # orchestrator injects the exported environment's ID directly (see
+  # pingone_davinci_flow for the same pattern).
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Description - optional string
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  # Population ID - optional, references population. Immutable in the
+  # provider (replace-on-change), but that is a provider-side plan detail
+  # that does not affect export.
+  - name: PopulationID
+    terraform_name: population_id
+    type: string
+    source_path: Population.Id
+    references_type: pingone_population
+    reference_field: id
+
+  # User Filter - optional string (SCIM filter for dynamic membership)
+  - name: UserFilter
+    terraform_name: user_filter
+    type: string
+    source_path: UserFilter
+
+  # External ID - optional string
+  - name: ExternalID
+    terraform_name: external_id
+    type: string
+    source_path: ExternalId
+
+  # Custom Data - optional, arbitrary user-defined JSON object
+  - name: CustomData
+    terraform_name: custom_data
+    type: object
+    source_path: CustomData
+    transform: jsonencode_raw
+
+dependencies:
+  depends_on: []
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

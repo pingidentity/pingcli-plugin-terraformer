@@ -1,0 +1,97 @@
+# PingOne Resource (OAuth 2.0 custom resource) Definition
+
+metadata:
+  platform: pingone
+  resource_type: pingone_resource
+  api_type: Resource
+  name: PingOne Resource
+  short_name: resource
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: Resource
+  list_method: ResourcesApi.ReadAllResources
+  get_method: ResourcesApi.ReadOneResource
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Description - optional string
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  # Type - computed only (only CUSTOM can be created via Terraform)
+  - name: Type
+    terraform_name: type
+    type: string
+    source_path: Type
+    computed: true
+
+  # Audience - optional string, defaults to resource name if unset
+  - name: Audience
+    terraform_name: audience
+    type: string
+    source_path: Audience
+
+  # AccessTokenValiditySeconds - optional number, API default 3600
+  - name: AccessTokenValiditySeconds
+    terraform_name: access_token_validity_seconds
+    type: number
+    source_path: AccessTokenValiditySeconds
+
+  # IntrospectEndpointAuthMethod - optional string, API default CLIENT_SECRET_BASIC
+  - name: IntrospectEndpointAuthMethod
+    terraform_name: introspect_endpoint_auth_method
+    type: string
+    source_path: IntrospectEndpointAuthMethod
+
+  # ApplicationPermissionsSettings - optional nested object
+  - name: ApplicationPermissionsSettings
+    terraform_name: application_permissions_settings
+    type: object
+    source_path: ApplicationPermissionsSettings
+    nested_attributes:
+      - name: ClaimEnabled
+        terraform_name: claim_enabled
+        type: bool
+        source_path: ClaimEnabled
+        required: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

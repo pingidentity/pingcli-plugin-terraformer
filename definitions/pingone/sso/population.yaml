@@ -1,0 +1,116 @@
+# PingOne Population Resource Definition
+
+metadata:
+  platform: pingone
+  resource_type: pingone_population
+  api_type: Population
+  name: PingOne Population
+  short_name: population
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: Population
+  list_method: PopulationsApi.ReadAllPopulations
+  get_method: PopulationsApi.ReadOnePopulation
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only (resource identifier, not written to HCL as an argument)
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Description - optional string
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  # AlternativeIdentifiers - optional set of strings
+  - name: AlternativeIdentifiers
+    terraform_name: alternative_identifiers
+    type: set
+    source_path: AlternativeIdentifiers
+
+  # PreferredLanguage - optional string
+  - name: PreferredLanguage
+    terraform_name: preferred_language
+    type: string
+    source_path: PreferredLanguage
+
+  # PasswordPolicy - optional nested object. References a password policy
+  # resource. pingone_password_policy is not yet exported by this tool (no
+  # YAML definition/handler exists), so the reference resolver falls back to
+  # a Terraform variable (var.pingone_password_policy_id) until that resource
+  # type is added, at which point resolution is automatically promoted to a
+  # resource reference with no changes needed here.
+  - name: PasswordPolicy
+    terraform_name: password_policy
+    type: object
+    source_path: PasswordPolicy
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        required: true
+        references_type: pingone_password_policy
+        reference_field: id
+
+  # Theme - optional nested object. References a branding theme resource.
+  - name: Theme
+    terraform_name: theme
+    type: object
+    source_path: Theme
+    nested_attributes:
+      - name: ID
+        terraform_name: id
+        type: string
+        source_path: Id
+        references_type: pingone_branding_theme
+        reference_field: id
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+    - resource_type: pingone_password_policy
+      field_path: PasswordPolicy.ID
+      lookup_field: id
+      reference_format: "pingone_password_policy.{resource_name}.id"
+      optional: true
+
+    - resource_type: pingone_branding_theme
+      field_path: Theme.ID
+      lookup_field: id
+      reference_format: "pingone_branding_theme.{resource_name}.id"
+      optional: true
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

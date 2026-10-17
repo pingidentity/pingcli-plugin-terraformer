@@ -1,0 +1,699 @@
+# PingOne Application (SSO) Resource Definition
+#
+# Scope: models the 4 application types the pingone_application Terraform
+# resource schema actually supports — OIDC, SAML, External Link, WS-Fed.
+# The 3 built-in PingOne system application types (Admin Console, Portal,
+# Self Service) have no corresponding schema block in the provider and are
+# skipped by the Go handler (internal/platform/pingone/resource_sso_application.go)
+# with a warning rather than emitting an invalid resource block.
+#
+# The Go handler unwraps the management SDK's discriminated union
+# (ReadOneApplication200Response) and projects the result into a flat
+# applicationData struct with source_path field names used below.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_application
+  api_type: Application
+  name: PingOne Application
+  short_name: application
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: Application
+  list_method: ApplicationsApi.ReadAllApplications
+  get_method: ApplicationsApi.ReadOneApplication
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: EnvironmentId
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required string
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  - name: Enabled
+    terraform_name: enabled
+    type: bool
+    source_path: Enabled
+
+  - name: HiddenFromAppPortal
+    terraform_name: hidden_from_app_portal
+    type: bool
+    source_path: HiddenFromAppPortal
+
+  - name: LoginPageUrl
+    terraform_name: login_page_url
+    type: string
+    source_path: LoginPageUrl
+
+  # tags - only meaningful for OIDC applications; conflicts with the other
+  # 3 options blocks per the provider schema.
+  - name: Tags
+    terraform_name: tags
+    type: set
+    source_path: Tags
+
+  - name: AccessControlRoleType
+    terraform_name: access_control_role_type
+    type: string
+    source_path: AccessControlRoleType
+
+  - name: AccessControlGroupOptions
+    terraform_name: access_control_group_options
+    type: object
+    source_path: AccessControlGroupOptions
+    nested_attributes:
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+        required: true
+      - name: Groups
+        terraform_name: groups
+        type: set
+        source_path: Groups
+        required: true
+
+  - name: Icon
+    terraform_name: icon
+    type: object
+    source_path: Icon
+    nested_attributes:
+      - name: Id
+        terraform_name: id
+        type: string
+        source_path: Id
+        required: true
+      - name: Href
+        terraform_name: href
+        type: string
+        source_path: Href
+        required: true
+
+  # ── oidc_options ──────────────────────────────────────────────────
+  - name: OIDC
+    terraform_name: oidc_options
+    type: object
+    source_path: OIDC
+    nested_attributes:
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+        required: true
+
+      - name: GrantTypes
+        terraform_name: grant_types
+        type: set
+        source_path: GrantTypes
+        required: true
+
+      - name: ResponseTypes
+        terraform_name: response_types
+        type: set
+        source_path: ResponseTypes
+
+      - name: TokenEndpointAuthMethod
+        terraform_name: token_endpoint_auth_method
+        type: string
+        source_path: TokenEndpointAuthMethod
+        required: true
+
+      - name: ClientId
+        terraform_name: client_id
+        type: string
+        source_path: ClientId
+        computed: true
+
+      - name: HomePageUrl
+        terraform_name: home_page_url
+        type: string
+        source_path: HomePageUrl
+
+      - name: AdditionalRefreshTokenReplayProtectionEnabled
+        terraform_name: additional_refresh_token_replay_protection_enabled
+        type: bool
+        source_path: AdditionalRefreshTokenReplayProtectionEnabled
+
+      - name: AllowWildcardInRedirectUris
+        terraform_name: allow_wildcard_in_redirect_uris
+        type: bool
+        source_path: AllowWildcardInRedirectUris
+
+      - name: CorsSettings
+        terraform_name: cors_settings
+        type: object
+        source_path: CorsSettings
+        nested_attributes:
+          - name: Behavior
+            terraform_name: behavior
+            type: string
+            source_path: Behavior
+            required: true
+          - name: Origins
+            terraform_name: origins
+            type: set
+            source_path: Origins
+
+      - name: DeviceCustomVerificationUri
+        terraform_name: device_custom_verification_uri
+        type: string
+        source_path: DeviceCustomVerificationUri
+
+      - name: DevicePathId
+        terraform_name: device_path_id
+        type: string
+        source_path: DevicePathId
+
+      - name: DevicePollingInterval
+        terraform_name: device_polling_interval
+        type: number
+        source_path: DevicePollingInterval
+
+      - name: DeviceTimeout
+        terraform_name: device_timeout
+        type: number
+        source_path: DeviceTimeout
+
+      - name: IdpSignoff
+        terraform_name: idp_signoff
+        type: bool
+        source_path: IdpSignoff
+
+      - name: IncludeX5t
+        terraform_name: include_x5t
+        type: bool
+        source_path: IncludeX5t
+
+      - name: InitiateLoginUri
+        terraform_name: initiate_login_uri
+        type: string
+        source_path: InitiateLoginUri
+
+      - name: Jwks
+        terraform_name: jwks
+        type: string
+        source_path: Jwks
+
+      - name: JwksUrl
+        terraform_name: jwks_url
+        type: string
+        source_path: JwksUrl
+
+      - name: MobileApp
+        terraform_name: mobile_app
+        type: object
+        source_path: MobileApp
+        nested_attributes:
+          - name: BundleId
+            terraform_name: bundle_id
+            type: string
+            source_path: BundleId
+          - name: PackageName
+            terraform_name: package_name
+            type: string
+            source_path: PackageName
+          - name: HuaweiAppId
+            terraform_name: huawei_app_id
+            type: string
+            source_path: HuaweiAppId
+          - name: HuaweiPackageName
+            terraform_name: huawei_package_name
+            type: string
+            source_path: HuaweiPackageName
+          - name: PasscodeGracePeriod
+            terraform_name: passcode_grace_period
+            type: number
+            source_path: PasscodeGracePeriod
+          - name: PasscodeRefreshSeconds
+            terraform_name: passcode_refresh_seconds
+            type: number
+            source_path: PasscodeRefreshSeconds
+          - name: UniversalAppLink
+            terraform_name: universal_app_link
+            type: string
+            source_path: UniversalAppLink
+          - name: IntegrityDetection
+            terraform_name: integrity_detection
+            type: object
+            source_path: IntegrityDetection
+            nested_attributes:
+              - name: Enabled
+                terraform_name: enabled
+                type: bool
+                source_path: Enabled
+              - name: ExcludedPlatforms
+                terraform_name: excluded_platforms
+                type: set
+                source_path: ExcludedPlatforms
+              - name: CacheDuration
+                terraform_name: cache_duration
+                type: object
+                source_path: CacheDuration
+                nested_attributes:
+                  - name: Amount
+                    terraform_name: amount
+                    type: number
+                    source_path: Amount
+                    required: true
+                  - name: Units
+                    terraform_name: units
+                    type: string
+                    source_path: Units
+              - name: GooglePlay
+                terraform_name: google_play
+                type: object
+                source_path: GooglePlay
+                nested_attributes:
+                  - name: VerificationType
+                    terraform_name: verification_type
+                    type: string
+                    source_path: VerificationType
+                    required: true
+                  - name: DecryptionKey
+                    terraform_name: decryption_key
+                    type: string
+                    source_path: DecryptionKey
+                    sensitive: true
+                  - name: VerificationKey
+                    terraform_name: verification_key
+                    type: string
+                    source_path: VerificationKey
+                    sensitive: true
+                  - name: ServiceAccountCredentialsJson
+                    terraform_name: service_account_credentials_json
+                    type: string
+                    source_path: ServiceAccountCredentialsJson
+                    sensitive: true
+
+      - name: OpSessionCheckEnabled
+        terraform_name: op_session_check_enabled
+        type: bool
+        source_path: OpSessionCheckEnabled
+
+      - name: ParRequirement
+        terraform_name: par_requirement
+        type: string
+        source_path: ParRequirement
+
+      - name: ParTimeout
+        terraform_name: par_timeout
+        type: number
+        source_path: ParTimeout
+
+      - name: PkceEnforcement
+        terraform_name: pkce_enforcement
+        type: string
+        source_path: PkceEnforcement
+
+      - name: PostLogoutRedirectUris
+        terraform_name: post_logout_redirect_uris
+        type: set
+        source_path: PostLogoutRedirectUris
+
+      - name: RedirectUris
+        terraform_name: redirect_uris
+        type: set
+        source_path: RedirectUris
+
+      - name: RefreshTokenDuration
+        terraform_name: refresh_token_duration
+        type: number
+        source_path: RefreshTokenDuration
+
+      - name: RefreshTokenRollingDuration
+        terraform_name: refresh_token_rolling_duration
+        type: number
+        source_path: RefreshTokenRollingDuration
+
+      - name: RefreshTokenRollingGracePeriodDuration
+        terraform_name: refresh_token_rolling_grace_period_duration
+        type: number
+        source_path: RefreshTokenRollingGracePeriodDuration
+
+      - name: RefreshTokenType
+        terraform_name: refresh_token_type
+        type: string
+        source_path: RefreshTokenType
+
+      - name: RequestScopesForMultipleResourcesEnabled
+        terraform_name: request_scopes_for_multiple_resources_enabled
+        type: bool
+        source_path: RequestScopesForMultipleResourcesEnabled
+
+      - name: RequireSignedRequestObject
+        terraform_name: require_signed_request_object
+        type: bool
+        source_path: RequireSignedRequestObject
+
+      - name: Signing
+        terraform_name: signing
+        type: object
+        source_path: Signing
+        nested_attributes:
+          - name: KeyRotationPolicyId
+            terraform_name: key_rotation_policy_id
+            type: string
+            source_path: KeyRotationPolicyId
+            references_type: pingone_key_rotation_policy
+            reference_field: id
+
+      - name: SupportUnsignedRequestObject
+        terraform_name: support_unsigned_request_object
+        type: bool
+        source_path: SupportUnsignedRequestObject
+
+      - name: TargetLinkUri
+        terraform_name: target_link_uri
+        type: string
+        source_path: TargetLinkUri
+
+  # ── saml_options ──────────────────────────────────────────────────
+  - name: SAML
+    terraform_name: saml_options
+    type: object
+    source_path: SAML
+    nested_attributes:
+      - name: AcsUrls
+        terraform_name: acs_urls
+        type: set
+        source_path: AcsUrls
+        required: true
+
+      - name: AssertionDuration
+        terraform_name: assertion_duration
+        type: number
+        source_path: AssertionDuration
+        required: true
+
+      - name: SpEntityId
+        terraform_name: sp_entity_id
+        type: string
+        source_path: SpEntityId
+        required: true
+
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+
+      - name: AssertionSignedEnabled
+        terraform_name: assertion_signed_enabled
+        type: bool
+        source_path: AssertionSignedEnabled
+
+      - name: CorsSettings
+        terraform_name: cors_settings
+        type: object
+        source_path: CorsSettings
+        nested_attributes:
+          - name: Behavior
+            terraform_name: behavior
+            type: string
+            source_path: Behavior
+            required: true
+          - name: Origins
+            terraform_name: origins
+            type: set
+            source_path: Origins
+
+      - name: DefaultTargetUrl
+        terraform_name: default_target_url
+        type: string
+        source_path: DefaultTargetUrl
+
+      - name: EnableRequestedAuthnContext
+        terraform_name: enable_requested_authn_context
+        type: bool
+        source_path: EnableRequestedAuthnContext
+
+      - name: HomePageUrl
+        terraform_name: home_page_url
+        type: string
+        source_path: HomePageUrl
+
+      - name: IdpSigningKey
+        terraform_name: idp_signing_key
+        type: object
+        source_path: IdpSigningKey
+        nested_attributes:
+          - name: KeyId
+            terraform_name: key_id
+            type: string
+            source_path: KeyId
+            required: true
+            references_type: pingone_key
+            reference_field: id
+          - name: Algorithm
+            terraform_name: algorithm
+            type: string
+            source_path: Algorithm
+
+      - name: NameIdFormat
+        terraform_name: nameid_format
+        type: string
+        source_path: NameIdFormat
+
+      - name: ResponseIsSigned
+        terraform_name: response_is_signed
+        type: bool
+        source_path: ResponseIsSigned
+
+      - name: SessionNotOnOrAfterDuration
+        terraform_name: session_not_on_or_after_duration
+        type: number
+        source_path: SessionNotOnOrAfterDuration
+
+      - name: SloBinding
+        terraform_name: slo_binding
+        type: string
+        source_path: SloBinding
+
+      - name: SloEndpoint
+        terraform_name: slo_endpoint
+        type: string
+        source_path: SloEndpoint
+
+      - name: SloResponseEndpoint
+        terraform_name: slo_response_endpoint
+        type: string
+        source_path: SloResponseEndpoint
+
+      - name: SloWindow
+        terraform_name: slo_window
+        type: number
+        source_path: SloWindow
+
+      - name: SpEncryption
+        terraform_name: sp_encryption
+        type: object
+        source_path: SpEncryption
+        nested_attributes:
+          - name: Algorithm
+            terraform_name: algorithm
+            type: string
+            source_path: Algorithm
+            required: true
+          - name: Certificate
+            terraform_name: certificate
+            type: object
+            source_path: Certificate
+            required: true
+            nested_attributes:
+              - name: Id
+                terraform_name: id
+                type: string
+                source_path: Id
+                required: true
+
+      - name: SpVerification
+        terraform_name: sp_verification
+        type: object
+        source_path: SpVerification
+        nested_attributes:
+          - name: CertificateIds
+            terraform_name: certificate_ids
+            type: set
+            source_path: CertificateIds
+            required: true
+          - name: AuthnRequestSigned
+            terraform_name: authn_request_signed
+            type: bool
+            source_path: AuthnRequestSigned
+
+      - name: VirtualServerIdSettings
+        terraform_name: virtual_server_id_settings
+        type: object
+        source_path: VirtualServerIdSettings
+        nested_attributes:
+          - name: Enabled
+            terraform_name: enabled
+            type: bool
+            source_path: Enabled
+          - name: VirtualServerIds
+            terraform_name: virtual_server_ids
+            type: list
+            source_path: VirtualServerIds
+            nested_attributes:
+              - name: VsId
+                terraform_name: vs_id
+                type: string
+                source_path: VsId
+                required: true
+              - name: Default
+                terraform_name: default
+                type: bool
+                source_path: Default
+
+  # ── external_link_options ─────────────────────────────────────────
+  - name: ExternalLink
+    terraform_name: external_link_options
+    type: object
+    source_path: ExternalLink
+    nested_attributes:
+      - name: HomePageUrl
+        terraform_name: home_page_url
+        type: string
+        source_path: HomePageUrl
+        required: true
+
+  # ── wsfed_options ─────────────────────────────────────────────────
+  - name: WSFED
+    terraform_name: wsfed_options
+    type: object
+    source_path: WSFED
+    nested_attributes:
+      - name: DomainName
+        terraform_name: domain_name
+        type: string
+        source_path: DomainName
+        required: true
+
+      - name: ReplyUrl
+        terraform_name: reply_url
+        type: string
+        source_path: ReplyUrl
+        required: true
+
+      - name: Type
+        terraform_name: type
+        type: string
+        source_path: Type
+        required: true
+
+      - name: IdpSigningKey
+        terraform_name: idp_signing_key
+        type: object
+        source_path: IdpSigningKey
+        nested_attributes:
+          - name: KeyId
+            terraform_name: key_id
+            type: string
+            source_path: KeyId
+            required: true
+            references_type: pingone_key
+            reference_field: id
+          - name: Algorithm
+            terraform_name: algorithm
+            type: string
+            source_path: Algorithm
+            required: true
+
+      - name: AudienceRestriction
+        terraform_name: audience_restriction
+        type: string
+        source_path: AudienceRestriction
+
+      - name: CorsSettings
+        terraform_name: cors_settings
+        type: object
+        source_path: CorsSettings
+        nested_attributes:
+          - name: Behavior
+            terraform_name: behavior
+            type: string
+            source_path: Behavior
+            required: true
+          - name: Origins
+            terraform_name: origins
+            type: set
+            source_path: Origins
+
+      - name: SloEndpoint
+        terraform_name: slo_endpoint
+        type: string
+        source_path: SloEndpoint
+
+      - name: SubjectNameIdentifierFormat
+        terraform_name: subject_name_identifier_format
+        type: string
+        source_path: SubjectNameIdentifierFormat
+
+      - name: Kerberos
+        terraform_name: kerberos
+        type: object
+        source_path: Kerberos
+        nested_attributes:
+          - name: Gateways
+            terraform_name: gateways
+            type: set
+            source_path: Gateways
+            nested_attributes:
+              - name: Id
+                terraform_name: id
+                type: string
+                source_path: Id
+                required: true
+                references_type: pingone_gateway
+                reference_field: id
+              - name: Type
+                terraform_name: type
+                type: string
+                source_path: Type
+              - name: UserType
+                terraform_name: user_type
+                type: object
+                source_path: UserType
+                nested_attributes:
+                  - name: Id
+                    terraform_name: id
+                    type: string
+                    source_path: Id
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentId
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

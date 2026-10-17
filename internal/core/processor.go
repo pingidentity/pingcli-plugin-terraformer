@@ -15,6 +15,20 @@ import (
 // emitted verbatim (not Go %q-quoted).
 type RawHCLValue string
 
+// InterpolatedString wraps a plain string value that contains a raw,
+// unescaped Terraform interpolation expression (e.g. a SCIM filter clause
+// like `population.id eq "${pingone_population.my_pop.id}"`), produced by
+// resolving a UUID embedded inside an otherwise plain (non-JSON) string
+// attribute — see EmbeddedReferenceRule.PlainString.
+//
+// Unlike RawHCLValue (a bare, unquoted expression such as a resource
+// traversal or jsonencode(...) call), an InterpolatedString represents the
+// *entire quoted string value*: formatters must render it as a string
+// literal — quoting/escaping everything except the "${...}" portion, which
+// must remain unescaped so Terraform evaluates it as an interpolation
+// rather than a literal "$${...}".
+type InterpolatedString string
+
 // ResolvedReference represents a cross-resource reference that has been resolved
 // through the dependency graph. The orchestrator replaces raw UUID strings with
 // ResolvedReference values during post-processing. Formatters use type assertion

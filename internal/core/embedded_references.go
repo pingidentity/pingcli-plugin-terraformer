@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -56,6 +57,24 @@ type EmbeddedReferenceRule struct {
 	//                reference/variable is re-embedded back inside the
 	//                wrapper on write.
 	UnwrapMode string
+
+	// PlainStringPattern switches the rule into "plain string" mode: the
+	// attribute value is a plain (non-JSON, non-jsonencode-wrapped) string
+	// attribute — e.g. a SCIM filter clause like
+	// `population.id eq "<uuid>"` — rather than a RawHCLValue JSON blob.
+	// AttributePath addresses a plain string attribute directly (no
+	// jsonencode(...) unwrapping, no JSONKeyPath/UnwrapMode/Precondition —
+	// those only apply to JSON-blob mode and are ignored when this is set).
+	//
+	// The pattern must contain exactly one capture group matching a UUID
+	// (e.g. `population\.id eq "([0-9a-f-]+)"`). The matched UUID is
+	// resolved via the dependency graph exactly like JSON-blob mode
+	// (Strategy applies identically), and the result is an
+	// InterpolatedString — the entire string value with the matched UUID
+	// substring replaced by a raw "${...}" interpolation expression, ready
+	// for formatters to render as a quoted string literal without escaping
+	// that expression.
+	PlainStringPattern string
 }
 
 // richTextUnwrapMode is the UnwrapMode value that enables Slate-style
@@ -195,8 +214,14 @@ func walkAndProcessPath(
 					nextTraversalKey = traversalKey + "_" + key
 				}
 				if isLastSegment {
-					// This key should be a RawHCLValue - try to process it
-					if rawValue, ok := nextValue.(RawHCLValue); ok {
+					if rule.PlainStringPattern != "" {
+						if strValue, ok := nextValue.(string); ok {
+							if processed, changed := processPlainString(strValue, rule, resource, g, allocator, nextTraversalKey, varSeen, fallbackVars); changed {
+								typedCurrent[key] = processed
+							}
+						}
+					} else if rawValue, ok := nextValue.(RawHCLValue); ok {
+						// This key should be a RawHCLValue - try to process it
 						processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, nextTraversalKey, varSeen, fallbackVars)
 						typedCurrent[key] = processedValue
 					}
@@ -213,8 +238,14 @@ func walkAndProcessPath(
 			}
 
 			if isLastSegment {
-				// This is a RawHCLValue - process it
-				if rawValue, ok := nextValue.(RawHCLValue); ok {
+				if rule.PlainStringPattern != "" {
+					if strValue, ok := nextValue.(string); ok {
+						if processed, changed := processPlainString(strValue, rule, resource, g, allocator, traversalKey, varSeen, fallbackVars); changed {
+							typedCurrent[segment] = processed
+						}
+					}
+				} else if rawValue, ok := nextValue.(RawHCLValue); ok {
+					// This is a RawHCLValue - process it
 					processedValue := processRawHCLValue(rawValue, rule, resource, g, allocator, traversalKey, varSeen, fallbackVars)
 					typedCurrent[segment] = processedValue
 				}
@@ -292,40 +323,155 @@ func processRawHCLValue(
 		return value
 	}
 
-	// Strategy: "variable" — always emit a variable, skip graph lookup
-	if rule.Strategy == "variable" {
-		varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
-		tfRef := "var." + varName
-		newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
-		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
-		return newValue
-	}
-
-	// Strategy: "reference" (default) or "reference_with_fallback" — try graph lookup
-	refName, err := g.GetReferenceName(rule.TargetResourceType, uuidStr)
-	if err != nil {
-		// UUID not found in graph
-		if rule.Strategy == "reference_with_fallback" {
-			varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
-			tfRef := "var." + varName
-			newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
-			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
-			return newValue
-		}
-		// Default strategy: leave unchanged
+	tfRef, resolved := resolveReferenceToTFRef(rule, resource, uuidStr, jsonData, "properties."+rule.JSONKeyPath, g, allocator, traversalKey, varSeen, fallbackVars)
+	if !resolved {
 		return value
 	}
 
-	// Build the terraform reference string
-	tfRef := fmt.Sprintf("%s.%s.%s", rule.TargetResourceType, refName, rule.ReferenceField)
+	return replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
+}
 
-	// Replace the UUID string in the RawHCLValue with the terraform reference
-	newValue := replaceExtractedValue(value, rule, wrapper, uuidStr, tfRef)
+// plainStringPatternCache memoizes compiled PlainStringPattern regexes so
+// repeated calls (one per resource of the same type) don't recompile the
+// same pattern. Keyed by the raw pattern string; safe for concurrent read
+// access since regexp.Regexp is immutable after compilation and this
+// package's resolution pass is single-threaded per Export call.
+var plainStringPatternCache = make(map[string]*regexp.Regexp)
 
-	// Add graph edge
-	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, "properties."+rule.JSONKeyPath, "")
+// compilePlainStringPattern compiles (and caches) rule.PlainStringPattern.
+// Returns nil, false on an invalid pattern or a pattern with a capture-group
+// count other than exactly one — malformed rule configuration, not
+// malformed input data, so this no-ops rather than panicking.
+func compilePlainStringPattern(pattern string) (*regexp.Regexp, bool) {
+	if re, ok := plainStringPatternCache[pattern]; ok {
+		return re, re.NumSubexp() == 1
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, false
+	}
+	plainStringPatternCache[pattern] = re
+	return re, re.NumSubexp() == 1
+}
 
-	return newValue
+// processPlainString finds every UUID embedded inside a plain (non-JSON)
+// string attribute value via rule.PlainStringPattern's single capture group
+// (a SCIM filter may legitimately reference the same target type more than
+// once, e.g. `population.id eq "u1" or population.id eq "u2"`), and resolves
+// each to a Terraform reference or variable exactly like
+// processRawHCLValue's JSON-blob path (same Strategy semantics). Returns an
+// InterpolatedString — the original string with every resolved UUID
+// substring replaced by a raw "${...}" expression — instead of a
+// jsonencode(...)-wrapped RawHCLValue.
+//
+// Occurrences that don't resolve (non-UUID-shaped match, or default strategy
+// with the UUID not yet in the graph) are left untouched in place; only
+// resolved occurrences are substituted. Returns (value, false) unchanged if
+// no occurrence resolved at all.
+func processPlainString(
+	value string,
+	rule EmbeddedReferenceRule,
+	resource *ResourceData,
+	g *graph.DependencyGraph,
+	allocator *fallbackVariableAllocator,
+	traversalKey string,
+	varSeen map[string]bool,
+	fallbackVars *[]FallbackVariable,
+) (InterpolatedString, bool) {
+	re, ok := compilePlainStringPattern(rule.PlainStringPattern)
+	if !ok {
+		return "", false
+	}
+
+	matches := re.FindAllStringSubmatchIndex(value, -1)
+	if matches == nil {
+		return "", false
+	}
+
+	var sb strings.Builder
+	lastEnd := 0
+	changed := false
+
+	for _, match := range matches {
+		// match[2], match[3] bound the first (and required-to-be-only) capture group.
+		start, end := match[2], match[3]
+		uuidStr := value[start:end]
+
+		tfRef, resolved := resolveReferenceToTFRef(rule, resource, uuidStr, nil, rule.AttributePath, g, allocator, traversalKey, varSeen, fallbackVars)
+		if !resolved {
+			continue
+		}
+
+		sb.WriteString(value[lastEnd:start])
+		sb.WriteString("${")
+		sb.WriteString(tfRef)
+		sb.WriteString("}")
+		lastEnd = end
+		changed = true
+	}
+	sb.WriteString(value[lastEnd:])
+
+	if !changed {
+		return "", false
+	}
+	return InterpolatedString(sb.String()), true
+}
+
+// resolveReferenceToTFRef resolves a single extracted UUID to a Terraform
+// expression (a resource traversal like "pingone_population.my_pop.id", or a
+// variable reference like "var.pingone_population_id") per the rule's
+// Strategy, applying the unconditional UUID-format guard. Shared by the
+// JSON-blob path (processRawHCLValue) and the plain-string path
+// (processPlainString); the caller owns how the returned token is embedded
+// (sentinel-substitution into the blob vs "${...}" splicing into a string).
+//
+// jsonData is the enclosing JSON blob's parsed data — the source for
+// VariableNamingPath-derived fallback-variable names — or nil when the
+// occurrence was found in a plain string (no blob context; naming falls back
+// to the traversal key). edgePath is the graph-edge annotation path
+// ("properties.<keypath>" for blobs, rule.AttributePath for plain strings).
+//
+// Returns (tfRef, true) on a resolved reference or fallback variable, or
+// ("", false) when the occurrence should stay unresolved in place
+// (non-UUID-shaped value, or a graph miss under the default "reference"
+// strategy).
+func resolveReferenceToTFRef(
+	rule EmbeddedReferenceRule,
+	resource *ResourceData,
+	uuidStr string,
+	jsonData interface{},
+	edgePath string,
+	g *graph.DependencyGraph,
+	allocator *fallbackVariableAllocator,
+	traversalKey string,
+	varSeen map[string]bool,
+	fallbackVars *[]FallbackVariable,
+) (string, bool) {
+	// Unconditional UUID-format guard, mirroring processRawHCLValue.
+	if !looksLikeUUID(uuidStr) {
+		return "", false
+	}
+
+	// Strategy: "variable" — always emit a variable, skip graph lookup.
+	if rule.Strategy == "variable" {
+		varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
+		addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
+		return "var." + varName, true
+	}
+
+	// Strategy: "reference" (default) or "reference_with_fallback" — try graph lookup.
+	refName, err := g.GetReferenceName(rule.TargetResourceType, uuidStr)
+	if err != nil {
+		if rule.Strategy == "reference_with_fallback" {
+			varName := allocatedVariableName(rule, jsonData, uuidStr, traversalKey, allocator)
+			addEmbeddedFallbackVariable(varName, rule, uuidStr, varSeen, fallbackVars)
+			return "var." + varName, true
+		}
+		return "", false
+	}
+
+	_ = g.AddEdge(resource.ResourceType, resource.ID, rule.TargetResourceType, uuidStr, edgePath, "")
+	return fmt.Sprintf("%s.%s.%s", rule.TargetResourceType, refName, rule.ReferenceField), true
 }
 
 // replaceExtractedValue re-embeds a resolved reference/variable token in
