@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// htmlPageData is the template data for the self-contained review page.
-type htmlPageData struct {
+// HTMLPageData is the template data for the self-contained review page.
+type HTMLPageData struct {
 	Title     string
 	Meta      string // one-line provenance summary
 	Types     []string
@@ -89,7 +89,7 @@ var htmlTemplate = template.Must(template.New("review").Parse(`<!DOCTYPE html>
 // RenderHTML renders the self-contained review page. Code content (HCL,
 // JSON, markdown) is HTML-escaped by html/template automatically; the page
 // uses only <pre> wrappers around escaped content.
-func RenderHTML(data htmlPageData) (string, error) {
+func RenderHTML(data HTMLPageData) (string, error) {
 	var sb strings.Builder
 	if err := htmlTemplate.Execute(&sb, data); err != nil {
 		return "", err

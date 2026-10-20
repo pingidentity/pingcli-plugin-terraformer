@@ -141,9 +141,13 @@ func buildChecklist(in ChecklistInput) []ChecklistRow {
 func checkE2EFixture(in ChecklistInput, rt string) ChecklistRow {
 	short := strings.TrimPrefix(rt, "pingone_")
 
-	// Find the fixture dir (category dir varies; scan).
-	matches, _ := walkDefinitionFiles(in.RepoDir) // reuse: same tree walk shape
-	_ = matches
+	// pingone_environment IS the composition root — the throwaway
+	// environment the fixtures are created in. No fixture module applies.
+	if rt == "pingone_environment" {
+		return ChecklistRow{Status: StatusPass, Item: "`pingone_environment` E2E fixture",
+			Detail: "is the composition root itself (terraform-test-data/root)"}
+	}
+
 	fixtureDir := in.RepoDir + "/terraform-test-data"
 	category, fixtureMain := findFixtureDir(fixtureDir, short)
 
@@ -159,10 +163,10 @@ func checkE2EFixture(in ChecklistInput, rt string) ChecklistRow {
 	// Wired into root?
 	rootMain, err := os.ReadFile(fixtureDir + "/root/main.tf")
 	wired := err == nil && strings.Contains(string(rootMain), "/"+short+"\"")
-	_ = category
 
 	if wired {
-		return ChecklistRow{Status: StatusPass, Item: fmt.Sprintf("`%s` E2E fixture", rt), Detail: fixtureMain}
+		return ChecklistRow{Status: StatusPass, Item: fmt.Sprintf("`%s` E2E fixture", rt),
+			Detail: fixtureMain + " (" + category + " fixture)"}
 	}
 	return ChecklistRow{Status: StatusWarn, Item: fmt.Sprintf("`%s` E2E fixture", rt),
 		Detail: "fixture module exists but is not wired into terraform-test-data/root/main.tf"}
