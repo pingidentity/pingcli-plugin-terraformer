@@ -4,59 +4,32 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
-	"github.com/pingidentity/pingcli-plugin-terraformer/definitions"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/filter"
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/export"
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/formatters"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/module"
 	pingoneplatform "github.com/pingidentity/pingcli-plugin-terraformer/internal/platform/pingone"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
-	"github.com/pingidentity/pingcli-plugin-terraformer/internal/variables"
 	"github.com/pingidentity/pingcli/shared/grpc"
 	"github.com/spf13/pflag"
 )
 
-// Command metadata for the export subcommand
 var (
-	// ExportExample provides usage examples for the command
-	ExportExample = `  # Export PingOne resources to Terraform
-  pingcli tf export \
-    --pingone-worker-environment-id <auth-uuid> \
-    --pingone-worker-client-id <client-id> \
-    --pingone-worker-client-secret <secret> \
-    --pingone-region-code NA \
-    --out ./environment.tf
+	// ExportExample provides usage examples for the export command
+	ExportExample = `  # Export all resources
+  pingcli tf export
 
-  # Export from different environment than worker app
-  pingcli tf export \
-    --pingone-worker-environment-id <auth-uuid> \
-    --pingone-export-environment-id <target-uuid> \
-    --pingone-worker-client-id <client-id> \
-    --pingone-worker-client-secret <secret> \
-    --pingone-region-code NA \
-    --out ./environment.tf
+  # Export to a specific directory in HCL format
+  pingcli tf export --out ./output
 
-  # Export without Terraform dependencies (raw UUIDs)
-  pingcli tf export \
-    --pingone-worker-environment-id <uuid> \
-    --skip-dependencies
+  # Export in Terraform JSON format
+  pingcli tf export --output-format tfjson --out ./output
 
-  # List all resource addresses
-  pingcli tf export \
-    --pingone-worker-environment-id <uuid> \
-    --list-resources
+  # Export with import blocks and values
+  pingcli tf export --include-imports --include-values --out ./output
 
-  # Export only DaVinci flow resources
+  # Export only specific resources
   pingcli tf export \
     --include-resources "pingone_davinci_flow*" \
     --out ./output
@@ -136,7 +109,7 @@ func (c *ExportCommand) Configuration() (*grpc.PingCliCommandConfiguration, erro
 }
 
 // Run is the execution entry point for the export subcommand.
-// It parses flags and executes the export logic.
+// It parses flags and delegates the pipeline to internal/export.
 func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 	// Create a new FlagSet for parsing command-line flags
 	flags := pflag.NewFlagSet("export", pflag.ContinueOnError)
@@ -181,64 +154,61 @@ func (c *ExportCommand) Run(args []string, logger grpc.Logger) error {
 		return fmt.Errorf("unsupported output format: %s. Supported: hcl, tfjson", *outputFormat)
 	}
 
-	// Execute export
-	return c.runExport(logger, *workerEnvironmentID, *exportEnvironmentID, *regionCode, *clientID, *clientSecret, *out, *skipDependencies, *moduleDir, *moduleName, *includeImports, *includeValues, *outputFormat, *includeResources, *excludeResources, *listResources, *includeUpstream, *outputAttributes, *outputAttributeFile)
-}
-
-// runExport handles API export of all resources from an environment
-// All exports now generate Terraform module structure
-func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret, out string, skipDeps bool, moduleDir string, moduleName string, includeImports bool, includeValues bool, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool, outputAttributes []string, outputAttributeFile string) error {
 	// Get credentials from environment variables if not provided via flags
-	if workerEnvironmentID == "" {
-		workerEnvironmentID = os.Getenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
+	workerEnv := *workerEnvironmentID
+	if workerEnv == "" {
+		workerEnv = os.Getenv("PINGCLI_PINGONE_ENVIRONMENT_ID")
 	}
-	if exportEnvironmentID == "" {
-		exportEnvironmentID = os.Getenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID")
-		// Default export environment to worker environment if not specified
-		if exportEnvironmentID == "" {
-			exportEnvironmentID = workerEnvironmentID
+	exportEnv := *exportEnvironmentID
+	if exportEnv == "" {
+		exportEnv = os.Getenv("PINGCLI_PINGONE_EXPORT_ENVIRONMENT_ID")
+		if exportEnv == "" {
+			exportEnv = workerEnv
 		}
 	}
-	if regionCode == "" {
-		regionCode = os.Getenv("PINGCLI_PINGONE_REGION_CODE")
+	region := *regionCode
+	if region == "" {
+		region = os.Getenv("PINGCLI_PINGONE_REGION_CODE")
 	}
-	if clientID == "" {
-		clientID = os.Getenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID")
+	cid := *clientID
+	if cid == "" {
+		cid = os.Getenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID")
 	}
-	if clientSecret == "" {
-		clientSecret = os.Getenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET")
+	secret := *clientSecret
+	if secret == "" {
+		secret = os.Getenv("PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET")
 	}
 
 	// Validate required credentials
-	if workerEnvironmentID == "" {
+	if workerEnv == "" {
 		return fmt.Errorf("worker environment ID is required: use --pingone-worker-environment-id flag or PINGCLI_PINGONE_ENVIRONMENT_ID env var")
 	}
-	if clientID == "" {
+	if cid == "" {
 		return fmt.Errorf("client ID is required: use --pingone-worker-client-id flag or PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_ID env var")
 	}
-	if clientSecret == "" {
+	if secret == "" {
 		return fmt.Errorf("client secret is required: use --pingone-worker-client-secret flag or PINGCLI_PINGONE_CLIENT_CREDENTIALS_CLIENT_SECRET env var")
 	}
 
 	// Default region to NA if not specified
-	if regionCode == "" {
-		regionCode = "NA"
+	if region == "" {
+		region = "NA"
 	}
 
 	// Log export start
-	if err := logger.Message(fmt.Sprintf("Exporting PingOne resources from environment: %s (Region: %s)", exportEnvironmentID, regionCode), nil); err != nil {
+	if err := logger.Message(fmt.Sprintf("Exporting PingOne resources from environment: %s (Region: %s)", exportEnv, region), nil); err != nil {
 		return err
 	}
 
 	// Create API client
 	// Use NewFromCredentials to support two-environment model: worker environment for auth, export environment for resources
 	ctx := context.Background()
-	client, err := pingoneplatform.NewFromCredentials(ctx, workerEnvironmentID, exportEnvironmentID, regionCode, clientID, clientSecret)
+	client, err := pingoneplatform.NewFromCredentials(ctx, workerEnv, exportEnv, region, cid, secret)
 	if err != nil {
 		if logErr := logger.PluginError("Failed to create API client", map[string]string{
-			"worker_environment_id": workerEnvironmentID,
-			"export_environment_id": exportEnvironmentID,
-			"region_code":           regionCode,
+			"worker_environment_id": workerEnv,
+			"export_environment_id": exportEnv,
+			"region_code":           region,
 			"error":                 err.Error(),
 		}); logErr != nil {
 			return fmt.Errorf("failed to log error: %w", logErr)
@@ -246,406 +216,28 @@ func (c *ExportCommand) runExport(logger grpc.Logger, workerEnvironmentID, expor
 		return fmt.Errorf("failed to create API client: %w", err)
 	}
 
-	return c.exportAsModule(ctx, client, logger, skipDeps, includeImports, includeValues, moduleDir, moduleName, out, exportEnvironmentID, outputFormat, includeResources, excludeResources, listResources, includeUpstream, outputAttributes, outputAttributeFile)
-}
-
-// exportAsModule uses the schema-driven orchestrator pipeline to export
-// resources and generate a Terraform module.
-func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatform.Client, logger grpc.Logger, skipDeps, includeImports, includeValues bool, moduleDir, moduleName, out, environmentID, outputFormat string, includeResources []string, excludeResources []string, listResources bool, includeUpstream bool, outputAttributes []string, outputAttributeFile string) error {
-	outputDir := out
-	if outputDir == "" {
-		outputDir = "."
-	}
-
-	if err := logger.Message(fmt.Sprintf("Generating Terraform module in: %s/%s", outputDir, moduleDir), nil); err != nil {
-		return fmt.Errorf("failed to log message: %w", err)
-	}
-
-	// 1. Load schema definitions from embedded FS.
-	registry := schema.NewRegistry()
-	if err := registry.LoadFromFS(definitions.FS, "pingone"); err != nil {
-		return fmt.Errorf("failed to load definitions: %w", err)
-	}
-
-	// 2. Create custom handler registry and load platform-specific handlers.
-	customReg := core.NewCustomHandlerRegistry()
-	pingoneplatform.RegisterCustomHandlers(customReg)
-
-	// 3. Create processor.
-	proc := core.NewProcessor(registry, core.WithCustomHandlers(customReg))
-
-	// 4. Use client directly.
-	apiClient := client
-
-	// Build resource filter from include/exclude patterns.
-	var resourceFilter *filter.ResourceFilter
-	if len(includeResources) > 0 || len(excludeResources) > 0 {
-		var err error
-		resourceFilter, err = filter.NewResourceFilter(includeResources, excludeResources)
-		if err != nil {
-			return fmt.Errorf("invalid resource filter pattern: %w", err)
-		}
-	}
-
-	// 5. Create and run orchestrator.
-	embeddedRefs := pingoneplatform.NewEmbeddedReferenceRegistry()
-	orch := core.NewExportOrchestrator(registry, proc, apiClient, core.WithProgressFunc(func(msg string) {
-		_ = logger.Message(msg, nil)
-	}), core.WithEmbeddedReferences(embeddedRefs))
-
-	result, err := orch.Export(ctx, core.ExportOptions{
-		SkipDependencies: skipDeps,
-		GenerateImports:  includeImports,
-		EnvironmentID:    environmentID,
-		ResourceFilter:   resourceFilter,
-		ListOnly:         listResources,
-		IncludeUpstream:  includeUpstream,
-	})
+	registry, err := export.LoadFullRegistry()
 	if err != nil {
-		return fmt.Errorf("orchestrator export failed: %w", err)
+		return err
 	}
 
-	// Log any warnings collected by the API client during export.
-	for _, w := range apiClient.Warnings() {
-		_ = logger.Warn(w, nil)
-	}
-
-	// Handle --list-resources mode: print resource addresses and exit.
-	// Addresses are enumerated output, so they go to stdout (not the logger)
-	// to remain pipeable — matching list-outputs behaviour.
-	if listResources {
-		if err := writeResourceAddresses(os.Stdout, result); err != nil {
-			return err
-		}
-		return nil // Exit early, don't generate module
-	}
-
-	// 6. Format results into output, imports, and variables.
-	outFmt, fmtErr := formatters.NewFormatter(outputFormat)
-	if fmtErr != nil {
-		return fmtErr
-	}
-	varExtractor := variables.NewVariableExtractor(registry)
-
-	var allOutputParts []string
-	var allImportBlocks []module.ImportBlock
-	var allVariables []module.Variable
-
-	for _, erd := range result.ResourcesByType {
-		// Extract variables FIRST and inject references into resource attributes
-		// so the formatter renders var.X expressions instead of raw values.
-		for _, rd := range erd.Resources {
-			// Schema-driven variable extraction (variable_eligible attributes).
-			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Name)
-			if extErr != nil {
-				return fmt.Errorf("extract variables %s: %w", erd.ResourceType, extErr)
-			}
-
-			for _, ev := range extracted {
-				allVariables = append(allVariables, module.Variable{
-					Name:         ev.VariableName,
-					Type:         ev.VariableType,
-					Description:  ev.Description,
-					Default:      ev.CurrentValue,
-					Sensitive:    ev.Sensitive,
-					IsSecret:     ev.IsSecret,
-					ResourceType: ev.ResourceType,
-					ResourceName: ev.ResourceName,
-				})
-
-				// Inject variable reference into resource attributes.
-				// For type_discriminated_block (single-key map), inject inside the map.
-				ref := core.ResolvedReference{
-					IsVariable:   true,
-					VariableName: ev.VariableName,
-				}
-				if ev.CurrentValue != nil {
-					if s, ok := ev.CurrentValue.(string); ok {
-						ref.OriginalValue = s
-					} else {
-						ref.OriginalValue = fmt.Sprintf("%v", ev.CurrentValue)
-					}
-				}
-
-				if m, ok := rd.Attributes[ev.AttributePath].(map[string]interface{}); ok && len(m) == 1 {
-					for k := range m {
-						m[k] = ref
-					}
-				} else {
-					rd.Attributes[ev.AttributePath] = ref
-				}
-			}
-
-			// Custom-transform-provided variables (e.g., connector properties).
-			// These already have var. references baked into their RawHCLValue — do NOT inject.
-			for i := range rd.ExtractedVariables {
-				ev := &rd.ExtractedVariables[i]
-				allVariables = append(allVariables, module.Variable{
-					Name:         ev.VariableName,
-					Type:         ev.VariableType,
-					Description:  ev.Description,
-					Default:      ev.CurrentValue,
-					Sensitive:    ev.Sensitive,
-					IsSecret:     ev.IsSecret,
-					ResourceType: ev.ResourceType,
-					ResourceName: ev.ResourceName,
-				})
-			}
-		}
-
-		// Format resource output (now with variable references injected).
-		formattedOutput, fmtErr := outFmt.FormatList(erd.Resources, erd.Definition, formatters.FormatOptions{
-			SkipDependencies: skipDeps,
-			EnvironmentID:    environmentID,
-		})
-		if fmtErr != nil {
-			return fmt.Errorf("format %s: %w", erd.ResourceType, fmtErr)
-		}
-		allOutputParts = append(allOutputParts, formattedOutput)
-
-		// Generate import blocks.
-		if includeImports && erd.Definition.Dependencies.ImportIDFormat != "" {
-			for _, rd := range erd.Resources {
-				label := importResourceLabel(rd, erd.Definition)
-				allImportBlocks = append(allImportBlocks, module.ImportBlock{
-					To: fmt.Sprintf("module.%s.%s.%s", moduleName, erd.ResourceType, label),
-					ID: buildImportID(erd.Definition, rd, environmentID),
-				})
-			}
-		}
-	}
-
-	// Include fallback variables from filter-excluded reference resolution.
-	// These are references to resources that were excluded by the filter and
-	// resolved to variable fallbacks with label-derived names.
-	for _, fv := range result.FallbackVariables {
-		allVariables = append(allVariables, module.Variable{
-			Name:         fv.Name,
-			Type:         fv.Type,
-			Description:  fv.Description,
-			ResourceType: fv.ResourceType,
-			Default:      fv.Default,
-		})
-	}
-
-	// 7. Resolve --output-attribute / --output-attribute-file paths into output blocks.
-	outputPaths, pathErr := collectOutputPaths(outputAttributes, outputAttributeFile)
-	if pathErr != nil {
-		return pathErr
-	}
-	var allOutputs []module.Output
-	if len(outputPaths) > 0 {
-		allOutputs = buildOutputs(outputPaths, result, logger)
-	}
-
-	// 8. Build module structure.
-	moduleConfig := module.ModuleConfig{
-		OutputDir:      outputDir,
-		ModuleDirName:  moduleDir,
-		ModuleName:     moduleName,
-		IncludeImports: includeImports,
-		IncludeValues:  includeValues,
-		EnvironmentID:  environmentID,
-		OutputFormat:   outputFormat,
-	}
-
-	// Combine formatted output by resource type into ModuleResources.
-	resources := buildModuleResources(result, allOutputParts)
-
-	structure := &module.ModuleStructure{
-		Config:       moduleConfig,
-		Variables:    allVariables,
-		Outputs:      allOutputs,
-		Resources:    resources,
-		ImportBlocks: allImportBlocks,
-	}
-
-	// 8. Generate module files.
-	generator := module.NewGenerator(moduleConfig)
-	if err := generator.Generate(structure); err != nil {
-		return fmt.Errorf("failed to generate module: %w", err)
-	}
-
-	if err := logger.Message(fmt.Sprintf("✓ Module successfully generated in: %s", outputDir), map[string]string{
-		"module_dir":      moduleDir,
-		"include_imports": fmt.Sprintf("%v", includeImports),
-		"include_values":  fmt.Sprintf("%v", includeValues),
-	}); err != nil {
-		return fmt.Errorf("failed to log success: %w", err)
-	}
-
-	return nil
-}
-
-// buildModuleResources maps orchestrator results to module.ModuleResources.
-// Each resource type key maps to concatenated HCL for that type.
-func buildModuleResources(result *core.ExportResult, outputParts []string) module.ModuleResources {
-	mr := make(module.ModuleResources)
-	for i, erd := range result.ResourcesByType {
-		if i >= len(outputParts) {
-			break
-		}
-		mr[erd.ResourceType] += outputParts[i]
-	}
-	return mr
-}
-
-// importResourceLabel derives the sanitized resource label for import blocks,
-// matching the logic used by the imports generator and HCL/tfjson formatters.
-func importResourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) string {
-	if data.Label != "" {
-		return data.Label
-	}
-	if len(def.API.LabelFields) > 0 {
-		keys := make([]string, 0, len(def.API.LabelFields))
-		for _, field := range def.API.LabelFields {
-			if v, ok := data.Attributes[field]; ok && v != nil {
-				if s, ok := v.(string); ok && s != "" {
-					keys = append(keys, s)
-				}
-			}
-		}
-		if len(keys) > 0 {
-			return utils.SanitizeMultiKeyResourceName(keys...)
-		}
-	}
-	if data.Name != "" {
-		return utils.SanitizeResourceName(data.Name)
-	}
-	return data.ID
-}
-
-// outputAttrPath holds a parsed --output-attribute path.
-type outputAttrPath struct {
-	resourceType string
-	labelPattern string
-	attrPath     string // dot-notation, e.g. "id" or "settings.csp"
-}
-
-// parseOutputPath splits "resource_type.label_or_glob.attr" or
-// "resource_type.label_or_glob.nested.attr" into its three logical parts.
-// The first dot-segment is resource_type, the second is label, and everything
-// after the second dot is the attribute path.
-func parseOutputPath(raw string) (outputAttrPath, bool) {
-	parts := strings.SplitN(raw, ".", 3)
-	if len(parts) < 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return outputAttrPath{}, false
-	}
-	return outputAttrPath{
-		resourceType: parts[0],
-		labelPattern: parts[1],
-		attrPath:     parts[2],
-	}, true
-}
-
-// writeResourceAddresses writes one "resource_type.label" address per line to
-// w. Used by --list-resources; addresses are enumerated output and belong on
-// stdout so they stay pipeable, matching the list-outputs command.
-func writeResourceAddresses(w io.Writer, result *core.ExportResult) error {
-	buf := bufio.NewWriter(w)
-	for _, erd := range result.ResourcesByType {
-		for _, rd := range erd.Resources {
-			if _, err := fmt.Fprintf(buf, "%s.%s\n", erd.ResourceType, rd.Label); err != nil {
-				return fmt.Errorf("failed to write resource address: %w", err)
-			}
-		}
-	}
-	if err := buf.Flush(); err != nil {
-		return fmt.Errorf("failed to flush resource addresses: %w", err)
-	}
-	return nil
-}
-
-// collectOutputPaths merges --output-attribute values with lines read from
-// --output-attribute-file, deduplicates, and returns the combined slice.
-func collectOutputPaths(flags []string, filePath string) ([]string, error) {
-	seen := make(map[string]struct{})
-	var paths []string
-	add := func(p string) {
-		p = strings.TrimSpace(p)
-		if p == "" || strings.HasPrefix(p, "#") {
-			return
-		}
-		if _, ok := seen[p]; !ok {
-			seen[p] = struct{}{}
-			paths = append(paths, p)
-		}
-	}
-	for _, f := range flags {
-		add(f)
-	}
-	if filePath != "" {
-		f, err := os.Open(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("cannot open --output-attribute-file %q: %w", filePath, err)
-		}
-		defer f.Close()
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			add(scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("reading --output-attribute-file: %w", err)
-		}
-	}
-	return paths, nil
-}
-
-// buildOutputs converts collected path strings into module.Output values by
-// matching each (resourceType, labelPattern, attrPath) against exported results.
-func buildOutputs(paths []string, result *core.ExportResult, logger grpc.Logger) []module.Output {
-	// Index results by resource type for O(1) lookup.
-	byType := make(map[string]*core.ExportedResourceData, len(result.ResourcesByType))
-	for _, erd := range result.ResourcesByType {
-		byType[erd.ResourceType] = erd
-	}
-
-	var outputs []module.Output
-	for _, raw := range paths {
-		p, ok := parseOutputPath(raw)
-		if !ok {
-			_ = logger.Warn(fmt.Sprintf("skipping malformed --output-attribute path %q: expected resource_type.label.attr", raw), nil)
-			continue
-		}
-		erd, found := byType[p.resourceType]
-		if !found {
-			_ = logger.Warn(fmt.Sprintf("--output-attribute: resource type %q not found in export results", p.resourceType), nil)
-			continue
-		}
-		matched := 0
-		for _, rd := range erd.Resources {
-			ok, err := filepath.Match(strings.ToLower(p.labelPattern), strings.ToLower(rd.Label))
-			if err != nil || !ok {
-				continue
-			}
-			matched++
-			name := p.resourceType + "__" + rd.Label + "__" + strings.ReplaceAll(p.attrPath, ".", "__")
-			outputs = append(outputs, module.Output{
-				Name:        name,
-				Description: "The " + p.attrPath + " of " + p.resourceType + " " + rd.Label,
-				Value:       p.resourceType + "." + rd.Label + "." + p.attrPath,
-			})
-		}
-		if matched == 0 {
-			_ = logger.Warn(fmt.Sprintf("--output-attribute: pattern %q matched no %s resources", p.labelPattern, p.resourceType), nil)
-		}
-	}
-	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
-	return outputs
-}
-
-// buildImportID expands the definition's import ID format for a single resource.
-func buildImportID(def *schema.ResourceDefinition, rd *core.ResourceData, environmentID string) string {
-	format := def.Dependencies.ImportIDFormat
-	format = strings.ReplaceAll(format, "{env_id}", environmentID)
-	format = strings.ReplaceAll(format, "{resource_id}", rd.ID)
-	// Expand any remaining {attr_name} placeholders.
-	for k, v := range rd.Attributes {
-		if s, ok := v.(string); ok {
-			format = strings.ReplaceAll(format, "{"+k+"}", s)
-		} else if ref, ok := v.(core.ResolvedReference); ok && ref.OriginalValue != "" {
-			format = strings.ReplaceAll(format, "{"+k+"}", ref.OriginalValue)
-		}
-	}
-	return format
+	return export.Run(ctx, export.RunOptions{
+		Registry:            registry,
+		Client:              client,
+		Logger:              logger,
+		EnvironmentID:       exportEnv,
+		OutputDir:           *out,
+		ModuleDir:           *moduleDir,
+		ModuleName:          *moduleName,
+		IncludeImports:      *includeImports,
+		IncludeValues:       *includeValues,
+		OutputFormat:        *outputFormat,
+		SkipDependencies:    *skipDependencies,
+		IncludeResources:    *includeResources,
+		ExcludeResources:    *excludeResources,
+		ListOnly:            *listResources,
+		IncludeUpstream:     *includeUpstream,
+		OutputAttributes:    *outputAttributes,
+		OutputAttributeFile: *outputAttributeFile,
+	})
 }
