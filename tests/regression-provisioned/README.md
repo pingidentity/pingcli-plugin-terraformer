@@ -33,8 +33,11 @@ builds base and PR export binaries, runs the export matrix from
 `tests/regression/matrix.json` against the provisioned environment, compares
 outputs, and always tears the environment down. Set
 `E2E_KEEP_ENVIRONMENT=1` to skip teardown for debugging — destroy manually
-afterwards with `terraform destroy` in `terraform-test-data/root`. Reports
-land in `regression-reports/`.
+afterwards with `terraform destroy` in `terraform-test-data/root`. Reports,
+export outputs, and per-entry logs land in
+`regression-reports/run-e2e-<timestamp>/` (also linked from
+`regression-reports/latest`) and persist even when the comparison fails; the
+summary table prints at the end regardless of exit status.
 
 CI runs this tier on demand via the `regression-provisioned` workflow
 (`workflow_dispatch` only — per-run environment creation has cost and

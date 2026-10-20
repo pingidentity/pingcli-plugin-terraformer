@@ -78,12 +78,21 @@ apply_defaults() {
 
 # ---------------------------------------------------------------------------
 # Globals (set after apply_defaults)
+#
+# names/statuses/breaking_counts/acceptable_counts are file-scoped so the
+# EXIT trap (finalize) can print the summary even when main aborts.
 # ---------------------------------------------------------------------------
 REPO_ROOT=""
 TMPDIR_LOCAL=""
 WORKTREE_DIR=""
 TF_DIR=""
 PROVISIONED_ENV_ID=""
+REPORTS_DIR=""
+
+names=()
+statuses=()
+breaking_counts=()
+acceptable_counts=()
 
 setup_dirs() {
   REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -91,13 +100,47 @@ setup_dirs() {
     die "Could not locate repo root (Makefile not found at ${REPO_ROOT})"
   fi
 
+  # Working area (worktree + binaries) is temporary; reports and export
+  # outputs persist under regression-reports/ so failures can be inspected.
   TMPDIR_LOCAL="$(mktemp -d "${TMPDIR:-/tmp}/pingcli-e2e.XXXXXX")"
   WORKTREE_DIR="${TMPDIR_LOCAL}/worktree-base"
   TF_DIR="${REPO_ROOT}/terraform-test-data/root"
+  REPORTS_DIR="${REPO_ROOT}/regression-reports/run-e2e-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "${REPORTS_DIR}"
 
   info "Repo root  : ${REPO_ROOT}"
   info "Temp dir   : ${TMPDIR_LOCAL}"
   info "Base branch: ${REGRESSION_BASE}"
+  info "Reports    : ${REPORTS_DIR}"
+}
+
+# ---------------------------------------------------------------------------
+# Finalize (EXIT trap companion to cleanup): print the summary table and
+# verdict regardless of how main ended, so a failed run still reports.
+# ---------------------------------------------------------------------------
+finalize() {
+  local rc=$?
+
+  if [ "${#names[@]}" -gt 0 ]; then
+    print_summary names[@] statuses[@] breaking_counts[@] acceptable_counts[@]
+
+    if [ "${rc}" -eq 0 ]; then
+      success "E2E test PASSED - no breaking changes."
+    else
+      fail "E2E test FAILED - breaking changes or errors detected."
+    fi
+  fi
+
+  if [ -d "${REPORTS_DIR}" ]; then
+    ln -sfn "$(basename "${REPORTS_DIR}")" "${REPO_ROOT}/regression-reports/latest" || true
+    info "Reports and export outputs: ${REPORTS_DIR}"
+    info "Quick access: regression-reports/latest/"
+    for i in "${!names[@]}"; do
+      if [ "${statuses[$i]}" != "PASS" ]; then
+        info "  ${names[$i]}: ${REPORTS_DIR}/report-${names[$i]}.json (diff: log-compare-${names[$i]}.txt)"
+      fi
+    done
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -131,6 +174,10 @@ cleanup() {
     rm -rf "${TMPDIR_LOCAL}"
   fi
 }
+
+# Wire the traps: finalize (summary + report pointers) runs after cleanup
+# (teardown) so the summary prints even when teardown itself fails.
+trap 'rc=$?; cleanup; finalize' EXIT
 
 # ---------------------------------------------------------------------------
 # Provision a throwaway environment and apply terraform-test-data/root.
@@ -209,7 +256,9 @@ build_args() {
 
 # ---------------------------------------------------------------------------
 # Run a single matrix entry (base binary vs PR binary against the
-# provisioned environment). Returns 0 if no breaking changes, 1 otherwise.
+# provisioned environment). Returns 0 if no breaking changes, 1 if breaking
+# changes found, 2 on an infrastructure error (export or compare failure).
+# Export logs are captured to files; compare output streams and is captured.
 # ---------------------------------------------------------------------------
 run_entry() {
   local name="$1"
@@ -218,9 +267,9 @@ run_entry() {
   local include_imports="$4"
   local include_values="$5"
 
-  local outdir_base="${TMPDIR_LOCAL}/output-base-${name}"
-  local outdir_pr="${TMPDIR_LOCAL}/output-pr-${name}"
-  local report="${TMPDIR_LOCAL}/report-${name}.json"
+  local outdir_base="${REPORTS_DIR}/output-base-${name}"
+  local outdir_pr="${REPORTS_DIR}/output-pr-${name}"
+  local report="${REPORTS_DIR}/report-${name}.json"
 
   mkdir -p "${outdir_base}" "${outdir_pr}"
 
@@ -228,32 +277,50 @@ run_entry() {
 
   local base_args pr_args
   base_args=$(build_args "${format}" "${skip_deps}" "${include_imports}" "${include_values}" "${outdir_base}")
-  "${TMPDIR_LOCAL}/binary-base" ${base_args}
+
+  set +e
+  "${TMPDIR_LOCAL}/binary-base" ${base_args} >"${REPORTS_DIR}/log-base-${name}.txt" 2>&1
+  local base_rc=$?
+  set -e
+  if [ "${base_rc}" -ne 0 ]; then
+    fail "Base export failed for '${name}' (exit ${base_rc}) - see ${REPORTS_DIR}/log-base-${name}.txt"
+    jq -n --arg err "base export failed (exit ${base_rc})" \
+      '{has_breaking: false, error: $err, breaking_count: 0, acceptable_count: 0}' > "${report}"
+    return 2
+  fi
 
   pr_args=$(build_args "${format}" "${skip_deps}" "${include_imports}" "${include_values}" "${outdir_pr}")
-  "${TMPDIR_LOCAL}/binary-pr" ${pr_args}
 
+  set +e
+  "${TMPDIR_LOCAL}/binary-pr" ${pr_args} >"${REPORTS_DIR}/log-pr-${name}.txt" 2>&1
+  local pr_rc=$?
+  set -e
+  if [ "${pr_rc}" -ne 0 ]; then
+    fail "PR export failed for '${name}' (exit ${pr_rc}) - see ${REPORTS_DIR}/log-pr-${name}.txt"
+    jq -n --arg err "PR export failed (exit ${pr_rc})" \
+      '{has_breaking: false, error: $err, breaking_count: 0, acceptable_count: 0}' > "${report}"
+    return 2
+  fi
+
+  set +e
   "${TMPDIR_LOCAL}/regression-compare" \
     --base-dir "${outdir_base}" \
     --pr-dir   "${outdir_pr}"   \
-    --report-file "${report}" || true   # compare exits non-zero on breaking; handled below
+    --report-file "${report}" 2>&1 | tee "${REPORTS_DIR}/log-compare-${name}.txt"
+  local compare_rc=${PIPESTATUS[0]}
+  set -e
 
-  if [ -f "${report}" ] && jq -e '.has_breaking == true' "${report}" &>/dev/null; then
+  if [ ! -f "${report}" ]; then
+    fail "regression-compare produced no report for '${name}' (exit ${compare_rc}) - see ${REPORTS_DIR}/log-compare-${name}.txt"
+    jq -n --arg err "regression-compare produced no report (exit ${compare_rc})" \
+      '{has_breaking: false, error: $err, breaking_count: 0, acceptable_count: 0}' > "${report}"
+    return 2
+  fi
+
+  if jq -e '.has_breaking == true' "${report}" >/dev/null 2>&1; then
     return 1
   fi
   return 0
-}
-
-# ---------------------------------------------------------------------------
-# Copy reports to repo root, before the cleanup trap deletes TMPDIR_LOCAL
-# ---------------------------------------------------------------------------
-copy_reports() {
-  local reports_dir="${REPO_ROOT}/regression-reports"
-  mkdir -p "${reports_dir}"
-  for f in "${TMPDIR_LOCAL}"/report-*.json; do
-    [ -f "${f}" ] && cp "${f}" "${reports_dir}/"
-  done
-  info "Reports copied to: ${reports_dir}"
 }
 
 # ---------------------------------------------------------------------------
@@ -265,7 +332,7 @@ print_summary() {
   local -a breaking=("${!3}")
   local -a acceptable=("${!4}")
 
-  local col_name=20 col_status=10 col_break=10 col_acc=10
+  local col_name=20 col_status=12 col_break=10 col_acc=10
 
   printf '\n%s══════════════════════════════════════════════%s\n' "${BOLD}" "${RESET}"
   printf '%s E2E Test Summary%s\n' "${BOLD}" "${RESET}"
@@ -293,10 +360,16 @@ print_summary() {
         "${GREEN}" "${col_status}" "✅ PASS" "${RESET}" \
         "${col_break}" "${brk}" \
         "${col_acc}" "${acc}"
+    elif [ "${status}" = "ERROR" ]; then
+      printf ' %-*s  %s%-*s%s  %-*s  %-*s\n' \
+        "${col_name}" "${name}" \
+        "${YELLOW}" "${col_status}" "⚠️ ERROR" "${RESET}" \
+        "${col_break}" "${brk}" \
+        "${col_acc}" "${acc}"
     else
       printf ' %-*s  %s%-*s%s  %-*s  %-*s\n' \
         "${col_name}" "${name}" \
-        "${RED}" "${col_status}" "❌ FAIL" "${RESET}" \
+        "${RED}" "${col_status}" "❌ BREAKING" "${RESET}" \
         "${col_break}" "${brk}" \
         "${col_acc}" "${acc}"
     fi
@@ -313,8 +386,6 @@ main() {
   apply_defaults
   setup_dirs
 
-  trap cleanup EXIT
-
   provision
   build_binaries
 
@@ -324,10 +395,6 @@ main() {
   local entry_count
   entry_count=$(jq 'length' "${matrix_file}")
 
-  local -a names=()
-  local -a statuses=()
-  local -a breaking_counts=()
-  local -a acceptable_counts=()
   local overall_exit=0
 
   for (( i=0; i<entry_count; i++ )); do
@@ -341,7 +408,7 @@ main() {
     local entry_exit=0
     run_entry "${name}" "${format}" "${skip_deps}" "${include_imports}" "${include_values}" || entry_exit=$?
 
-    local report="${TMPDIR_LOCAL}/report-${name}.json"
+    local report="${REPORTS_DIR}/report-${name}.json"
     local brk=0 acc=0
     if [ -f "${report}" ]; then
       brk=$(jq -r '.breaking_count // 0' "${report}")
@@ -352,24 +419,23 @@ main() {
     breaking_counts+=("${brk}")
     acceptable_counts+=("${acc}")
 
-    if [ "${entry_exit}" -eq 0 ]; then
-      statuses+=("PASS")
-      success "Matrix entry '${name}' passed (breaking=${brk}, acceptable=${acc})"
-    else
-      statuses+=("FAIL")
-      fail    "Matrix entry '${name}' has breaking changes (breaking=${brk}, acceptable=${acc})"
-      overall_exit=1
-    fi
+    case "${entry_exit}" in
+      0)
+        statuses+=("PASS")
+        success "Matrix entry '${name}' passed (breaking=${brk}, acceptable=${acc})"
+        ;;
+      2)
+        statuses+=("ERROR")
+        fail "Matrix entry '${name}' errored - see ${REPORTS_DIR}"
+        overall_exit=1
+        ;;
+      *)
+        statuses+=("BREAKING")
+        fail "Matrix entry '${name}' has breaking changes (breaking=${brk}, acceptable=${acc})"
+        overall_exit=1
+        ;;
+    esac
   done
-
-  copy_reports
-  print_summary names[@] statuses[@] breaking_counts[@] acceptable_counts[@]
-
-  if [ "${overall_exit}" -ne 0 ]; then
-    fail "E2E test FAILED - breaking changes detected."
-  else
-    success "E2E test PASSED - no breaking changes."
-  fi
 
   exit "${overall_exit}"
 }
