@@ -90,6 +90,8 @@ make test
     - Connector tests validate API integration functionality
     - Configuration dependencies are not hardcoded into the tests (but created as pre-requisites), to allow them to be run by any developer on their own tenant
 
+- [ ] **Resource Review Bundle**. For PRs that add or change resource definitions or platform handlers, generate the review bundle with `make review-bundle` (dry-run without credentials; CI posts the live bundle automatically on such PRs via the `review-bundle` workflow). Attach or summarize the bundle in the PR description and address its checklist: every **CHECK** row needs an explicit note, every **WARN** row a fix or justification. See `tools/review-bundle` and `tests/regression-provisioned/README.md`.
+
 - [ ] **Test Environment**. Ensure you have access to a PingOne trial or licensed environment for integration testing. The following environment variables must be set for full test execution:
   - `TEST_PINGONE_ENVIRONMENT_ID`
   - `TEST_PINGONE_REGION_CODE` 

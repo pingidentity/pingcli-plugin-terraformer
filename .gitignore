@@ -67,6 +67,9 @@ pingcli-terraformer
 
 # Local regression test reports
 regression-reports/
+
+# Review bundle output (tools/review-bundle)
+review-bundle/
 .scratch/
 .polaris/
 .claude/

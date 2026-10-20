@@ -95,8 +95,16 @@ e2e: build
 	@echo "==> Running provisioned-environment E2E test..."
 	@./tests/regression-provisioned/run-local.sh
 
+review-bundle:
+	@echo "==> Generating resource review bundle (dry-run without PINGCLI_PINGONE_* creds)..."
+	@go run ./tools/review-bundle/ --base-ref main --out review-bundle $(REVIEW_ARGS)
+
+review-bundle-live: build
+	@echo "==> Generating live resource review bundle (provisions a throwaway environment)..."
+	@./tests/review/run-live.sh
+
 devcheck: build vet fmt lint test testacc
 
 devchecknotest: build vet fmt lint test
 
-.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint tflint fmt clean regression-local e2e devcheck devchecknotest
+.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint tflint fmt clean regression-local e2e review-bundle review-bundle-live devcheck devchecknotest
