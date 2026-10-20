@@ -1,0 +1,3 @@
+```release-note:internal
+Expanded the provisioned-environment E2E fixture set to cover the full SSO resource family (14 fixtured modules; `resource_secret` and `application_secret` are auto-covered by their parents), documented the fixture-module contract in `tests/regression-provisioned/README.md`, and bumped the fixture provider pin to pingidentity/pingone 1.21.1.
+```
