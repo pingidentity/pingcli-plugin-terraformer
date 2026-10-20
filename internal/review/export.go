@@ -28,10 +28,15 @@ type ClosureResult struct {
 	Registry *schema.Registry
 }
 
-// isDaVinciType reports whether a resource type's definition lives under
-// definitions/pingone/davinci/ — i.e. requires the DaVinci service.
+// isDaVinciType reports whether a resource type requires the DaVinci
+// service. The resource-type prefix is authoritative (every definition
+// under definitions/pingone/davinci/ is named pingone_davinci_*); the SDK
+// package check is defense in depth. The package check alone is not
+// sufficient: pingone_davinci_application_flow_policy lists via the
+// management SDK but still 403s in an SSO-only environment (#163).
 func isDaVinciType(def *schema.ResourceDefinition) bool {
-	return strings.Contains(def.API.SDKPackage, "pingone-go-client/davinci")
+	return strings.HasPrefix(def.Metadata.ResourceType, "pingone_davinci_") ||
+		strings.Contains(def.API.SDKPackage, "pingone-go-client/davinci")
 }
 
 // ComputeClosure builds the dependency-closed review set for the given seed

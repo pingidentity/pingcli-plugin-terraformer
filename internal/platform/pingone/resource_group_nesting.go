@@ -43,6 +43,13 @@ func toGroupNestingData(groupID, environmentID string, v *management.GroupNestin
 
 // listGroupNestings implements list-then-scan: lists all groups, then lists
 // nestings for each.
+//
+// GET /environments/{envID}/groups/{groupID}/memberOfGroups returns
+// _embedded.groupMemberships ([]GroupMembership, where Id is the nested
+// group's ID) — NOT _embedded.groups. The SDK's EntityArrayEmbedded has no
+// memberOfGroups-specific field, so GetGroupsOk() never matches here
+// (surfaced by the review bundle's live verification: 0 exports despite a
+// nesting existing in the environment).
 func listGroupNestings(ctx context.Context, c *Client, envID string) ([]interface{}, error) {
 	mgmt, err := c.management(ctx)
 	if err != nil {
@@ -65,12 +72,12 @@ func listGroupNestings(ctx context.Context, c *Client, envID string) ([]interfac
 			if !ok || embedded == nil {
 				continue
 			}
-			groups, ok := embedded.GetGroupsOk()
+			memberships, ok := embedded.GetGroupMembershipsOk()
 			if !ok {
 				continue
 			}
-			for i := range groups {
-				nestedID := groups[i].GetId()
+			for i := range memberships {
+				nestedID := memberships[i].GetId()
 				result = append(result, toGroupNestingData(groupID, c.environmentID.String(), management.NewGroupNesting(nestedID)))
 			}
 		}

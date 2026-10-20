@@ -23,28 +23,36 @@ func TestGroupNestingResourceHandlerFunctions(t *testing.T) {
 	assert.NotNil(t, h.get)
 }
 
+// membership is one entry of _embedded.groupMemberships, the real shape of
+// GET /environments/{envID}/groups/{groupID}/memberOfGroups (verified live:
+// the embedded key is groupMemberships, not groups).
+type membership struct {
+	id   string
+	typ  string
+	name string
+}
+
 // newGroupNestingMux serves /groups (list) and
 // /groups/{groupID}/memberOfGroups[/{nestedGroupID}] from the same test
-// server.
-func newGroupNestingMux(groupsBody map[string]any, nestingsByGroup map[string]any) *httptest.Server {
+// server, mirroring the live API response shapes: the list returns
+// _embedded.groupMemberships ([]GroupMembership), the single get returns
+// the flat membership body.
+func newGroupNestingMux(groupsBody map[string]any, membershipsByGroup map[string][]membership) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/environments/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if groupID, nestedID, ok := parseGroupNestingPath(r.URL.Path); ok {
-			body, exists := nestingsByGroup[groupID]
+			members, exists := membershipsByGroup[groupID]
 			if !exists {
 				w.WriteHeader(http.StatusNotFound)
 				_ = json.NewEncoder(w).Encode(map[string]any{"message": "not found"})
 				return
 			}
 			if nestedID != "" {
-				// Single-get: unwrap embedded.groups[0] as the flat GroupNesting body.
-				embedded, _ := body.(map[string]any)["_embedded"].(map[string]any)
-				groups, _ := embedded["groups"].([]any)
-				for _, g := range groups {
-					gm := g.(map[string]any)
-					if gm["id"] == nestedID {
-						_ = json.NewEncoder(w).Encode(gm)
+				// Single-get: flat membership body (decoded into GroupNesting).
+				for _, m := range members {
+					if m.id == nestedID {
+						_ = json.NewEncoder(w).Encode(map[string]any{"id": m.id, "type": m.typ})
 						return
 					}
 				}
@@ -52,7 +60,14 @@ func newGroupNestingMux(groupsBody map[string]any, nestingsByGroup map[string]an
 				_ = json.NewEncoder(w).Encode(map[string]any{"message": "not found"})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(body)
+			// List: _embedded.groupMemberships.
+			items := make([]any, 0, len(members))
+			for _, m := range members {
+				items = append(items, map[string]any{"id": m.id, "type": m.typ, "name": m.name})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"_embedded": map[string]any{"groupMemberships": items},
+			})
 			return
 		}
 		_ = json.NewEncoder(w).Encode(groupsBody)
@@ -86,20 +101,12 @@ func groupsListBody(ids ...string) map[string]any {
 
 func TestListGroupNestings(t *testing.T) {
 	groupsBody := groupsListBody("group-1", "group-2")
-	nestingsByGroup := map[string]any{
-		"group-1": map[string]any{
-			"_embedded": map[string]any{
-				"groups": []any{
-					map[string]any{"id": "nested-1", "type": "DIRECT"},
-				},
-			},
-		},
-		"group-2": map[string]any{
-			"_embedded": map[string]any{"groups": []any{}},
-		},
+	membershipsByGroup := map[string][]membership{
+		"group-1": {{id: "nested-1", typ: "DIRECT", name: "child group"}},
+		"group-2": {},
 	}
 
-	srv := newGroupNestingMux(groupsBody, nestingsByGroup)
+	srv := newGroupNestingMux(groupsBody, membershipsByGroup)
 	defer srv.Close()
 
 	mgmt := newTestGroupManagementClient(srv.URL)
@@ -125,16 +132,10 @@ func TestListGroupNestings_ManagementClientUnavailable(t *testing.T) {
 }
 
 func TestGetGroupNesting(t *testing.T) {
-	nestingsByGroup := map[string]any{
-		"group-1": map[string]any{
-			"_embedded": map[string]any{
-				"groups": []any{
-					map[string]any{"id": "nested-1", "type": "DIRECT"},
-				},
-			},
-		},
+	membershipsByGroup := map[string][]membership{
+		"group-1": {{id: "nested-1", typ: "DIRECT", name: "child group"}},
 	}
-	srv := newGroupNestingMux(map[string]any{}, nestingsByGroup)
+	srv := newGroupNestingMux(map[string]any{}, membershipsByGroup)
 	defer srv.Close()
 
 	mgmt := newTestGroupManagementClient(srv.URL)
