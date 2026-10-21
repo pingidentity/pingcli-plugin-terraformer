@@ -1,0 +1,96 @@
+# PingOne Group Nesting Resource Definition
+#
+# SDK: github.com/patrickcping/pingone-go-sdk-v2/management, type GroupNesting.
+# Children of pingone_group. GroupsApi.ReadGroupNesting is scoped by groupID
+# (the parent group), so listing requires enumerating groups first, then
+# listing nestings per group. GroupNesting.Id is the *nested* group's ID
+# (there is no separate nesting-relationship ID), so the Go handler projects
+# both the parent group's ID and the nested group's ID onto a flat
+# groupNestingData struct (resource_group_nesting.go) rather than exposing
+# the raw SDK struct.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_group_nesting
+  api_type: GroupNesting
+  name: PingOne Group Nesting
+  short_name: group_nesting
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: GroupNesting
+  list_method: GroupsApi.ReadGroupNesting
+  get_method: GroupsApi.ReadOneGroupNesting
+  id_field: id
+  name_field: id
+  pagination_type: cursor
+  additional_id_fields:
+    - group_id
+
+attributes:
+  # ID - computed only. Sourced from the flat groupNestingData struct (field
+  # name ID, not the raw GroupNesting SDK struct's Id) — matches
+  # NestedGroupID below since GroupNesting.Id IS the nested group's ID and
+  # there is no separate nesting-relationship ID.
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: ID
+    computed: true
+
+  # Environment ID - required, references environment. No source_path: the
+  # orchestrator injects the exported environment's ID directly.
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # GroupID - required, references the parent group. Sourced from the flat
+  # groupNestingData struct the Go handler projects (not part of the raw
+  # GroupNesting SDK struct, which has no parent group field).
+  - name: GroupID
+    terraform_name: group_id
+    type: string
+    source_path: GroupID
+    required: true
+    references_type: pingone_group
+    reference_field: id
+
+  # NestedGroupID - required, references the nested group
+  - name: NestedGroupID
+    terraform_name: nested_group_id
+    type: string
+    source_path: NestedGroupID
+    required: true
+    references_type: pingone_group
+    reference_field: id
+
+  # Type - computed only
+  - name: Type
+    terraform_name: type
+    type: string
+    source_path: Type
+    computed: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+    - resource_type: pingone_group
+      field_path: GroupID
+      lookup_field: id
+      reference_format: "pingone_group.{name}.id"
+    - resource_type: pingone_group
+      field_path: NestedGroupID
+      lookup_field: id
+      reference_format: "pingone_group.{name}.id"
+
+  import_id_format: "{env_id}/{group_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

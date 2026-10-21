@@ -1,0 +1,3 @@
+```release-note:documentation
+docs: Add release process documentation
+```

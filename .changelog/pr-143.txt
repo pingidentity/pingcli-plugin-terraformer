@@ -1,0 +1,7 @@
+```release-note:internal
+Expanded the provisioned-environment E2E fixture set to cover the full SSO resource family (14 fixtured modules; `resource_secret` and `application_secret` are auto-covered by their parents), documented the fixture-module contract in `tests/regression-provisioned/README.md`, and bumped the fixture provider pin to pingidentity/pingone 1.21.1.
+```
+
+```release-note:feature
+Added a resource review bundle generator (`make review-bundle`, `tools/review-bundle`): for every PR adding or changing resource definitions or platform handlers, it produces a human-reviewable bundle with a definition-driven summary (API surface, attributes, dependencies, embedded reference rules, custom code paths, changed fields), a review checklist auto-answered where mechanical, a restricted live export, raw API snapshots, and a self-contained HTML review page. CI posts the bundle automatically on such PRs (`.github/workflows/review-bundle.yaml`); the export runs against a dependency-filtered registry so SSO-only environments without DaVinci do not abort the run (see #163).
+```

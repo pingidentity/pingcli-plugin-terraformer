@@ -1,0 +1,79 @@
+# Provisioned-environment E2E test.
+#
+# Provisions a throwaway PingOne environment via Terraform itself
+# (terraform-test-data/root, authenticated with an org-admin credential
+# scoped to this run's lifecycle), applies hand-authored fixture resources
+# into it, then runs the same base-vs-PR export/compare pipeline as
+# regression.yaml against that fresh environment. Additive to regression.yaml,
+# which is unchanged and continues comparing against its own static
+# environment.
+#
+# Runs on workflow_dispatch only for now (no schedule yet) - real
+# environment creation/deletion per run has cost, quota, and rate-limit
+# implications that haven't been signed off on for automatic scheduling.
+#
+# Security: org-admin credentials (create/delete environment only) live in
+# the "regression-provision" GitHub Environment, separate from the
+# "regression" Environment used by regression.yaml's static-environment
+# worker-app credentials.
+
+name: regression-provisioned
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_environment:
+        description: "Skip teardown and leave the provisioned environment in place for debugging"
+        type: boolean
+        default: false
+
+concurrency:
+  group: regression-provisioned
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    environment: regression-provision
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Full history, not the default shallow single-ref fetch: the
+          # script's build_binaries() step does `git worktree add
+          # origin/${REGRESSION_BASE}`, which needs that ref to exist
+          # locally even when this workflow runs from a different branch.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.14.6'
+
+      - name: Run provisioned-environment E2E test
+        env:
+          PINGCLI_PINGONE_ORGADMIN_CLIENT_ID: ${{ secrets.PINGCLI_PINGONE_ORGADMIN_CLIENT_ID }}
+          PINGCLI_PINGONE_ORGADMIN_CLIENT_SECRET: ${{ secrets.PINGCLI_PINGONE_ORGADMIN_CLIENT_SECRET }}
+          PINGCLI_PINGONE_ORGADMIN_ENVIRONMENT_ID: ${{ secrets.PINGCLI_PINGONE_ORGADMIN_ENVIRONMENT_ID }}
+          PINGCLI_PINGONE_ORGADMIN_REGION_CODE: ${{ secrets.PINGCLI_PINGONE_ORGADMIN_REGION_CODE }}
+          PINGCLI_PINGONE_ORGADMIN_LICENSE_ID: ${{ secrets.PINGCLI_PINGONE_ORGADMIN_LICENSE_ID }}
+          E2E_KEEP_ENVIRONMENT: ${{ inputs.keep_environment && '1' || '0' }}
+          REGRESSION_BASE: main
+        run: ./tests/regression-provisioned/run-local.sh
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports
+          path: regression-reports/
+          if-no-files-found: ignore
+          retention-days: 7

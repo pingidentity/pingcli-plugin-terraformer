@@ -161,10 +161,29 @@ This command:
 5. Iterates through all matrix entries, exporting resources with both binaries
 6. Compares outputs using the regression-compare tool
 7. Prints a summary table showing pass/fail status for each matrix entry
-8. Copies JSON reports to `regression-reports/` directory
-9. Cleans up temporary files and worktree
+8. Cleans up the temporary worktree and binaries
 
-The script exits with code 0 if all comparisons pass (no breaking changes), or 1 if any breaking changes are detected.
+The script exits with code 0 if all comparisons pass (no breaking changes), or 1 if any breaking changes or errors are detected.
+
+#### Where the output goes
+
+Everything the run produces persists in `regression-reports/run-<timestamp>/`
+(gitignored; also reachable as `regression-reports/latest`, a symlink to the
+most recent run), even when the comparison fails:
+
+| Path | Contents |
+|---|---|
+| `report-<entry>.json` | comparison report per matrix entry (breaking/acceptable counts, error field on infrastructure failures) |
+| `report-<entry>.md` | friendly markdown twin: verdict, breaking diffs **grouped into repeated patterns** (one row per kind+attribute+expected→actual with a count), acceptable additions |
+| `report-<entry>.html` | self-contained HTML page of the same content (dark-mode aware; open in a browser) |
+| `output-base-<entry>/`, `output-pr-<entry>/` | full export outputs from both binaries |
+| `log-base-<entry>.txt`, `log-pr-<entry>.txt` | export logs |
+| `log-compare-<entry>.txt` | regression-compare output |
+
+The summary table and the verdict print at the end of the run regardless of
+exit status, and any non-PASS entries are listed with their report paths. An
+entry whose export or comparison crashed is classified `ERROR` (not a pass),
+with the failure recorded in its report file.
 
 ### Using the Makefile target
 

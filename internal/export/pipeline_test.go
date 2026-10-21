@@ -1,6 +1,6 @@
 // Copyright © 2025 Ping Identity Corporation
 
-package cmd
+package export
 
 import (
 	"bytes"
@@ -72,7 +72,7 @@ func TestParseOutputPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := parseOutputPath(tt.raw)
+			got, ok := ParseOutputPath(tt.raw)
 			assert.Equal(t, tt.wantOk, ok)
 			if tt.wantOk {
 				assert.Equal(t, tt.wantResType, got.resourceType)
@@ -86,7 +86,7 @@ func TestParseOutputPath(t *testing.T) {
 // ---- collectOutputPaths tests ----
 
 func TestCollectOutputPaths_FlagsOnly(t *testing.T) {
-	paths, err := collectOutputPaths([]string{
+	paths, err := CollectOutputPaths([]string{
 		"pingone_davinci_flow.my_flow.id",
 		"pingone_davinci_flow.my_flow.id", // duplicate
 		"pingone_davinci_flow.other_flow.name",
@@ -103,7 +103,7 @@ func TestCollectOutputPaths_File(t *testing.T) {
 	content := "pingone_davinci_flow.flow_a.id\n# comment line\n\npingone_davinci_flow.flow_b.name\n"
 	require.NoError(t, os.WriteFile(tmp, []byte(content), 0600))
 
-	paths, err := collectOutputPaths(nil, tmp)
+	paths, err := CollectOutputPaths(nil, tmp)
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"pingone_davinci_flow.flow_a.id",
@@ -115,7 +115,7 @@ func TestCollectOutputPaths_MergeAndDedup(t *testing.T) {
 	tmp := filepath.Join(t.TempDir(), "outputs.txt")
 	require.NoError(t, os.WriteFile(tmp, []byte("pingone_davinci_flow.flow_a.id\n"), 0600))
 
-	paths, err := collectOutputPaths([]string{
+	paths, err := CollectOutputPaths([]string{
 		"pingone_davinci_flow.flow_a.id", // already in file — should dedup
 		"pingone_davinci_flow.flow_b.name",
 	}, tmp)
@@ -127,7 +127,7 @@ func TestCollectOutputPaths_MergeAndDedup(t *testing.T) {
 }
 
 func TestCollectOutputPaths_MissingFile(t *testing.T) {
-	_, err := collectOutputPaths(nil, "/nonexistent/path/outputs.txt")
+	_, err := CollectOutputPaths(nil, "/nonexistent/path/outputs.txt")
 	assert.Error(t, err)
 }
 
@@ -149,7 +149,7 @@ func TestBuildOutputs_ExactMatch(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__my_flow")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"pingone_davinci_flow.pingcli__my_flow.id"}, result, logger)
+	outputs := BuildOutputs([]string{"pingone_davinci_flow.pingcli__my_flow.id"}, result, logger)
 	require.Len(t, outputs, 1)
 	assert.Equal(t, "pingone_davinci_flow__pingcli__my_flow__id", outputs[0].Name)
 	assert.Equal(t, "pingone_davinci_flow.pingcli__my_flow.id", outputs[0].Value)
@@ -164,7 +164,7 @@ func TestBuildOutputs_EqualLabelsRemainTypeQualified(t *testing.T) {
 	}}
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{
+	outputs := BuildOutputs([]string{
 		"target_type_a.pingcli__DVA.id",
 		"target_type_b.pingcli__DVA.id",
 	}, result, logger)
@@ -178,7 +178,7 @@ func TestBuildOutputs_GlobMatchesAll(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__flow_a", "pingcli__flow_b")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"pingone_davinci_flow.*.id"}, result, logger)
+	outputs := BuildOutputs([]string{"pingone_davinci_flow.*.id"}, result, logger)
 	require.Len(t, outputs, 2)
 	// Sorted by name
 	assert.Equal(t, "pingone_davinci_flow__pingcli__flow_a__id", outputs[0].Name)
@@ -190,7 +190,7 @@ func TestBuildOutputs_NoMatchWarns(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__flow_a")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"pingone_davinci_flow.no_such_label.id"}, result, logger)
+	outputs := BuildOutputs([]string{"pingone_davinci_flow.no_such_label.id"}, result, logger)
 	assert.Empty(t, outputs)
 	require.Len(t, logger.warnings, 1)
 	assert.Contains(t, logger.warnings[0], "matched no")
@@ -203,7 +203,7 @@ func TestBuildOutputs_UsesResourceTypeBeforeLabelMatching(t *testing.T) {
 	}}
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"target_type_b.pingcli__DVA.value"}, result, logger)
+	outputs := BuildOutputs([]string{"target_type_b.pingcli__DVA.value"}, result, logger)
 	require.Len(t, outputs, 1)
 	assert.Equal(t, "target_type_b.pingcli__DVA.value", outputs[0].Value)
 	assert.Equal(t, "target_type_b__pingcli__DVA__value", outputs[0].Name)
@@ -213,7 +213,7 @@ func TestBuildOutputs_UnknownResourceTypeWarns(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__flow_a")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"pingone_davinci_variable.*.id"}, result, logger)
+	outputs := BuildOutputs([]string{"pingone_davinci_variable.*.id"}, result, logger)
 	assert.Empty(t, outputs)
 	require.Len(t, logger.warnings, 1)
 	assert.Contains(t, logger.warnings[0], "not found in export results")
@@ -223,7 +223,7 @@ func TestBuildOutputs_MalformedPathWarns(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__flow_a")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"bad_path"}, result, logger)
+	outputs := BuildOutputs([]string{"bad_path"}, result, logger)
 	assert.Empty(t, outputs)
 	require.Len(t, logger.warnings, 1)
 	assert.Contains(t, logger.warnings[0], "malformed")
@@ -233,7 +233,7 @@ func TestBuildOutputs_NestedAttrPath(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__my_flow")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"pingone_davinci_flow.pingcli__my_flow.settings.csp"}, result, logger)
+	outputs := BuildOutputs([]string{"pingone_davinci_flow.pingcli__my_flow.settings.csp"}, result, logger)
 	require.Len(t, outputs, 1)
 	assert.Equal(t, "pingone_davinci_flow__pingcli__my_flow__settings__csp", outputs[0].Name)
 	assert.Equal(t, "pingone_davinci_flow.pingcli__my_flow.settings.csp", outputs[0].Value)
@@ -243,7 +243,7 @@ func TestBuildOutputs_SortedOutput(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__z_flow", "pingcli__a_flow")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{"pingone_davinci_flow.*.id"}, result, logger)
+	outputs := BuildOutputs([]string{"pingone_davinci_flow.*.id"}, result, logger)
 	require.Len(t, outputs, 2)
 	assert.True(t, outputs[0].Name < outputs[1].Name, "outputs should be sorted by name")
 }
@@ -252,7 +252,7 @@ func TestBuildOutputs_EmptyWhenNoPaths(t *testing.T) {
 	result := makeResult("pingone_davinci_flow", "pingcli__flow_a")
 	logger := &mockLogger{}
 
-	outputs := buildOutputs([]string{}, result, logger)
+	outputs := BuildOutputs([]string{}, result, logger)
 	assert.Empty(t, outputs)
 }
 
@@ -270,7 +270,7 @@ func TestWriteResourceAddresses(t *testing.T) {
 	}}
 
 	var buf bytes.Buffer
-	require.NoError(t, writeResourceAddresses(&buf, result))
+	require.NoError(t, WriteResourceAddresses(&buf, result))
 	assert.Equal(t, `pingone_davinci_flow.pingcli__flow_a
 pingone_davinci_flow.pingcli__flow_b
 pingone_davinci_variable.pingcli__DuplicateName
@@ -279,6 +279,6 @@ pingone_davinci_variable.pingcli__DuplicateName
 
 func TestWriteResourceAddresses_EmptyResult(t *testing.T) {
 	var buf bytes.Buffer
-	require.NoError(t, writeResourceAddresses(&buf, &core.ExportResult{}))
+	require.NoError(t, WriteResourceAddresses(&buf, &core.ExportResult{}))
 	assert.Empty(t, buf.String())
 }
