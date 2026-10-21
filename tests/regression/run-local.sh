@@ -133,7 +133,7 @@ finalize() {
     info "Quick access: regression-reports/latest/"
     for i in "${!names[@]}"; do
       if [ "${statuses[$i]}" != "PASS" ]; then
-        info "  ${names[$i]}: ${REPORTS_DIR}/report-${names[$i]}.json (diff: log-compare-${names[$i]}.txt)"
+        info "  ${names[$i]}: ${REPORTS_DIR}/report-${names[$i]}.md (report-${names[$i]}.html · diff: log-compare-${names[$i]}.txt)"
       fi
     done
   fi
@@ -183,12 +183,19 @@ build_args() {
 
 # write_error_report records an infrastructure failure (export crash, compare
 # crash) as a report file, so the entry still shows up in the persisted
-# evidence instead of reading as a pass.
+# evidence instead of reading as a pass. Writes both the JSON error shape the
+# classification logic reads and a friendly markdown twin.
 write_error_report() {
   local report="$1"
   local error="$2"
   jq -n --arg err "${error}" \
     '{has_breaking: false, error: $err, breaking_count: 0, acceptable_count: 0}' > "${report}"
+  {
+    echo "# Regression Comparison Report"
+    echo
+    echo "> **⚠️ The comparison errored:** ${error}"
+    echo "> This entry's exports did not complete. See \`log-base-*.txt\` / \`log-pr-*.txt\` for the failing step's output."
+  } > "${report%.json}.md"
 }
 
 # ---------------------------------------------------------------------------
@@ -242,7 +249,9 @@ run_entry() {
   "${TMPDIR_LOCAL}/regression-compare" \
     --base-dir "${outdir_base}" \
     --pr-dir   "${outdir_pr}"   \
-    --report-file "${report}" 2>&1 | tee "${REPORTS_DIR}/log-compare-${name}.txt"
+    --report-file "${report}" \
+    --markdown "${REPORTS_DIR}/report-${name}.md" \
+    --html "${REPORTS_DIR}/report-${name}.html" 2>&1 | tee "${REPORTS_DIR}/log-compare-${name}.txt"
   local compare_rc=${PIPESTATUS[0]}
   set -e
 

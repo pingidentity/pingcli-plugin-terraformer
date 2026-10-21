@@ -174,6 +174,8 @@ most recent run), even when the comparison fails:
 | Path | Contents |
 |---|---|
 | `report-<entry>.json` | comparison report per matrix entry (breaking/acceptable counts, error field on infrastructure failures) |
+| `report-<entry>.md` | friendly markdown twin: verdict, breaking diffs **grouped into repeated patterns** (one row per kind+attribute+expected→actual with a count), acceptable additions |
+| `report-<entry>.html` | self-contained HTML page of the same content (dark-mode aware; open in a browser) |
 | `output-base-<entry>/`, `output-pr-<entry>/` | full export outputs from both binaries |
 | `log-base-<entry>.txt`, `log-pr-<entry>.txt` | export logs |
 | `log-compare-<entry>.txt` | regression-compare output |

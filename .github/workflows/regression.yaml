@@ -205,6 +205,7 @@ jobs:
             --base-dir ./output-base \
             --pr-dir ./output-pr \
             --report-file "report-${MATRIX_NAME}.json" \
+            --markdown "report-${MATRIX_NAME}.md" \
             2>&1 | tee comparison-output.txt
           EXIT_CODE=${PIPESTATUS[0]}
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
@@ -222,7 +223,7 @@ jobs:
           MATRIX_NAME: ${{ matrix.name }}
         with:
           name: regression-report-${{ matrix.name }}
-          path: report-${{ matrix.name }}.json
+          path: report-${{ matrix.name }}.*
           retention-days: 7
 
       - name: Check result
@@ -295,29 +296,24 @@ jobs:
               echo "One or more export configurations produced breaking changes."
               echo "Review the detailed reports in the workflow artifacts."
               echo ""
-              echo "<details>"
-              echo "<summary>Breaking change details</summary>"
-              echo ""
               for report_dir in reports/regression-report-*; do
-                report_file=$(find "$report_dir" -name "*.json" -type f | head -1)
-                if [ -z "$report_file" ]; then
+                report_md=$(find "$report_dir" -name "*.md" -type f | head -1)
+                if [ -z "$report_md" ]; then
                   continue
                 fi
 
-                has_breaking=$(jq -r '.has_breaking' "$report_file")
-                if [ "$has_breaking" != "true" ]; then
-                  continue
+                # The markdown report groups repeated diffs into patterns
+                # (e.g. one attribute change across 192 resources renders as
+                # one row); splice its Breaking changes sections into the
+                # comment instead of dumping every raw diff line.
+                if grep -q "^## Breaking changes" "$report_md"; then
+                  name=$(basename "$report_dir" | sed 's/regression-report-//')
+                  echo "#### \`$name\`"
+                  echo ""
+                  sed -n '/^## Breaking changes/,/^## Acceptable additions/p' "$report_md" | head -n -1
+                  echo ""
                 fi
-
-                name=$(basename "$report_dir" | sed 's/regression-report-//')
-                echo "#### \`$name\`"
-                echo ""
-                echo '```'
-                jq -r '.files[] | select(.breaking_diffs != null) | .breaking_diffs[] | "\(.kind): \(.resource) \(.attribute // "") \(.expected // "") -> \(.actual // "")"' "$report_file"
-                echo '```'
-                echo ""
               done
-              echo "</details>"
             fi
             echo ""
             echo "---"
