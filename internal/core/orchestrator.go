@@ -212,9 +212,12 @@ func (o *ExportOrchestrator) Export(ctx context.Context, opts ExportOptions) (*E
 			return nil, fmt.Errorf("process %s: %w", resourceType, err)
 		}
 
-		// Assign unique Terraform labels to each resource.
+		// Assign unique Terraform labels to each resource. An error here means
+		// duplicates were disambiguated for a type that does not opt into
+		// AllowDuplicateLabels — reported as a warning (degraded but valid
+		// output), not a failed export (issue #166).
 		if err := assignLabels(processed, def); err != nil {
-			return nil, fmt.Errorf("%s: %w", resourceType, err)
+			o.progress(fmt.Sprintf("Warning: %v", err))
 		}
 
 		// Add ALL resources to the graph before filtering so that
@@ -948,66 +951,41 @@ func (o *ExportOrchestrator) orderByDependencies(defs []*schema.ResourceDefiniti
 // assignLabels computes and assigns unique Terraform resource labels to each
 // resource. For resource types that allow duplicate labels
 // (AllowDuplicateLabels), collisions are disambiguated by appending _2, _3, etc.
-// For other types, duplicate labels produce an error.
+// For other types, duplicate labels also disambiguate (deterministically, by
+// resource ID order) and a warning is reported via the progress callback —
+// legacy DaVinci data can contain (name, context) duplicates the API no longer
+// permits creating, and a hard error would block the whole export for one
+// resource type. See issue #166.
 func assignLabels(resources []*ResourceData, def *schema.ResourceDefinition) error {
-	type labelInfo struct {
-		indices []int
-		names   []string
-		ids     []string
-	}
-	seen := make(map[string]*labelInfo)
+	// Sort resources by ID first so that suffix assignment (_2, _3, ...) is
+	// deterministic across exports: API list order is not guaranteed, but IDs
+	// are stable, so the same environment always yields the same labels.
+	stable := make([]*ResourceData, len(resources))
+	copy(stable, resources)
+	sort.SliceStable(stable, func(i, j int) bool { return stable[i].ID < stable[j].ID })
 
-	// First pass: compute base labels and detect collisions.
-	baseLabels := make([]string, len(resources))
-	for i, rd := range resources {
-		label := terraformLabel(rd, def)
-		baseLabels[i] = label
-		if info, exists := seen[label]; exists {
-			info.indices = append(info.indices, i)
-			info.names = append(info.names, rd.Name)
-			info.ids = append(info.ids, rd.ID)
-		} else {
-			seen[label] = &labelInfo{
-				indices: []int{i},
-				names:   []string{rd.Name},
-				ids:     []string{rd.ID},
-			}
-		}
-	}
-
-	// Check for duplicates.
-	var duplicates []string
-	for label, info := range seen {
-		if len(info.indices) <= 1 {
-			continue
-		}
-		if !def.API.AllowDuplicateLabels {
-			duplicates = append(duplicates, fmt.Sprintf(
-				"label %q produced by %d resources (names: %s, IDs: %s)",
-				label, len(info.indices),
-				strings.Join(info.names, ", "),
-				strings.Join(info.ids, ", "),
-			))
-		}
-	}
-
-	if len(duplicates) > 0 {
-		sort.Strings(duplicates)
-		return fmt.Errorf("duplicate resource labels:\n  %s", strings.Join(duplicates, "\n  "))
-	}
-
-	// Second pass: assign labels, disambiguating duplicates when allowed.
 	usage := make(map[string]int)
-	for i, rd := range resources {
-		label := baseLabels[i]
+	var disambiguated []string
+	for _, rd := range stable {
+		label := terraformLabel(rd, def)
 		count := usage[label]
 		usage[label] = count + 1
 		if count > 0 {
 			// Append suffix to disambiguate: label_2, label_3, ...
 			rd.Label = fmt.Sprintf("%s_%d", label, count+1)
+			disambiguated = append(disambiguated,
+				fmt.Sprintf("%s (ID: %s) -> %s", rd.Name, rd.ID, rd.Label))
 		} else {
 			rd.Label = label
 		}
+	}
+
+	if len(disambiguated) > 0 && !def.API.AllowDuplicateLabels {
+		sort.Strings(disambiguated)
+		return fmt.Errorf("%s: duplicate resource labels disambiguated with suffixes; "+
+			"these resources share the same label_fields values and may be legacy duplicates "+
+			"(review before apply):\n  %s",
+			def.Metadata.ResourceType, strings.Join(disambiguated, "\n  "))
 	}
 
 	return nil
@@ -1016,14 +994,18 @@ func assignLabels(resources []*ResourceData, def *schema.ResourceDefinition) err
 // terraformLabel computes the sanitized Terraform resource label for a processed
 // resource. This must match the label the HCL formatter produces so that
 // graph-based GenerateTerraformReference returns the correct resource reference.
+//
+// Label fields may be dot-paths into nested object attributes (e.g. "flow.id")
+// to address a sub-field of a processed object attribute keyed by terraform_name.
+// An intermediate segment that is absent or nil skips that field — resources
+// without the nested value (e.g. DaVinci variables with no owning flow) simply
+// label on the remaining fields.
 func terraformLabel(rd *ResourceData, def *schema.ResourceDefinition) string {
 	if len(def.API.LabelFields) > 0 {
 		keys := make([]string, 0, len(def.API.LabelFields))
 		for _, field := range def.API.LabelFields {
-			if v, ok := rd.Attributes[field]; ok && v != nil {
-				if s, ok := v.(string); ok && s != "" {
-					keys = append(keys, s)
-				}
+			if s := LabelFieldValue(rd.Attributes, field); s != "" {
+				keys = append(keys, s)
 			}
 		}
 		if len(keys) > 0 {
@@ -1034,6 +1016,31 @@ func terraformLabel(rd *ResourceData, def *schema.ResourceDefinition) string {
 		return utils.SanitizeResourceName(rd.Name)
 	}
 	return rd.ID
+}
+
+// LabelFieldValue resolves a label field (plain attribute name or dot-path
+// through nested object maps) to a non-empty string, or "" when absent.
+func LabelFieldValue(attrs map[string]interface{}, field string) string {
+	if field == "" {
+		return ""
+	}
+	segments := strings.Split(field, ".")
+	var current interface{} = attrs
+	for _, seg := range segments {
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return ""
+		}
+		current, ok = m[seg]
+		if !ok || current == nil {
+			return ""
+		}
+	}
+	s, ok := current.(string)
+	if !ok || s == "" {
+		return ""
+	}
+	return s
 }
 
 // applyUpstreamExpansion applies filter + expansion when IncludeUpstream is active.
