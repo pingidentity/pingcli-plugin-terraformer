@@ -160,3 +160,23 @@ func unwrapTypeDiscriminatedBlock(value interface{}) interface{} {
 func expandDescription(template, resourceName string) string {
 	return strings.ReplaceAll(template, "{name}", resourceName)
 }
+
+// DisambiguateName returns a unique Terraform variable name for a resource
+// whose derived name was already claimed by a different resource instance.
+// The suffix is the resource's unique Terraform label — stable across
+// exports, unlike the API ID. Used by the export command when two distinct
+// resources derive the same base name (e.g. two same-named flow-context
+// DaVinci variables, which the API permits — see #166).
+//
+// claimed maps every currently claimed variable name to its owning resource
+// instance key; the caller registers both the original and the returned name.
+func DisambiguateName(baseName, resourceLabel string, claimed map[string]string) string {
+	suffix := utils.SanitizeVariableName(resourceLabel)
+	candidate := baseName + "_" + suffix
+	for {
+		if _, exists := claimed[candidate]; !exists {
+			return candidate
+		}
+		candidate = candidate + "_x"
+	}
+}

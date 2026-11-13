@@ -356,3 +356,27 @@ func TestExtractWithTerraformName(t *testing.T) {
 	assert.Equal(t, "davinci_variable_company_name_value", v.VariableName)
 	assert.Equal(t, "Value for company_name", v.Description)
 }
+
+// Two distinct resources may derive the same Terraform variable name (e.g.
+// two same-named flow-context DaVinci variables — API-permitted per #166).
+// The export command disambiguates via DisambiguateName using the resource label.
+func TestDisambiguateName(t *testing.T) {
+	claimed := map[string]string{"davinci_variable_e2eVarA_value": "pingone_davinci_variable:var-1"}
+
+	got := DisambiguateName("davinci_variable_e2eVarA_value",
+		"pingcli__e2eVarA_flow_d27bd44463811bb6d5d914a82b1c30f5", claimed)
+	assert.Equal(t, "davinci_variable_e2eVarA_value_pingcli__e2eVarA_flow_d27bd44463811bb6d5d914a82b1c30f5", got)
+
+	// Label with HCL-hostile characters is sanitized (SanitizeVariableName
+	// replaces hyphens with underscores, unlike label hex-encoding).
+	got2 := DisambiguateName("davinci_variable_x_value", "pingcli__My-0020-Flow", claimed)
+	assert.Equal(t, "davinci_variable_x_value_pingcli__My_0020_Flow", got2)
+
+	// Name+label both taken: helper never returns a claimed name.
+	claimed[got] = "other-owner"
+	got3 := DisambiguateName("davinci_variable_e2eVarA_value",
+		"pingcli__e2eVarA_flow_d27bd44463811bb6d5d914a82b1c30f5", claimed)
+	assert.NotEqual(t, got, got3)
+	_, stillFree := claimed[got3]
+	assert.False(t, stillFree)
+}
