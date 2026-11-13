@@ -5,3 +5,7 @@ Duplicate Terraform labels on any resource type are now disambiguated with a det
 
 Note: flow-context variable labels change in this release (they gain a `_flow_<flow-id>` segment). Exports that previously failed on duplicate labels now succeed; no other existing labels change.
 ```
+
+```release-note:bug
+Exported Terraform variable names are now unique across resources: when two distinct resources would derive the same variable name (previously possible for same-named flow-context DaVinci variables), the second resource's variables gain a suffix built from its Terraform resource label. This only affects exports that previously failed with a duplicate-label error; existing successful exports produce byte-identical output.
+```
