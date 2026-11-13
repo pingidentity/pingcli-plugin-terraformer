@@ -244,3 +244,34 @@ func TestVariableLabelFlowContextDotPath(t *testing.T) {
 	assert.Equal(t, "pingcli__flowContextVarA_flow_"+flowB, processed[1].Label)
 	assert.Equal(t, "pingcli__flowInstanceVarA_flowInstance", processed[2].Label)
 }
+
+// TestAssignLabels_LegacyFlowInstanceDuplicates covers the #166 degradation
+// path: legacy environments can contain two flowInstance-context variables
+// with the same name — the current API rejects creating them
+// (UNIQUENESS_VIOLATION), so they cannot exist as real fixtures, but the
+// exporter must not abort. Both get unique labels (deterministic, ID-ordered)
+// and assignLabels returns the warning error the orchestrator reports.
+func TestAssignLabels_LegacyFlowInstanceDuplicates(t *testing.T) {
+	resources := []*ResourceData{
+		// Input order reversed vs ID order: suffix must follow ID order.
+		{ID: "legacy-id-2", Name: "cancelUrl", Attributes: map[string]interface{}{
+			"name": "cancelUrl", "context": "flowInstance"}},
+		{ID: "legacy-id-1", Name: "cancelUrl", Attributes: map[string]interface{}{
+			"name": "cancelUrl", "context": "flowInstance"}},
+	}
+	def := &schema.ResourceDefinition{
+		API: schema.APIDefinition{
+			NameField:   "name",
+			LabelFields: []string{"name", "context", "flow.id"},
+		},
+	}
+
+	err := assignLabels(resources, def)
+	require.Error(t, err) // warning, not fatal — orchestrator reports it
+	assert.Contains(t, err.Error(), "duplicate resource labels disambiguated")
+	assert.Contains(t, err.Error(), "legacy-id-2")
+
+	// legacy-id-1 sorts first and keeps the base label; legacy-id-2 is suffixed.
+	assert.Equal(t, "pingcli__cancelUrl_flowInstance", resources[1].Label)
+	assert.Equal(t, "pingcli__cancelUrl_flowInstance_2", resources[0].Label)
+}
