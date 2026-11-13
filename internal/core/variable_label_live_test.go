@@ -55,7 +55,7 @@ func TestLiveVariableLabels(t *testing.T) {
 	for i, p := range processed {
 		p.ID = body.Data.Embedded.Variables[i].Id.String()
 	}
-	err = assignLabels(processed, def)
+	err = assignLabels(processed, def, nil)
 	t.Logf("assignLabels warning/err (nil = no collisions): %v", err)
 
 	seen := map[string]int{}

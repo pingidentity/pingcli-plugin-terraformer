@@ -19,7 +19,7 @@ api:
   # API permits the same name on different flows. Only flow-context variables
   # carry the Flow field, so company/flowInstance labels are unchanged.
   # Dot-path labels require the nested-attribute lookup added in #166.
-  label_fields: [name, context, flow.id]
+  label_fields: [name, context, flow.id@pingone_davinci_flow]
   pagination_type: cursor
 
 attributes:

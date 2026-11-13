@@ -1,9 +1,9 @@
 ```release-note:bug
-The DaVinci variable exporter now includes the owning flow in the Terraform resource label of flow-context variables (`label_fields: [name, context, flow.id]`). The DaVinci API permits the same variable name on different flows (uniqueness domain is name + context + flow), so two such variables previously produced identical labels and the export failed with a duplicate-label error. Labels of company- and flowInstance-context variables are unchanged.
+The DaVinci variable exporter now includes the owning flow in the Terraform resource label of flow-context variables (`label_fields: [name, context, flow.id@pingone_davinci_flow]`). The DaVinci API permits the same variable name on different flows (uniqueness domain is name + context + flow), so two such variables previously produced identical labels and the export failed with a duplicate-label error. Labels of company- and flowInstance-context variables are unchanged.
 
 Duplicate Terraform labels on any resource type are now disambiguated with a deterministic `_2`, `_3`, … suffix (ordered by resource ID, stable across exports) instead of aborting the export, with a warning listing the affected resources. This covers legacy environments that contain pre-existing duplicate variables (e.g. duplicate `cancelUrl`-style flowInstance variables created before the API enforced name uniqueness) — see issue #166.
 
-Note: flow-context variable labels change in this release (they gain a `_flow_<flow-id>` segment). Exports that previously failed on duplicate labels now succeed; no other existing labels change.
+Note: flow-context variable labels change in this release (they gain a `_flow_<flow-label>` segment (the owning flow's exported resource name, e.g. `_flow_My-0020-Flow`)). Exports that previously failed on duplicate labels now succeed; no other existing labels change.
 ```
 
 ```release-note:bug

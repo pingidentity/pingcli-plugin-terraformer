@@ -665,7 +665,7 @@ func resourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) stri
 	if len(def.API.LabelFields) > 0 {
 		keys := make([]string, 0, len(def.API.LabelFields))
 		for _, field := range def.API.LabelFields {
-			if s := core.LabelFieldValue(data.Attributes, field); s != "" {
+			if s := core.LabelFieldValue(data.Attributes, field, nil); s != "" {
 				keys = append(keys, s)
 			}
 		}
