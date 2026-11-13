@@ -206,7 +206,7 @@ func isScalarValue(value interface{}) bool {
 // and preserves the casing from the original components.
 func connectorVariableName(prefix, resourceName, propertyName string) string {
 	cleanName := resourceName
-	for _, pfx := range []string{"pingcli__", "davinci__"} {
+	for _, pfx := range []string{utils.ResourceNamePrefix, "davinci__"} {
 		cleanName = strings.TrimPrefix(cleanName, pfx)
 	}
 	return utils.SanitizeVariableName(prefix + cleanName + "_" + propertyName)
