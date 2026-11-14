@@ -1132,3 +1132,46 @@ func TestFormatter_Format_RawHCLValue_BareVarRefs(t *testing.T) {
 	assert.Contains(t, output, `"properties" : {`,
 		"nested jsonencode body must survive hclwrite.Format re-indentation")
 }
+
+// Issue #166: label_fields dot-paths resolve through nested object attributes
+// (e.g. flow.id) so flow-context variables label on their owning flow.
+func TestFormat_LabelFields_DotPathNested(t *testing.T) {
+	f := hclformatter.NewFormatter()
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{ResourceType: "test_resource"},
+		API: schema.APIDefinition{
+			LabelFields: []string{"name", "context", "flow.id"},
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "val", TerraformName: "val", Type: "string"},
+		},
+	}
+
+	data := &core.ResourceData{
+		ResourceType: "test_resource",
+		ID:           "id1",
+		Attributes: map[string]interface{}{
+			"name":    "myvar",
+			"context": "flow",
+			"flow":    map[string]interface{}{"id": "flow-abc"},
+			"val":     "x",
+		},
+	}
+	out, err := f.Format(data, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, out, `resource "test_resource" "pingcli__myvar_flow_flow-abc"`)
+
+	// flowInstance variable with no flow attribute — two-part label unchanged.
+	data2 := &core.ResourceData{
+		ResourceType: "test_resource",
+		ID:           "id2",
+		Attributes: map[string]interface{}{
+			"name":    "myvar",
+			"context": "flowInstance",
+			"val":     "x",
+		},
+	}
+	out2, err := f.Format(data2, def, hclformatter.FormatOptions{})
+	require.NoError(t, err)
+	assert.Contains(t, out2, `resource "test_resource" "pingcli__myvar_flowInstance"`)
+}

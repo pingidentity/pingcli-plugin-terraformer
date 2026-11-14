@@ -1019,3 +1019,39 @@ func TestFormat_TypeDiscriminatedBlock_SecretStringKey(t *testing.T) {
 	assert.Equal(t, "${var.davinci_variable_secret_a_value}", value["secret_string"],
 		"secret_string must render as ${var.X} in tfjson output")
 }
+
+// Issue #166: label_fields dot-paths resolve through nested object attributes
+// (e.g. flow.id) so flow-context variables label on their owning flow.
+func TestFormat_LabelFields_DotPathNested(t *testing.T) {
+	f := NewFormatter()
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{ResourceType: "test_resource"},
+		API: schema.APIDefinition{
+			LabelFields: []string{"name", "context", "flow.id"},
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "val", TerraformName: "val", Type: "string"},
+		},
+	}
+
+	// Flow-context variable with nested flow map.
+	data := baseData("ignored", "id1", map[string]interface{}{
+		"name":    "myvar",
+		"context": "flow",
+		"flow":    map[string]interface{}{"id": "flow-abc"},
+		"val":     "x",
+	})
+	out, err := f.Format(data, def, FormatOptions{})
+	require.NoError(t, err)
+	_ = unmarshalResource(t, out, "test_resource", "pingcli__myvar_flow_flow-abc")
+
+	// flowInstance variable with no flow attribute — two-part label unchanged.
+	data2 := baseData("ignored", "id2", map[string]interface{}{
+		"name":    "myvar",
+		"context": "flowInstance",
+		"val":     "x",
+	})
+	out2, err := f.Format(data2, def, FormatOptions{})
+	require.NoError(t, err)
+	_ = unmarshalResource(t, out2, "test_resource", "pingcli__myvar_flowInstance")
+}

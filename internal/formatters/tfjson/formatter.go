@@ -473,6 +473,8 @@ func terraformName(attrDef schema.AttributeDefinition) string {
 }
 
 // resourceLabel derives the sanitized resource label from resource data.
+// Dot-paths in label_fields are resolved through nested object attributes,
+// matching core.terraformLabel.
 func resourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) string {
 	if data.Label != "" {
 		return data.Label
@@ -480,10 +482,8 @@ func resourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) stri
 	if len(def.API.LabelFields) > 0 {
 		keys := make([]string, 0, len(def.API.LabelFields))
 		for _, field := range def.API.LabelFields {
-			if v, ok := data.Attributes[field]; ok && v != nil {
-				if s, ok := v.(string); ok && s != "" {
-					keys = append(keys, s)
-				}
+			if s := core.LabelFieldValue(data.Attributes, field, nil); s != "" {
+				keys = append(keys, s)
 			}
 		}
 		if len(keys) > 0 {
