@@ -205,10 +205,10 @@ func isScalarValue(value interface{}) bool {
 // non-alphanumeric/underscore characters are replaced with underscores,
 // and preserves the casing from the original components.
 func connectorVariableName(prefix, resourceName, propertyName string) string {
-	cleanName := resourceName
-	for _, pfx := range []string{utils.ResourceNamePrefix, "davinci__"} {
-		cleanName = strings.TrimPrefix(cleanName, pfx)
-	}
+	// The pingcli__ resource-label prefix is stripped via the canonical
+	// helper; davinci__ is a legacy DaVinci-connector label prefix no current
+	// sanitizer produces, kept for old labels still in circulation.
+	cleanName := strings.TrimPrefix(utils.BareResourceName(resourceName), "davinci__")
 	return utils.SanitizeVariableName(prefix + cleanName + "_" + propertyName)
 }
 

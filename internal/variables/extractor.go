@@ -94,9 +94,9 @@ func (e *VariableExtractor) Extract(
 		// unlike the raw API name, which collides for API-permitted
 		// same-named resources (flow-context DaVinci variables, #166).
 		if hasRule && rule.VariablePrefix != "" {
-			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + stripResourceNamePrefix(resourceName) + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + utils.BareResourceName(resourceName) + "_" + tfName)
 		} else {
-			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + stripResourceNamePrefix(resourceName) + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + utils.BareResourceName(resourceName) + "_" + tfName)
 		}
 
 		// Apply rule overrides.
@@ -191,12 +191,3 @@ func DisambiguateName(baseName, resourceLabel string, claimed map[string]string)
 	}
 }
 
-// stripResourceNamePrefix removes the "pingcli__" resource-label prefix so
-// variable names derived from labels do not embed it
-// (davinci_variable_flowContextVarA_flow_flowB_value, not
-// davinci_variable_pingcli__flowContextVarA_..._value). Labels produced by
-// utils.SanitizeResourceName/SanitizeMultiKeyResourceName always carry the
-// prefix; anything else is returned unchanged.
-func stripResourceNamePrefix(label string) string {
-	return strings.TrimPrefix(label, utils.ResourceNamePrefix)
-}

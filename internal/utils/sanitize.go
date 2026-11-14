@@ -103,3 +103,14 @@ func SanitizeVariableName(name string) string {
 	}
 	return b.String()
 }
+
+// BareResourceName strips the resource-label prefix from a sanitized
+// Terraform resource label, yielding the bare encoded name for use as a
+// component of derived identifiers (variable names, disambiguation hints).
+// Unprefixed input is returned unchanged. This is the single canonical strip
+// point — code deriving identifiers from labels (connector property
+// variables, schema-driven variable extraction) must use it instead of
+// trimming the prefix ad hoc.
+func BareResourceName(label string) string {
+	return strings.TrimPrefix(label, ResourceNamePrefix)
+}
