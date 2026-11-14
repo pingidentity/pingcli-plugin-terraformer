@@ -380,3 +380,48 @@ func TestDisambiguateName(t *testing.T) {
 	_, stillFree := claimed[got3]
 	assert.False(t, stillFree)
 }
+
+// Variable names derive from the resource LABEL (pingcli__ prefix stripped),
+// not the raw API name — labels are unique per resource, so names are unique
+// even for API-permitted same-named resources (flow-context DaVinci
+// variables, #166). Matches connector property variable naming.
+func TestExtract_VariableNameFromLabel(t *testing.T) {
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Platform:     "pingone",
+			ResourceType: "pingone_davinci_variable",
+		},
+		Attributes: []schema.AttributeDefinition{
+			{Name: "value", TerraformName: "value", Type: "string", VariableEligible: true},
+		},
+		Variables: schema.VariableDefinition{
+			EligibleAttributes: []schema.VariableRule{
+				{AttributePath: "value", VariablePrefix: "davinci_variable_"},
+			},
+		},
+	}
+	ext := NewVariableExtractor(testRegistry(def))
+	data := map[string]interface{}{"value": "x"}
+
+	// Label carries the pingcli__ prefix (as rd.Label does); it is stripped.
+	vars, err := ext.Extract("pingone_davinci_variable", data,
+		"pingcli__flowContextVarA_flow_flowB")
+	require.NoError(t, err)
+	require.Len(t, vars, 1)
+	assert.Equal(t, "davinci_variable_flowContextVarA_flow_flowB_value", vars[0].VariableName)
+
+	// Same-named resources with different labels derive distinct names
+	// without any disambiguation suffix.
+	vars2, err := ext.Extract("pingone_davinci_variable", data,
+		"pingcli__flowContextVarA_flow_flowA")
+	require.NoError(t, err)
+	require.Len(t, vars2, 1)
+	assert.Equal(t, "davinci_variable_flowContextVarA_flow_flowA_value", vars2[0].VariableName)
+	assert.NotEqual(t, vars[0].VariableName, vars2[0].VariableName)
+
+	// Unprefixed input (older callers/tests) is unchanged.
+	vars3, err := ext.Extract("pingone_davinci_variable", data, "my_var")
+	require.NoError(t, err)
+	require.Len(t, vars3, 1)
+	assert.Equal(t, "davinci_variable_my_var_value", vars3[0].VariableName)
+}

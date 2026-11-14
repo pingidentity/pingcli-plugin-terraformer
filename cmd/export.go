@@ -348,7 +348,7 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatf
 		// so the formatter renders var.X expressions instead of raw values.
 		for _, rd := range erd.Resources {
 			// Schema-driven variable extraction (variable_eligible attributes).
-			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Name)
+			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Label)
 			if extErr != nil {
 				return fmt.Errorf("extract variables %s: %w", erd.ResourceType, extErr)
 			}

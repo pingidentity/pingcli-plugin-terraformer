@@ -26,6 +26,13 @@ func NewVariableExtractor(registry *schema.Registry) *VariableExtractor {
 //
 // data is the processed attribute map (attribute name -> value).
 // resourceName is the sanitized Terraform resource label.
+//
+// Variable names are derived from the resource label (with the "pingcli__"
+// prefix stripped), matching connector property variables: the label is
+// unique per resource, so derived variable names are unique too — including
+// for API-permitted same-named resources such as flow-context DaVinci
+// variables (#166). The raw API name would collide for those, which is why
+// it is no longer used.
 func (e *VariableExtractor) Extract(
 	resourceType string,
 	data map[string]interface{},
@@ -82,11 +89,14 @@ func (e *VariableExtractor) Extract(
 			VariableType:  inferTerraformType(attr.Type),
 		}
 
-		// Derive variable name.
+		// Derive variable name from the resource label, prefix-stripped.
+		// The label is unique per resource, so the derived name is unique —
+		// unlike the raw API name, which collides for API-permitted
+		// same-named resources (flow-context DaVinci variables, #166).
 		if hasRule && rule.VariablePrefix != "" {
-			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + resourceName + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + stripResourceNamePrefix(resourceName) + "_" + tfName)
 		} else {
-			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + resourceName + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + stripResourceNamePrefix(resourceName) + "_" + tfName)
 		}
 
 		// Apply rule overrides.
@@ -179,4 +189,14 @@ func DisambiguateName(baseName, resourceLabel string, claimed map[string]string)
 		}
 		candidate = candidate + "_x"
 	}
+}
+
+// stripResourceNamePrefix removes the "pingcli__" resource-label prefix so
+// variable names derived from labels do not embed it
+// (davinci_variable_flowContextVarA_flow_flowB_value, not
+// davinci_variable_pingcli__flowContextVarA_..._value). Labels produced by
+// utils.SanitizeResourceName/SanitizeMultiKeyResourceName always carry the
+// prefix; anything else is returned unchanged.
+func stripResourceNamePrefix(label string) string {
+	return strings.TrimPrefix(label, utils.ResourceNamePrefix)
 }

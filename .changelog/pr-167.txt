@@ -9,3 +9,7 @@ Note: flow-context variable labels change in this release (they gain a `_flow_<f
 ```release-note:bug
 Exported Terraform variable names are now unique across resources: when two distinct resources would derive the same variable name (previously possible for same-named flow-context DaVinci variables), the second resource's variables gain a suffix built from its Terraform resource label. This only affects exports that previously failed with a duplicate-label error; existing successful exports produce byte-identical output.
 ```
+
+```release-note:breaking-change
+Extracted Terraform variable names are now derived from the resource's Terraform label (with the `pingcli__` prefix stripped) instead of the raw API resource name — matching connector property variables. For DaVinci variables this changes names from e.g. `davinci_variable_agreementId_value` to `davinci_variable_agreementId_flowInstance_value` (the label components are included). Re-export your configuration and update any checked-in `.tfvars` files or scripts that reference the old variable names. The new names are unique per resource by construction, including for API-permitted same-named flow-context variables.
+```
