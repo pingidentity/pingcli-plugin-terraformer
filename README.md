@@ -146,7 +146,6 @@ pingcli-terraformer export --out ./output
 | `--module-dir` | `ping-export-module` | Child module directory name |
 | `--include-values` | `false` | Populate variable values from API |
 | `--include-imports` | `false` | Generate import blocks in root module |
-| `--skip-imports` | `false` | Skip generating import blocks |
 | `--skip-dependencies` | `false` | Use hardcoded UUIDs instead of references |
 | `--include-resources` | - | Include resources matching glob/regex pattern (repeatable) |
 | `--exclude-resources` | - | Exclude resources matching glob/regex pattern (repeatable) |
