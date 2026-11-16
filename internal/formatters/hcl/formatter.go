@@ -654,8 +654,10 @@ func terraformName(attrDef schema.AttributeDefinition) string {
 
 // resourceLabel derives the sanitized HCL resource label from resource data.
 // If the schema defines label_fields, it collects those attribute values in
-// order and calls utils.SanitizeMultiKeyResourceName. Otherwise it falls back
-// to utils.SanitizeResourceName applied to data.Name, or data.ID as a last resort.
+// order (dot-paths through nested object attributes supported, matching
+// core.terraformLabel) and calls utils.SanitizeMultiKeyResourceName. Otherwise
+// it falls back to utils.SanitizeResourceName applied to data.Name, or data.ID
+// as a last resort.
 func resourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) string {
 	if data.Label != "" {
 		return data.Label
@@ -663,10 +665,8 @@ func resourceLabel(data *core.ResourceData, def *schema.ResourceDefinition) stri
 	if len(def.API.LabelFields) > 0 {
 		keys := make([]string, 0, len(def.API.LabelFields))
 		for _, field := range def.API.LabelFields {
-			if v, ok := data.Attributes[field]; ok && v != nil {
-				if s, ok := v.(string); ok && s != "" {
-					keys = append(keys, s)
-				}
+			if s := core.LabelFieldValue(data.Attributes, field, nil); s != "" {
+				keys = append(keys, s)
 			}
 		}
 		if len(keys) > 0 {

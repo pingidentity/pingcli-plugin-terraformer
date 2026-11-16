@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+// ResourceNamePrefix is the prefix added to every sanitized Terraform resource
+// label by SanitizeResourceName and SanitizeMultiKeyResourceName. Exported so
+// consumers that embed one label inside another (e.g. #166's graph-resolved
+// label_fields segments) can strip it instead of duplicating the constant.
+const ResourceNamePrefix = "pingcli__"
+
 // SanitizeResourceName converts a resource name to a valid Terraform resource name
 // using the same logic as pingcli's ImportBlock.Sanitize() method.
 // This ensures consistency between the converter and pingcli export functionality.
@@ -26,7 +32,7 @@ func SanitizeResourceName(name string) string {
 		return fmt.Sprintf("-%04X-", s)
 	})
 	// Prefix resource names with pingcli__ (8 chars: "pingcli_")
-	return "pingcli__" + name
+	return ResourceNamePrefix + name
 }
 
 // SanitizeMultiKeyResourceName creates a unique resource name by combining multiple key components.
@@ -48,7 +54,7 @@ func SanitizeResourceName(name string) string {
 //   - Future resources with composite keys
 func SanitizeMultiKeyResourceName(keys ...string) string {
 	if len(keys) == 0 {
-		return "pingcli__"
+		return ResourceNamePrefix
 	}
 
 	// Sanitize each key individually
@@ -60,7 +66,7 @@ func SanitizeMultiKeyResourceName(keys ...string) string {
 	}
 
 	// Join with underscores and prefix
-	return fmt.Sprintf("pingcli__%s", strings.Join(sanitizedKeys, "_"))
+	return fmt.Sprintf("%s%s", ResourceNamePrefix, strings.Join(sanitizedKeys, "_"))
 }
 
 // SanitizeVariableResourceName creates a unique resource name for DaVinci variables
@@ -96,4 +102,15 @@ func SanitizeVariableName(name string) string {
 		}
 	}
 	return b.String()
+}
+
+// BareResourceName strips the resource-label prefix from a sanitized
+// Terraform resource label, yielding the bare encoded name for use as a
+// component of derived identifiers (variable names, disambiguation hints).
+// Unprefixed input is returned unchanged. This is the single canonical strip
+// point — code deriving identifiers from labels (connector property
+// variables, schema-driven variable extraction) must use it instead of
+// trimming the prefix ad hoc.
+func BareResourceName(label string) string {
+	return strings.TrimPrefix(label, ResourceNamePrefix)
 }

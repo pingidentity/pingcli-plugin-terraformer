@@ -1,0 +1,15 @@
+```release-note:bug
+The DaVinci variable exporter now includes the owning flow in the Terraform resource label of flow-context variables (`label_fields: [name, context, flow.id@pingone_davinci_flow]`). The DaVinci API permits the same variable name on different flows (uniqueness domain is name + context + flow), so two such variables previously produced identical labels and the export failed with a duplicate-label error. Labels of company- and flowInstance-context variables are unchanged.
+
+Duplicate Terraform labels on any resource type are now disambiguated with a deterministic `_2`, `_3`, … suffix (ordered by resource ID, stable across exports) instead of aborting the export, with a warning listing the affected resources. This covers legacy environments that contain pre-existing duplicate variables (e.g. duplicate `cancelUrl`-style flowInstance variables created before the API enforced name uniqueness) — see issue #166.
+
+Note: flow-context variable labels change in this release (they gain a `_flow_<flow-label>` segment (the owning flow's exported resource name, e.g. `_flow_My-0020-Flow`)). Exports that previously failed on duplicate labels now succeed; no other existing labels change.
+```
+
+```release-note:bug
+Exported Terraform variable names are now unique across resources: when two distinct resources would derive the same variable name (previously possible for same-named flow-context DaVinci variables), the second resource's variables gain a suffix built from its Terraform resource label. This only affects exports that previously failed with a duplicate-label error; existing successful exports produce byte-identical output.
+```
+
+```release-note:breaking-change
+Extracted Terraform variable names are now derived from the resource's Terraform label (with the `pingcli__` prefix stripped) instead of the raw API resource name — matching connector property variables. For DaVinci variables this changes names from e.g. `davinci_variable_agreementId_value` to `davinci_variable_agreementId_flowInstance_value` (the label components are included). Re-export your configuration and update any checked-in `.tfvars` files or scripts that reference the old variable names. The new names are unique per resource by construction, including for API-permitted same-named flow-context variables.
+```

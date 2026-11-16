@@ -331,14 +331,51 @@ func (c *ExportCommand) exportAsModule(ctx context.Context, client *pingoneplatf
 	var allImportBlocks []module.ImportBlock
 	var allVariables []module.Variable
 
+	// Tracks claimed Terraform variable names to their owning resource
+	// instance (resource type + API ID). Two distinct resources may derive
+	// the same variable name (e.g. two same-named flow-context DaVinci
+	// variables, which the API permits — see #166); the second owner
+	// disambiguates using its unique Terraform label so both variables and
+	// their injected var.X references stay consistent.
+	type varClaim struct {
+		ownerKey  string
+		variables map[int]string // index into extracted slice -> final name
+	}
+	claimedVarNames := make(map[string]string) // variable name -> owner key
+
 	for _, erd := range result.ResourcesByType {
 		// Extract variables FIRST and inject references into resource attributes
 		// so the formatter renders var.X expressions instead of raw values.
 		for _, rd := range erd.Resources {
 			// Schema-driven variable extraction (variable_eligible attributes).
-			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Name)
+			extracted, extErr := varExtractor.Extract(erd.ResourceType, rd.Attributes, rd.Label)
 			if extErr != nil {
 				return fmt.Errorf("extract variables %s: %w", erd.ResourceType, extErr)
+			}
+
+			// Disambiguate variable names claimed by a different resource
+			// instance: two same-named resources (API-permitted for flow-
+			// context DaVinci variables) would otherwise emit duplicate
+			// tfvars entries and cross-wired var.X references. The suffix
+			// is the resource's unique Terraform label — stable across
+			// exports, unlike the API ID.
+			ownerKey := erd.ResourceType + ":" + rd.ID
+			renames := make(map[int]string)
+			for i, ev := range extracted {
+				if claimedBy, exists := claimedVarNames[ev.VariableName]; exists && claimedBy != ownerKey {
+					finalName := variables.DisambiguateName(ev.VariableName, rd.Label, claimedVarNames)
+					claimedVarNames[finalName] = ownerKey
+					renames[i] = finalName
+				} else if !exists {
+					claimedVarNames[ev.VariableName] = ownerKey
+				}
+			}
+
+			for i, ev := range extracted {
+				if final, renamed := renames[i]; renamed {
+					ev.VariableName = final
+					extracted[i] = ev
+				}
 			}
 
 			for _, ev := range extracted {

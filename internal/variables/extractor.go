@@ -26,6 +26,13 @@ func NewVariableExtractor(registry *schema.Registry) *VariableExtractor {
 //
 // data is the processed attribute map (attribute name -> value).
 // resourceName is the sanitized Terraform resource label.
+//
+// Variable names are derived from the resource label (with the "pingcli__"
+// prefix stripped), matching connector property variables: the label is
+// unique per resource, so derived variable names are unique too — including
+// for API-permitted same-named resources such as flow-context DaVinci
+// variables (#166). The raw API name would collide for those, which is why
+// it is no longer used.
 func (e *VariableExtractor) Extract(
 	resourceType string,
 	data map[string]interface{},
@@ -82,11 +89,14 @@ func (e *VariableExtractor) Extract(
 			VariableType:  inferTerraformType(attr.Type),
 		}
 
-		// Derive variable name.
+		// Derive variable name from the resource label, prefix-stripped.
+		// The label is unique per resource, so the derived name is unique —
+		// unlike the raw API name, which collides for API-permitted
+		// same-named resources (flow-context DaVinci variables, #166).
 		if hasRule && rule.VariablePrefix != "" {
-			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + resourceName + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(rule.VariablePrefix + utils.BareResourceName(resourceName) + "_" + tfName)
 		} else {
-			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + resourceName + "_" + tfName)
+			ev.VariableName = utils.SanitizeVariableName(resourceType + "_" + utils.BareResourceName(resourceName) + "_" + tfName)
 		}
 
 		// Apply rule overrides.
@@ -160,3 +170,24 @@ func unwrapTypeDiscriminatedBlock(value interface{}) interface{} {
 func expandDescription(template, resourceName string) string {
 	return strings.ReplaceAll(template, "{name}", resourceName)
 }
+
+// DisambiguateName returns a unique Terraform variable name for a resource
+// whose derived name was already claimed by a different resource instance.
+// The suffix is the resource's unique Terraform label — stable across
+// exports, unlike the API ID. Used by the export command when two distinct
+// resources derive the same base name (e.g. two same-named flow-context
+// DaVinci variables, which the API permits — see #166).
+//
+// claimed maps every currently claimed variable name to its owning resource
+// instance key; the caller registers both the original and the returned name.
+func DisambiguateName(baseName, resourceLabel string, claimed map[string]string) string {
+	suffix := utils.SanitizeVariableName(resourceLabel)
+	candidate := baseName + "_" + suffix
+	for {
+		if _, exists := claimed[candidate]; !exists {
+			return candidate
+		}
+		candidate = candidate + "_x"
+	}
+}
+
