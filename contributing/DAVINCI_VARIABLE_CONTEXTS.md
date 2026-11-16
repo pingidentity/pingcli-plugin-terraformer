@@ -163,6 +163,39 @@ proven fact.
    label when two distinct resources would derive the same name — same
    collision class, same trigger set.
 
+## Failure mode: `value.string must be set` on exported string variables
+
+Exported `pingone_davinci_variable` blocks whose `value` renders as
+`json_object` on a `data_type = "string"` variable fail provider
+validation:
+
+```
+The `value.string` attribute must be set when `data_type` is set to `string`
+```
+
+**Cause is upstream data, not the exporter's conditional logic.** The
+`value` block key follows the value's runtime type (the
+`type_discriminated_block` `type_key_map` in `variable.yaml`): a scalar
+string renders as `string`, a map renders as `json_object`. A
+string-typed variable holding an **object-wrapped** value — e.g.
+`{"string": "abcd"}` instead of `"abcd"` — therefore exports as
+`json_object` and the provider rejects it.
+
+Known way this state arises: writing an object-shaped `value` through the
+variables API (PUT/POST with `{"value": {"string": ...}}` nesting
+mistakes), which the API stores verbatim instead of unwrapping. Observed
+2026-11 on variable `flowInstanceVarA` in the #166 test environment after
+an exploratory PUT.
+
+**Diagnosis**: `GET /environments/{id}/variables` and check the `value`
+shape — scalar string is healthy; `{"string": ...}` is the corruption.
+
+**Fix**: scalar `PUT` of the value (e.g. `{"value": "abcd"}`), then
+re-export. The exporter deliberately does not coerce `{"string": x}`
+maps to `x` for string-typed variables — that would silently paper over
+corrupted upstream data; the provider validation error is the honest
+signal.
+
 ## Open questions
 
 1. Legacy DaVinci API duplicate-creation behavior (see above).
