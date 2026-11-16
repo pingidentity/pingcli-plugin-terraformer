@@ -120,7 +120,6 @@ Current matrix entries:
 | `default-hcl` | hcl | no | no | no | no |
 | `hcl-skip-deps` | hcl | yes | no | no | no |
 | `hcl-include-all` | hcl | no | no | yes | yes |
-| `hcl-skip-imports` | hcl | no | yes | no | no |
 | `default-tfjson` | tfjson | no | no | no | no |
 | `tfjson-skip-deps` | tfjson | yes | no | no | no |
 
