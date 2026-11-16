@@ -1,0 +1,11 @@
+```release-note:new-resource
+`resource/pingone_branding_theme_default`: Added export support
+```
+
+```release-note:new-resource
+`resource/pingone_form`: Added export support
+```
+
+```release-note:new-resource
+`resource/pingone_notification_template_content`: Added export support. Predefined default template contents (read-only in the provider) are filtered from the export.
+```

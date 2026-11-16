@@ -19,7 +19,7 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 | `pingone_alert_channel` | ❌ |
 | `pingone_branding_settings` | ❌ |
 | `pingone_branding_theme` | ✅ |
-| `pingone_branding_theme_default` | ❌ |
+| `pingone_branding_theme_default` | ✅ |
 | `pingone_certificate` | ❌ |
 | `pingone_certificate_signing_response` | ❌ |
 | `pingone_custom_domain` | ❌ |
@@ -27,7 +27,7 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 | `pingone_custom_domain_verify` | ❌ |
 | `pingone_custom_role` | ❌ |
 | `pingone_environment` | ✅ |
-| `pingone_form` | ❌ |
+| `pingone_form` | ✅ |
 | `pingone_forms_recaptcha_v2` | ❌ |
 | `pingone_gateway` | ❌ |
 | `pingone_gateway_credential` | ❌ |
@@ -42,7 +42,7 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 | `pingone_notification_policy` | ❌ |
 | `pingone_notification_settings` | ❌ |
 | `pingone_notification_settings_email` | ❌ |
-| `pingone_notification_template_content` | ❌ |
+| `pingone_notification_template_content` | ✅ |
 | `pingone_phone_delivery_settings` | ❌ |
 | `pingone_rate_limit_configuration` | ❌ |
 | `pingone_role_assignment_user` | ❌ |
@@ -147,14 +147,14 @@ Legend: ✅ Supported · ❌ Not yet supported · 🚫 Out of scope (not planned
 
 | Category | Provider total | Exporter supported |
 |---|---|---|
-| Platform | 41 | 2 |
+| Platform | 41 | 5 |
 | SSO | 29 | 20 |
 | Authorize | 7 | 0 |
 | MFA | 5 | 0 |
 | DaVinci | 9 | 7 |
 | Protect | 2 | 0 |
 | Neo (Verify & Credentials) | 7 | 0 |
-| **Total** | **100** | **29** |
+| **Total** | **100** | **32** |
 
 > `pingone_user`, `pingone_user_application_role_assignment`, and `pingone_user_group_assignment` are marked out of scope — they represent individual end-user identity data, not promotable environment configuration, so they are intentionally excluded from export.
 

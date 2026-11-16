@@ -1,0 +1,186 @@
+# PingOne Notification Template Content Resource Definition
+#
+# Localized notification content per (template, delivery method, locale,
+# optional variant). The API lists contents per template name; the handler
+# scans all 16 EnumTemplateName values (list-then-scan).
+#
+# Bootstrap filtering (skill Phase 1a.5): every environment ships predefined
+# default contents (Default == true) that the provider cannot manage —
+# `pingone_notification_template_content` errors when importing them, and
+# their text is read-only. The handler drops them and keeps only
+# environment-authored custom contents (Default == false/absent), keeping
+# warnings out of the loop (deterministic, structural, per-environment-
+# independent exclusion).
+#
+# The union unwrap: TemplateContent is a type-discriminated union
+# (email/push/sms/voice); each variant carries the common envelope
+# (locale, delivery_method, variant, default) plus method-specific fields.
+# The projection exposes all variants' fields as separate optional
+# one-of-style attribute groups; exactly one group is populated per
+# resource, mirroring the provider's exactly-one-of schema.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_notification_template_content
+  api_type: TemplateContent
+  name: PingOne Notification Template Content
+  short_name: notification_template_content
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: TemplateContent
+  list_method: NotificationsTemplatesApi.ReadAllTemplateContents
+  get_method: NotificationsTemplatesApi.ReadOneContent
+  id_field: id
+  name_field: id
+  pagination_type: cursor
+  label_fields:
+    - template_name
+    - locale
+  additional_id_fields:
+    - template_name
+    - locale
+    - variant
+  allow_duplicate_labels: false
+
+attributes:
+  # ID - the content's ID (unique per environment)
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: EnvironmentID
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # TemplateName - which notification template this content belongs to
+  - name: TemplateName
+    terraform_name: template_name
+    type: string
+    source_path: TemplateName
+    required: true
+
+  # Locale - ISO language code; immutable after creation
+  - name: Locale
+    terraform_name: locale
+    type: string
+    source_path: Locale
+    required: true
+
+  # DeliveryMethod - email/push/sms/voice (informational; the populated
+  # one-of group below mirrors it)
+  - name: DeliveryMethod
+    terraform_name: delivery_method
+    type: string
+    source_path: DeliveryMethod
+    computed: true
+
+  # Default - whether this is a predefined read-only default (handler
+  # filters these out; computed for completeness)
+  - name: Default
+    terraform_name: default
+    type: bool
+    source_path: Default
+    computed: true
+
+  # Variant - custom-content variant name (optional; absent on plain
+  # custom contents)
+  - name: Variant
+    terraform_name: variant
+    type: string
+    source_path: Variant
+
+  # ---- email group ----
+  - name: EmailBody
+    terraform_name: email_body
+    type: string
+    source_path: EmailBody
+    variable_eligible: true
+
+  - name: EmailSubject
+    terraform_name: email_subject
+    type: string
+    source_path: EmailSubject
+
+  - name: EmailFromAddress
+    terraform_name: email_from_address
+    type: string
+    source_path: EmailFromAddress
+
+  - name: EmailFromName
+    terraform_name: email_from_name
+    type: string
+    source_path: EmailFromName
+
+  - name: EmailReplyToAddress
+    terraform_name: email_reply_to_address
+    type: string
+    source_path: EmailReplyToAddress
+
+  - name: EmailReplyToName
+    terraform_name: email_reply_to_name
+    type: string
+    source_path: EmailReplyToName
+
+  - name: EmailCharset
+    terraform_name: email_charset
+    type: string
+    source_path: EmailCharset
+
+  - name: EmailContentType
+    terraform_name: email_content_type
+    type: string
+    source_path: EmailContentType
+
+  # ---- push group ----
+  - name: PushTitle
+    terraform_name: push_title
+    type: string
+    source_path: PushTitle
+
+  - name: PushBody
+    terraform_name: push_body
+    type: string
+    source_path: PushBody
+
+  # ---- sms group ----
+  - name: SMSContent
+    terraform_name: sms_content
+    type: string
+    source_path: SMSContent
+
+  - name: SMSSender
+    terraform_name: sms_sender
+    type: string
+    source_path: SMSSender
+
+  # ---- voice group ----
+  - name: VoiceContent
+    terraform_name: voice_content
+    type: string
+    source_path: VoiceContent
+
+  - name: VoiceType
+    terraform_name: voice_type
+    type: string
+    source_path: VoiceType
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: EnvironmentID
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

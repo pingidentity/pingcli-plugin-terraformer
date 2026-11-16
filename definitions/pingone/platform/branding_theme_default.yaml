@@ -1,0 +1,76 @@
+# PingOne Branding Theme Default Resource Definition
+#
+# The environment's active branding theme. The API models this as the
+# `default` flag on each branding theme (PUT
+# /environments/{envID}/branding/themes/{themeID}/default), and the provider
+# models it as its own `pingone_branding_theme_default` resource scoped to
+# one theme. The exporter derives it from the themes list: one derived
+# resource per theme whose Default flag is true, keyed by the theme's ID.
+#
+# Only one theme can be default per environment, so this type exports zero
+# or one instance.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_branding_theme_default
+  api_type: BrandingThemeDefault
+  name: PingOne Branding Theme Default
+  short_name: branding_theme_default
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: BrandingThemeDefault
+  list_method: BrandingThemesApi.ReadBrandingThemes
+  get_method: BrandingThemesApi.ReadBrandingThemeDefault
+  id_field: id
+  name_field: id
+  pagination_type: cursor
+  allow_duplicate_labels: true
+
+attributes:
+  # ID - the owning theme's ID (the default-assignment has no ID of its own;
+  # the provider imports it as <environment_id> and keys off the theme).
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # BrandingThemeID - the activated theme. Rendered as a resolved reference
+  # to the pingone_branding_theme resource with the matching ID.
+  - name: ThemeId
+    terraform_name: branding_theme_id
+    type: string
+    source_path: Id
+    required: true
+    references_type: pingone_branding_theme
+    reference_field: id
+
+  # Default - computed confirmation flag from the API response
+  - name: Default
+    terraform_name: default
+    type: bool
+    source_path: Default
+    computed: true
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}"
+
+variables:
+  eligible_attributes: []
