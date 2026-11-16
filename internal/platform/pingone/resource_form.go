@@ -174,10 +174,12 @@ func hclKey(k string) string {
 var bareIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // writeHCLValue writes one value: objects recursively, escaped-JSON slate
-// strings as jsonencode(<original JSON>) — the API value IS JSON text, so
-// the expression re-parses it into the object the provider stores — and
-// everything else as a JSON literal (JSON scalars are valid HCL literals;
-// json.Marshal provides the quoting).
+// strings re-parsed and emitted as jsonencode(<the JSON object>) — the API
+// value IS JSON text, and jsonencode() of the parsed object produces the
+// same shape the provider's examples use; marshaling the string instead
+// would double-encode it (issue: slate labels rendered mangled in the UI) —
+// and everything else as a JSON literal (JSON scalars are valid HCL
+// literals; json.Marshal provides the quoting).
 func writeHCLValue(buf *strings.Builder, v interface{}, indent string) error {
 	switch val := v.(type) {
 	case map[string]interface{}:
@@ -203,13 +205,40 @@ func writeHCLValue(buf *strings.Builder, v interface{}, indent string) error {
 		buf.WriteString("]")
 		return nil
 	case string:
+		if looksLikeSlateJSON(val) {
+			// The API value is itself JSON text (Slate rich text: label,
+			// content, labelPasswordVerify). Emit it verbatim inside
+			// jsonencode(...) so HCL re-parses it into the object the
+			// provider stores — jsonencode([{"type":...}]) in the provider's
+			// examples. Marshaling the string first (jsonencode("[{\"type..")
+			// double-encodes: the provider stores an escaped literal blob and
+			// the UI shows mangled text.
+			//
+			// The API value must parse as JSON for this path; re-marshal the
+			// decoded value so the emitted expression is canonical (compacted,
+			// no leading whitespace) rather than trusting the raw text's
+			// formatting. Anything that fails to parse stays a quoted string.
+			var decoded interface{}
+			if err := json.Unmarshal([]byte(val), &decoded); err != nil {
+				// Unreachable for looksLikeSlateJSON inputs in practice; fall
+				// back to the quoted string rather than emitting broken HCL.
+				b, mErr := json.Marshal(val)
+				if mErr != nil {
+					return mErr
+				}
+				buf.Write(b)
+				return nil
+			}
+			b, err := json.Marshal(decoded)
+			if err != nil {
+				return err
+			}
+			buf.WriteString("jsonencode(" + string(b) + ")")
+			return nil
+		}
 		b, err := json.Marshal(val)
 		if err != nil {
 			return err
-		}
-		if looksLikeSlateJSON(val) {
-			buf.WriteString("jsonencode(" + string(b) + ")")
-			return nil
 		}
 		buf.Write(b)
 		return nil
