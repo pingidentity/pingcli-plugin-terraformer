@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -206,8 +207,17 @@ func walkAndProcessPath(
 		if segment == "*" {
 			// Wildcard: process all keys in this map. The map key itself
 			// becomes (part of) the disambiguation hint for whatever is
-			// found beneath it.
+			// found beneath it. Keys are processed in sorted order so the
+			// fallback-variable allocator's base-name/suffix assignment is
+			// deterministic — Go map iteration order is randomized, and
+			// which key processed first would otherwise decide which one
+			// claims the unsuffixed base variable name.
+			keys := make([]string, 0, len(typedCurrent))
 			for key := range typedCurrent {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
 				nextValue := typedCurrent[key]
 				nextTraversalKey := key
 				if traversalKey != "" {

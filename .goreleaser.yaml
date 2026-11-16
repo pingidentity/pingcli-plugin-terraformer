@@ -26,16 +26,21 @@ checksum:
   split: false
   disable: false
 
-brews:
+homebrew_casks:
   - commit_author:
       name: "goreleaserbot"
       email: "bot@goreleaser.com"
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    directory: "Formula"
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
     homepage: "https://github.com/pingidentity/pingcli-plugin-terraformer"
     description: "Ping CLI plugin for converting PingOne DaVinci flows to Terraform HCL"
     license: "Apache License 2.0"
     skip_upload: "auto"
+    hooks:
+      post:
+        install: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/pingcli-terraformer"]
+          end
     repository:
       owner: "pingidentity"
       name: "homebrew-tap"

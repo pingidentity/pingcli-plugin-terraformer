@@ -1,0 +1,3 @@
+```release-note:internal
+release: Replace deprecated brews config with homebrew_casks
+```

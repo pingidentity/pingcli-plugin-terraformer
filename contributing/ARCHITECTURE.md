@@ -222,7 +222,11 @@ type APIDefinition struct {
 }
 ```
 
-- `LabelFields`: Ordered list of terraform attribute names combined to produce the HCL resource label. The combined label is passed through `utils.SanitizeResourceName()` to generate a valid Terraform resource name. Falls back to the `name_field` value when empty.
+- `LabelFields`: Ordered list of terraform attribute names combined to produce the HCL resource label. Each field may be:
+  - a plain attribute name (`context`) — its string value;
+  - a dot-path into nested object attributes (`flow.id`) — the nested value;
+  - a dot-path with a referenced type (`flow.id@pingone_davinci_flow`) — the value at the path is a UUID; the segment resolves to the target resource's Terraform label via the dependency graph, with the `pingcli__` prefix stripped. This keeps labels environment-portable (name-derived, never UUID-derived — the same principle as the fallback-variable allocator). Requires the graph; types process in topological order, so a dependent type's labels resolve against targets already added to the graph. Unresolvable references (absent value, filtered target, nil graph) skip the segment.
+  The combined label is passed through `utils.SanitizeMultiKeyResourceName()` to generate a valid Terraform resource name. Falls back to the `name_field` value when empty. Duplicate labels never abort the export: they are disambiguated with deterministic `_2`, `_3`, … suffixes (resources sorted by stable API ID) and reported as a warning (see #166).
 - `AllowDuplicateLabels`: Skips unique label validation for resource types where the upstream system permits duplicate names (e.g., flow policies).
 
 ### AttributeDefinition

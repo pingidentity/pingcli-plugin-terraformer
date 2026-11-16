@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSanitizeResourceName(t *testing.T) {
@@ -233,4 +234,13 @@ func TestSanitizeVariableName(t *testing.T) {
 			t.Errorf("SanitizeVariableName(%q) = %q, expected %q", tt.in, result, tt.out)
 		}
 	}
+}
+
+func TestBareResourceName(t *testing.T) {
+	assert.Equal(t, "Customer", utils.BareResourceName("pingcli__Customer"))
+	assert.Equal(t, "My-0020-Flow", utils.BareResourceName("pingcli__My-0020-Flow"))
+	assert.Equal(t, "unprefixed", utils.BareResourceName("unprefixed"))
+	assert.Equal(t, "", utils.BareResourceName(""))
+	// Only the canonical prefix is stripped.
+	assert.Equal(t, "pingcli_prefix_but_wrong", utils.BareResourceName("pingcli_prefix_but_wrong"))
 }
