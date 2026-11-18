@@ -265,6 +265,13 @@ func looksLikeSlateJSON(s string) bool {
 // variant-specific property without enumerating all 24 types by hand.
 // The "type" discriminator rides along, giving the emitted HCL the same
 // variant-tagged shape the provider reads.
+//
+// Keys are rewritten from the API's camelCase JSON tags to the provider's
+// snake_case attribute names (providerToAPIKeys / providerFormKeys): the
+// provider's components.fields object type declares snake_case attributes
+// only, so a camelCase key is not an attribute at all — terraform core
+// drops it before any validator runs (silently for optional fields, a
+// "field is required" error for required ones like input_type).
 func projectFormField(field *management.FormField) map[string]interface{} {
 	if field == nil {
 		return nil
@@ -281,5 +288,94 @@ func projectFormField(field *management.FormField) map[string]interface{} {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil
 	}
-	return m
+	return remapFormFieldKeys(m)
+}
+
+// providerFormKeys maps the Forms API's camelCase JSON tags to the
+// provider's snake_case component-field attribute names. The list is the
+// complete set of multi-word keys across every form-field variant struct,
+// the agreement sub-object, and the button/link styles sub-object
+// (model_form_field_*.go, model_form_agreement_all_of_agreement.go,
+// model_form_flow_*_styles.go — json tags). The provider's
+// components.fields schema (terraform-provider-pingone
+// resource_form.go formComponentsFieldsTFObjectTypes and the nested
+// styles/agreement object types) declares snake_case names only.
+//
+// Nested objects (styles, agreement, padding, position, validation,
+// visibility, options) are remapped recursively — their keys carry the
+// same API camelCase spelling and the same provider snake_case names.
+var providerFormKeys = map[string]string{
+	"attributeDisabled":                        "attribute_disabled",
+	"backgroundColor":                          "background_color",
+	"borderColor":                              "border_color",
+	"countryCodeLabel":                         "country_code_label",
+	"defaultCountryCode":                       "default_country_code",
+	"displayDefaultThemeButtonBackgroundColor": "display_default_theme_button_background_color",
+	"displayDefaultThemeButtonBorderColor":     "display_default_theme_button_border_color",
+	"displayDefaultThemeButtonTextColor":       "display_default_theme_button_text_color",
+	"displayDefaultThemeLinkColor":             "display_default_theme_link_color",
+	"errorMessage":                             "error_message",
+	"extensionLabel":                           "extension_label",
+	"fallbackText":                             "fallback_text",
+	"iconSrc":                                  "icon_src",
+	"idpEnabled":                               "idp_enabled",
+	"idpId":                                    "idp_id",
+	"idpName":                                  "idp_name",
+	"idpType":                                  "idp_type",
+	"inputType":                                "input_type",
+	"labelMode":                                "label_mode",
+	"labelPasswordVerify":                      "label_password_verify",
+	"otherOptionAttributeDisabled":             "other_option_attribute_disabled",
+	"otherOptionEnabled":                       "other_option_enabled",
+	"otherOptionInputLabel":                    "other_option_input_label",
+	"otherOptionKey":                           "other_option_key",
+	"otherOptionLabel":                         "other_option_label",
+	"pollingAppearance":                        "polling_appearance",
+	"showExtension":                            "show_extension",
+	"showPasswordRequirements":                 "show_password_requirements",
+	"textColor":                                "text_color",
+	"titleEnabled":                             "title_enabled",
+	"useDynamicAgreement":                      "use_dynamic_agreement",
+	"validatePhoneNumber":                      "validate_phone_number",
+	"widthUnit":                                "width_unit",
+}
+
+// remapFormFieldKeys rewrites a projected form field's keys (and any nested
+// maps') from API camelCase to provider snake_case. Single-word keys pass
+// through; keys not in the table (type, key, label, content, position, ...)
+// are identical in both spellings.
+func remapFormFieldKeys(m map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		if nk, ok := providerFormKeys[k]; ok {
+			k = nk
+		}
+		// Recurse into nested objects; list entries keep their order but any
+		// object elements inside (options, nested field lists) remap too.
+		switch val := v.(type) {
+		case map[string]interface{}:
+			out[k] = remapFormFieldKeys(val)
+		case []interface{}:
+			out[k] = remapFormFieldSlice(val)
+		default:
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// remapFormFieldSlice remaps object elements of a JSON array.
+func remapFormFieldSlice(s []interface{}) []interface{} {
+	out := make([]interface{}, len(s))
+	for i, v := range s {
+		switch val := v.(type) {
+		case map[string]interface{}:
+			out[i] = remapFormFieldKeys(val)
+		case []interface{}:
+			out[i] = remapFormFieldSlice(val)
+		default:
+			out[i] = v
+		}
+	}
+	return out
 }

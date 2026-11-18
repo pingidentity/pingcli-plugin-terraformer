@@ -74,6 +74,131 @@ func TestHandleFormFieldProjection_NilInput(t *testing.T) {
 	assert.Nil(t, out)
 }
 
+func TestRemapFormFieldKeys_CamelToSnake(t *testing.T) {
+	// Every camelCase key in the table must convert; single-word keys pass
+	// through; unknown keys are left untouched.
+	in := map[string]interface{}{
+		"type":                     "AGREEMENT",
+		"key":                      "agreement",
+		"inputType":                "READ_ONLY_TEXT",
+		"titleEnabled":             true,
+		"pollingAppearance":        "DOTS",
+		"idpName":                  "Sample LinkedIn",
+		"idpType":                  "LINKEDIN_OIDC",
+		"idpId":                    "",
+		"attributeDisabled":        false,
+		"labelMode":                "FLOAT",
+		"labelPasswordVerify":      "[{\"type\":\"paragraph\"}]",
+		"showPasswordRequirements": true,
+		"otherOptionEnabled":       true,
+		"otherOptionKey":           "resend",
+		"validatePhoneNumber":      false,
+		"showExtension":            true,
+		"extensionLabel":           "Ext.",
+		"defaultCountryCode":       "US",
+		"countryCodeLabel":         "Country",
+		"errorMessage":             "bad",
+		"fallbackText":             "scan me",
+		"iconSrc":                  "https://example.com/i.png",
+		"useDynamicAgreement":      true,
+		"widthUnit":                "PIXEL",
+		"unknownCamelKey":          "kept-as-is",
+	}
+	got := remapFormFieldKeys(in)
+
+	want := map[string]interface{}{
+		"type":                       "AGREEMENT",
+		"key":                        "agreement",
+		"input_type":                 "READ_ONLY_TEXT",
+		"title_enabled":              true,
+		"polling_appearance":         "DOTS",
+		"idp_name":                   "Sample LinkedIn",
+		"idp_type":                   "LINKEDIN_OIDC",
+		"idp_id":                     "",
+		"attribute_disabled":         false,
+		"label_mode":                 "FLOAT",
+		"label_password_verify":      "[{\"type\":\"paragraph\"}]",
+		"show_password_requirements": true,
+		"other_option_enabled":       true,
+		"other_option_key":           "resend",
+		"validate_phone_number":      false,
+		"show_extension":             true,
+		"extension_label":            "Ext.",
+		"default_country_code":       "US",
+		"country_code_label":         "Country",
+		"error_message":              "bad",
+		"fallback_text":              "scan me",
+		"icon_src":                   "https://example.com/i.png",
+		"use_dynamic_agreement":      true,
+		"width_unit":                 "PIXEL",
+		"unknownCamelKey":            "kept-as-is",
+	}
+	assert.Equal(t, want, got)
+}
+
+func TestRemapFormFieldKeys_NestedObjectsAndSlices(t *testing.T) {
+	// Styles and agreement are nested objects whose keys carry the same
+	// camelCase API spelling; options is a list of objects.
+	in := map[string]interface{}{
+		"type": "SUBMIT_BUTTON",
+		"styles": map[string]interface{}{
+			"alignment":                          "CENTER",
+			"displayDefaultThemeButtonTextColor": false,
+			"backgroundColor":                    "#69788b",
+			"textColor":                          "#FFF",
+			"borderColor":                        "#000",
+			"widthUnit":                          "PIXEL",
+			"padding": map[string]interface{}{
+				"top": 1,
+			},
+		},
+		"agreement": map[string]interface{}{
+			"useDynamicAgreement": true,
+		},
+		"options": []interface{}{
+			map[string]interface{}{"label": "A", "value": "a"},
+			map[string]interface{}{"label": "B", "value": "b"},
+		},
+	}
+	got := remapFormFieldKeys(in)
+
+	assert.Equal(t, "#69788b", got["styles"].(map[string]interface{})["background_color"])
+	assert.Equal(t, "#FFF", got["styles"].(map[string]interface{})["text_color"])
+	assert.Equal(t, "#000", got["styles"].(map[string]interface{})["border_color"])
+	assert.Equal(t, "PIXEL", got["styles"].(map[string]interface{})["width_unit"])
+	assert.Equal(t, false, got["styles"].(map[string]interface{})["display_default_theme_button_text_color"])
+	assert.Equal(t, 1, got["styles"].(map[string]interface{})["padding"].(map[string]interface{})["top"])
+	assert.Equal(t, true, got["agreement"].(map[string]interface{})["use_dynamic_agreement"])
+	assert.Len(t, got["options"], 2)
+	assert.Equal(t, "A", got["options"].([]interface{})[0].(map[string]interface{})["label"])
+}
+
+func TestHandleFormFieldProjection_EmitsSnakeCaseKeys(t *testing.T) {
+	// End-to-end: an AGREEMENT field projected through the handler must emit
+	// input_type / title_enabled (snake_case) — the provider's declared
+	// attribute names — never the API's camelCase spelling.
+	agreement := management.NewFormFieldFormAgreement(
+		management.ENUMFORMFIELDTYPE_AGREEMENT,
+		*management.NewFormFieldCommonPosition(0, 0),
+		"agreement",
+		management.ENUMFORMAGREEMENTINPUTTYPE_READ_ONLY_TEXT,
+		true,
+	)
+
+	components := management.NewFormComponents([]management.FormField{
+		management.FormFieldFormAgreementAsFormField(agreement),
+	})
+
+	out, err := handleFormFieldProjection(components, nil, &schema.AttributeDefinition{}, nil)
+	require.NoError(t, err)
+
+	s := string(out.(core.RawHCLValue))
+	assert.Contains(t, s, `input_type = "READ_ONLY_TEXT"`)
+	assert.Contains(t, s, `title_enabled = true`)
+	assert.NotContains(t, s, `inputType`)
+	assert.NotContains(t, s, `titleEnabled`)
+}
+
 func TestHandleFormFieldProjection_PlainLabelStaysQuoted(t *testing.T) {
 	// A dropdown whose label is plain text (not Slate JSON): the emitted HCL
 	// must keep it a quoted string, not jsonencode() of anything.
