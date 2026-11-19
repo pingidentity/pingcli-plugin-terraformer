@@ -8,6 +8,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_davinci_flow
+  service: DaVinci
   api_type: Flow
   name: DaVinci Flow
   short_name: flow

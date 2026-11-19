@@ -12,6 +12,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_group_nesting
+  service: SSO
   api_type: GroupNesting
   name: PingOne Group Nesting
   short_name: group_nesting

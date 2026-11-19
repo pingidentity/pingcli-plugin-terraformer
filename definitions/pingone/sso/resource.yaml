@@ -3,6 +3,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_resource
+  service: SSO
   api_type: Resource
   name: PingOne Resource
   short_name: resource

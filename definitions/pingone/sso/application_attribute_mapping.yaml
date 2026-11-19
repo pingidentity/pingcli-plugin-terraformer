@@ -11,6 +11,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_application_attribute_mapping
+  service: SSO
   api_type: ApplicationAttributeMapping
   name: PingOne Application Attribute Mapping
   short_name: application_attribute_mapping

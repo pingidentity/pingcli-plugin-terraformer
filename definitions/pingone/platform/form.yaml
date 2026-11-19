@@ -21,6 +21,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_form
+  service: DaVinci
   api_type: Form
   name: PingOne Form
   short_name: form

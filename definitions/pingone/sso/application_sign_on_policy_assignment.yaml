@@ -8,6 +8,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_application_sign_on_policy_assignment
+  service: SSO
   api_type: SignOnPolicyAssignment
   name: PingOne Application Sign-On Policy Assignment
   short_name: application_sign_on_policy_assignment

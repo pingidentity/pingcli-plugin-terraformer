@@ -22,6 +22,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_notification_template_content
+  service: SSO
   api_type: TemplateContent
   name: PingOne Notification Template Content
   short_name: notification_template_content

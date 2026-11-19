@@ -29,12 +29,20 @@ type ClosureResult struct {
 }
 
 // isDaVinciType reports whether a resource type requires the DaVinci
-// service. The resource-type prefix is authoritative (every definition
-// under definitions/pingone/davinci/ is named pingone_davinci_*); the SDK
-// package check is defense in depth. The package check alone is not
-// sufficient: pingone_davinci_application_flow_policy lists via the
+// service. The declared metadata.service is authoritative when present
+// (every definition under definitions/pingone/ now declares it). The
+// resource-type prefix and SDK package checks remain as fallbacks for
+// definitions that predate the service field. The package check alone is
+// not sufficient: pingone_davinci_application_flow_policy lists via the
 // management SDK but still 403s in an SSO-only environment (#163).
+// Conversely the prefix check alone is not sufficient either:
+// pingone_form lists via the management SDK and has no davinci prefix,
+// but the Forms API is DaVinci-scoped and returns zero forms in an
+// SSO-only environment.
 func isDaVinciType(def *schema.ResourceDefinition) bool {
+	if def.Metadata.Service != "" {
+		return strings.EqualFold(def.Metadata.Service, "DaVinci")
+	}
 	return strings.HasPrefix(def.Metadata.ResourceType, "pingone_davinci_") ||
 		strings.Contains(def.API.SDKPackage, "pingone-go-client/davinci")
 }

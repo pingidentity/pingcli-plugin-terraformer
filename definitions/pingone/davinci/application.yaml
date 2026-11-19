@@ -3,6 +3,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_davinci_application
+  service: DaVinci
   api_type: Application
   name: DaVinci Application
   short_name: application

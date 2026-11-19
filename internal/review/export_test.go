@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pingidentity/pingcli-plugin-terraformer/internal/core"
+	"github.com/pingidentity/pingcli-plugin-terraformer/internal/schema"
 )
 
 func closureSeeds(types ...string) []string { return types }
@@ -95,6 +96,48 @@ func TestComputeClosure_EmbeddedRuleTargetPulled(t *testing.T) {
 
 	assert.Contains(t, result.Types, "pingone_population")
 	assert.NotContains(t, result.FallbackTargets, "pingone_population")
+}
+
+func TestComputeClosure_FormIsDaVinciService(t *testing.T) {
+	// pingone_form lists via the management SDK and carries no davinci
+	// prefix, but its declared metadata.service is DaVinci (the Forms API is
+	// DaVinci-scoped: zero forms list in an SSO-only environment). The
+	// service field is authoritative, so the type must be skipped live.
+	result, err := ComputeClosure(closureSeeds("pingone_form"), nil)
+	require.NoError(t, err)
+
+	assert.NotContains(t, result.Types, "pingone_form")
+	require.Contains(t, result.SkippedLive, "pingone_form")
+	assert.Contains(t, result.SkippedLive["pingone_form"], "DaVinci")
+}
+
+func TestComputeClosure_ServiceFieldAuthoritative(t *testing.T) {
+	// A definition declaring service: SSO with a davinci SDK package (the
+	// converse of form) must NOT be skipped: the declared service wins over
+	// the package heuristic. isDaVinciType is exercised directly with a
+	// synthetic definition since no shipped definition pairs them.
+	def := &schema.ResourceDefinition{
+		Metadata: schema.ResourceMetadata{
+			Service:      "SSO",
+			ResourceType: "pingone_synthetic",
+		},
+		API: schema.APIDefinition{
+			SDKPackage: "github.com/pingidentity/pingone-go-client/davinci",
+		},
+	}
+	assert.False(t, isDaVinciType(def))
+
+	// Service empty → fallback heuristics still work (package match).
+	def.Metadata.Service = ""
+	assert.True(t, isDaVinciType(def))
+
+	// Service empty, management package, no prefix → not DaVinci.
+	def.API.SDKPackage = "github.com/patrickcping/pingone-go-sdk-v2/management"
+	assert.False(t, isDaVinciType(def))
+
+	// Declared DaVinci wins regardless of package/prefix.
+	def.Metadata.Service = "DaVinci"
+	assert.True(t, isDaVinciType(def))
 }
 
 func TestComputeClosure_RegistryContainsExactlyClosure(t *testing.T) {

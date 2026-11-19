@@ -11,6 +11,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_resource_scope_openid
+  service: SSO
   api_type: ResourceScope
   name: PingOne OpenID Connect Resource Scope
   short_name: resource_scope_openid

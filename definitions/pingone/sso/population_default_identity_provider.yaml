@@ -11,6 +11,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_population_default_identity_provider
+  service: SSO
   api_type: PopulationDefaultIdp
   name: PingOne Population Default Identity Provider
   short_name: population_default_identity_provider

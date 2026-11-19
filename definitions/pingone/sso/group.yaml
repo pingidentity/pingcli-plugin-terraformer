@@ -9,6 +9,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_group
+  service: SSO
   api_type: Group
   name: PingOne Group
   short_name: group

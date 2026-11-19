@@ -10,6 +10,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_resource_scope
+  service: SSO
   api_type: ResourceScope
   name: PingOne Resource Scope
   short_name: resource_scope

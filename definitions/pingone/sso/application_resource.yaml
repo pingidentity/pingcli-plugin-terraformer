@@ -9,6 +9,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_application_resource
+  service: SSO
   api_type: ResourceApplicationResource
   name: PingOne Application Resource
   short_name: application_resource

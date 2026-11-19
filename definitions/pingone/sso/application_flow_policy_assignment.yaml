@@ -10,6 +10,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_application_flow_policy_assignment
+  service: SSO
   api_type: FlowPolicyAssignment
   name: PingOne Application Flow Policy Assignment
   short_name: application_flow_policy_assignment
