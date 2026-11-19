@@ -21,6 +21,14 @@ resource "pingone_environment" "this" {
 
   services = [
     { type = "SSO" },
+    {
+      # DaVinci service: the exporter's DaVinci resources (flows, connector
+      # instances, variables, forms) exist only in DaVinci-enabled
+      # environments. DAVINCI_MINIMAL skips the example/demo configuration —
+      # the fixtures below are the only content the e2e environment needs.
+      type = "DaVinci"
+      tags = ["DAVINCI_MINIMAL"]
+    },
   ]
 }
 
