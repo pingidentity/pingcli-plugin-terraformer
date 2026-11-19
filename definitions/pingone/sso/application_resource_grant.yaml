@@ -15,6 +15,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_application_resource_grant
+  service: SSO
   api_type: ApplicationResourceGrant
   name: PingOne Application Resource Grant
   short_name: application_resource_grant

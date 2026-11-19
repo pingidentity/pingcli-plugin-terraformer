@@ -3,6 +3,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_sign_on_policy
+  service: SSO
   api_type: SignOnPolicy
   name: PingOne Sign-On Policy
   short_name: sign_on_policy

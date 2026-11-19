@@ -13,6 +13,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_branding_theme_default
+  service: SSO
   api_type: BrandingThemeDefault
   name: PingOne Branding Theme Default
   short_name: branding_theme_default

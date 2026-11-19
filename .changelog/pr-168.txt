@@ -9,3 +9,15 @@
 ```release-note:new-resource
 `resource/pingone_notification_template_content`: Added export support. Predefined default template contents (read-only in the provider) are filtered from the export.
 ```
+
+```release-note:bug
+`resource/pingone_form`: Fixed double-encoding of slate rich-text field values (label, content, labelPasswordVerify). The exporter now emits `jsonencode(<parsed object>)` matching the provider's documented shape instead of `jsonencode("<escaped string>")`, which stored a literal escaped blob and rendered mangled text in the UI.
+```
+
+```release-note:bug
+`resource/pingone_form`: Fixed component-field keys being emitted in the API's camelCase spelling (inputType, titleEnabled, idpName, pollingAppearance, otherOption*, ...). The provider's `components.fields` schema declares snake_case attributes only, so camelCase keys were silently dropped (optional fields) or rejected as missing-required (input_type on AGREEMENT/SINGLE_CHECKBOX, polling_appearance on POLLING, idp_* on SOCIAL_LOGIN_BUTTON).
+```
+
+```release-note:internal
+Declared the PingOne service (SSO or DaVinci) in every resource definition's metadata and made the review-closure DaVinci classification read it as authoritative. The e2e throwaway environment now enables the DaVinci service (DAVINCI_MINIMAL) and includes a pingone_branding_theme_default fixture.
+```

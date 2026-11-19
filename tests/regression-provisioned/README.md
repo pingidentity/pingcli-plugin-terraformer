@@ -77,12 +77,26 @@ by the `resource` and `application` fixtures.
 
 ## SSO fixture coverage
 
+The throwaway environment enables **SSO and DaVinci** (`DAVINCI_MINIMAL` —
+see the `services` block in `terraform-test-data/root/main.tf`). A fixture
+for a resource declaring a different `metadata.service` must add that
+service to the environment as part of the fixture commit. Each known gap
+below must have a tracked follow-up, not just a mention here.
+
 | State | Resources |
 |---|---|
 | Fixtured | `population`, `group`, `group_nesting`, `sign_on_policy`, `password_policy`, `population_default`, `resource`, `resource_scope`, `resource_attribute`, `resource_scope_openid`, `resource_scope_pingone_api`, `application`, `application_sign_on_policy_assignment`, `application_attribute_mapping` |
+| Fixtured (platform) | `branding_theme_default` — the theme itself is a root-level resource (branding stays environment-specific, mirroring the demo repos); the default-activation fixture consumes its ID via the output→input pattern |
 | Auto-covered (no fixture needed) | `resource_secret`, `application_secret` |
-| Known gaps — not fixturable in an SSO-only environment | `population_default_identity_provider` (needs a `pingone_identity_provider`; no IdP exists here), `application_flow_policy_assignment` (needs the DaVinci service; the throwaway environment enables SSO only) |
-| Follow-up candidates | `application_resource`, `application_resource_grant` (both fixturable with the output→input pattern; chain three modules) |
+| Live-exported, no fixture (DaVinci MINIMAL ships content) | `pingone_form` — the 5 standard forms from `DAVINCI_MINIMAL` are exported and pass `terraform validate`; a hand-authored form fixture is a follow-up |
+| Known gaps — not fixturable in this environment | `population_default_identity_provider` (needs a `pingone_identity_provider`; no IdP exists here), `application_flow_policy_assignment` (needs DaVinci flows + applications, which DAVINCI_MINIMAL does not create), `notification_template_content` (custom contents need notification delivery services provisioned) |
+| Follow-up candidates | `application_resource`, `application_resource_grant` (both fixturable with the output→input pattern; chain three modules), DaVinci family (`davinci_flow`, `davinci_variable`, `davinci_connector_instance`, `davinci_application`) — service enabled, fixtures must author the content |
+
+Note on `pingone_branding_theme_default`: the fixture module activates the
+root-level `pingone_branding_theme.e2e` as the environment default. The
+exporter derives the resource from the themes list's `default` flag, so the
+fixture provides coverage of both the derived-default detection and the
+`branding_theme_id` → `pingone_branding_theme` reference resolution.
 
 Note on `pingone_resource_scope_pingone_api`: the exporter silently filters
 every built-in scope not matching `^p1:(read|update):user(:...)*$` (the

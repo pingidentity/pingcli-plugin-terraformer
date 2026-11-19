@@ -3,6 +3,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_davinci_variable
+  service: DaVinci
   api_type: Variable
   name: DaVinci Variable
   short_name: variable

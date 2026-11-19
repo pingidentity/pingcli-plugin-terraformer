@@ -3,6 +3,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_population
+  service: SSO
   api_type: Population
   name: PingOne Population
   short_name: population
