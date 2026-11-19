@@ -8,6 +8,7 @@ Thank you for your interest in contributing to the Ping CLI Terraformer Plugin.
 - [Developer Guide](contributing/DEVELOPER_GUIDE.md)
 - [AI-Assisted Development](contributing/AI_DEVELOPMENT.md)
 - [Naming Conventions](contributing/NAMING_CONVENTIONS.md)
+- [Release Process](CONTRIBUTING.release.md)
 
 ## Quick Start
 

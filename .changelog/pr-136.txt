@@ -1,0 +1,3 @@
+```release-note:new-resource
+`resource/pingone_resource`: Added export support
+```

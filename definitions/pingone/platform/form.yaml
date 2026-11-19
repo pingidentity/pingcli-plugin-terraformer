@@ -1,0 +1,138 @@
+# PingOne Form Resource Definition
+#
+# DaVinci-style sign-on forms managed through the PingOne platform API
+# (FormManagementApi). Environment-scoped: a plain list.
+#
+# The API's components.fields is a 24-variant union (FormField). The
+# projection exposes the common core every variant shares (type, position,
+# key, label, required, visibility, validation) plus the widely-used
+# variant-specific fields the provider schema models. Slate text
+# (label, content) is an escaped-JSON string in the API — the same
+# jsonencode(...) shape the provider's examples use — so label and content
+# use the jsonencode_raw transform. Variant fields that do not fit the
+# flat projection (options arrays, social-login icons, polling config) are
+# preserved through the custom transform on form_fields and documented as
+# a known gap: forms using them export with those fields dropped, which
+# makes them lossy on re-apply.
+#
+# Labels: form names are unique per environment (API-enforced), so name is
+# the label.
+
+metadata:
+  platform: pingone
+  resource_type: pingone_form
+  service: DaVinci
+  api_type: Form
+  name: PingOne Form
+  short_name: form
+  version: "1.0"
+
+api:
+  sdk_package: github.com/patrickcping/pingone-go-sdk-v2/management
+  sdk_type: Form
+  list_method: FormManagementApi.ReadAllForms
+  get_method: FormManagementApi.ReadForm
+  id_field: id
+  name_field: name
+  pagination_type: cursor
+
+attributes:
+  # ID - computed only (resource identifier)
+  - name: ID
+    terraform_name: id
+    type: string
+    source_path: Id
+    computed: true
+
+  # Environment ID - required, references environment
+  - name: EnvironmentID
+    terraform_name: environment_id
+    type: string
+    source_path: Environment.Id
+    required: true
+    references_type: pingone_environment
+    reference_field: id
+
+  # Name - required, unique per environment
+  - name: Name
+    terraform_name: name
+    type: string
+    source_path: Name
+    required: true
+
+  # Description - optional
+  - name: Description
+    terraform_name: description
+    type: string
+    source_path: Description
+
+  # Category - optional enum, defaults to CUSTOM
+  - name: Category
+    terraform_name: category
+    type: string
+    source_path: Category
+
+  # Cols - required, 1-4
+  - name: Cols
+    terraform_name: cols
+    type: number
+    source_path: Cols
+    required: true
+
+  # MarkOptional / MarkRequired - optional bools
+  - name: MarkOptional
+    terraform_name: mark_optional
+    type: bool
+    source_path: MarkOptional
+
+  - name: MarkRequired
+    terraform_name: mark_required
+    type: bool
+    source_path: MarkRequired
+
+  # PasswordAutoCompleteEnabled / TextAutoCompleteEnabled - optional bools
+  - name: PasswordAutoCompleteEnabled
+    terraform_name: password_auto_complete_enabled
+    type: bool
+    source_path: PasswordAutoCompleteEnabled
+
+  - name: TextAutoCompleteEnabled
+    terraform_name: text_auto_complete_enabled
+    type: bool
+    source_path: TextAutoCompleteEnabled
+
+  # TranslationMethod - optional enum
+  - name: TranslationMethod
+    terraform_name: translation_method
+    type: string
+    source_path: TranslationMethod
+
+  # LanguageBundle - optional i18n key -> translation map
+  - name: LanguageBundle
+    terraform_name: language_bundle
+    type: object
+    source_path: LanguageBundle
+
+  # Components - the form's field list. The custom transform projects the
+  # FormField union to the common core + per-variant extras as a
+  # JSON-shaped structure; jsonencode_raw then emits it as
+  # jsonencode({...}) HCL.
+  - name: Components
+    terraform_name: components
+    type: object
+    source_path: Components
+    required: true
+    transform: custom
+    custom_transform: handleFormFieldProjection
+
+dependencies:
+  depends_on:
+    - resource_type: pingone_environment
+      field_path: Environment.Id
+      lookup_field: id
+      reference_format: "var.pingone_environment_id"
+
+  import_id_format: "{env_id}/{resource_id}"
+
+variables:
+  eligible_attributes: []

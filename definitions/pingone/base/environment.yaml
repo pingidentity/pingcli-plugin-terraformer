@@ -3,11 +3,12 @@
 metadata:
   platform: pingone
   resource_type: pingone_environment
+  service: SSO
   api_type: EnvironmentResponse
   name: PingOne Environment
   short_name: environment
   version: "1.0"
-  enabled: false
+  enabled: true
 
 api:
   sdk_package: github.com/pingidentity/pingone-go-client/pingone

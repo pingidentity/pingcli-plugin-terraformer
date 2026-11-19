@@ -30,8 +30,12 @@ func TestNewClient(t *testing.T) {
 
 func TestNewFromCredentials(t *testing.T) {
 	ctx := context.Background()
-	// A valid UUID to use as exportEnvID in success cases.
+	// Valid UUIDs — real PingOne client/environment IDs are UUIDs, and the
+	// management SDK's Config.Validate() rejects non-UUID-shaped values.
 	validExportEnvID := "00000000-0000-0000-0000-000000000001"
+	validWorkerEnvID := "00000000-0000-0000-0000-000000000010"
+	validClientID := "00000000-0000-0000-0000-000000000020"
+	validClientSecret := "secret-123"
 
 	tests := []struct {
 		name          string
@@ -48,96 +52,96 @@ func TestNewFromCredentials(t *testing.T) {
 			workerEnvID:   "",
 			exportEnvID:   validExportEnvID,
 			region:        "NA",
-			clientID:      "client-123",
-			clientSecret:  "secret-123",
+			clientID:      validClientID,
+			clientSecret:  validClientSecret,
 			expectError:   true,
 			errorContains: "auth environment ID is required",
 		},
 		{
 			name:          "missing target environment ID",
-			workerEnvID:   "auth-env-123",
+			workerEnvID:   validWorkerEnvID,
 			exportEnvID:   "",
 			region:        "NA",
-			clientID:      "client-123",
-			clientSecret:  "secret-123",
+			clientID:      validClientID,
+			clientSecret:  validClientSecret,
 			expectError:   true,
 			errorContains: "target environment ID is required",
 		},
 		{
 			name:          "missing region",
-			workerEnvID:   "auth-env-123",
+			workerEnvID:   validWorkerEnvID,
 			exportEnvID:   validExportEnvID,
 			region:        "",
-			clientID:      "client-123",
-			clientSecret:  "secret-123",
+			clientID:      validClientID,
+			clientSecret:  validClientSecret,
 			expectError:   true,
 			errorContains: "region is required",
 		},
 		{
 			name:          "invalid region",
-			workerEnvID:   "auth-env-123",
+			workerEnvID:   validWorkerEnvID,
 			exportEnvID:   validExportEnvID,
 			region:        "XX",
-			clientID:      "client-123",
-			clientSecret:  "secret-123",
+			clientID:      validClientID,
+			clientSecret:  validClientSecret,
 			expectError:   true,
 			errorContains: "invalid region: XX",
 		},
 		{
 			name:          "missing client ID",
-			workerEnvID:   "auth-env-123",
+			workerEnvID:   validWorkerEnvID,
 			exportEnvID:   validExportEnvID,
 			region:        "NA",
 			clientID:      "",
-			clientSecret:  "secret-123",
+			clientSecret:  validClientSecret,
 			expectError:   true,
 			errorContains: "client ID is required",
 		},
 		{
 			name:          "missing client secret",
-			workerEnvID:   "auth-env-123",
+			workerEnvID:   validWorkerEnvID,
 			exportEnvID:   validExportEnvID,
 			region:        "NA",
-			clientID:      "client-123",
+			clientID:      validClientID,
 			clientSecret:  "",
 			expectError:   true,
 			errorContains: "client secret is required",
 		},
 		{
 			name:          "invalid export environment ID format",
-			workerEnvID:   "auth-env-123",
+			workerEnvID:   validWorkerEnvID,
 			exportEnvID:   "not-a-uuid",
 			region:        "NA",
-			clientID:      "client-123",
-			clientSecret:  "secret-123",
+			clientID:      validClientID,
+			clientSecret:  validClientSecret,
 			expectError:   true,
 			errorContains: "invalid export environment ID format",
 		},
 		{
 			name:         "valid credentials",
-			workerEnvID:  "auth-env-123",
+			workerEnvID:  validWorkerEnvID,
 			exportEnvID:  validExportEnvID,
 			region:       "NA",
-			clientID:     "client-123",
-			clientSecret: "secret-123",
+			clientID:     validClientID,
+			clientSecret: validClientSecret,
 			expectError:  false,
 		},
 		{
 			name:         "valid credentials AU region",
-			workerEnvID:  "auth-env-123",
+			workerEnvID:  validWorkerEnvID,
 			exportEnvID:  "00000000-0000-0000-0000-000000000002",
 			region:       "AU",
-			clientID:     "client-123",
-			clientSecret: "secret-123",
+			clientID:     validClientID,
+			clientSecret: validClientSecret,
 			expectError:  false,
 		},
 		{
 			name:         "valid credentials SG region",
-			workerEnvID:  "auth-env-123",
+			workerEnvID:  validWorkerEnvID,
 			exportEnvID:  "00000000-0000-0000-0000-000000000003",
 			region:       "SG",
-			clientID:     "client-123",
-			clientSecret: "secret-123",
+			clientID:     validClientID,
+			clientSecret: validClientSecret,
 			expectError:  false,
 		},
 	}
@@ -193,4 +197,29 @@ func TestValidRegions(t *testing.T) {
 	assert.Contains(t, regions, "CA")
 	assert.Contains(t, regions, "AU")
 	assert.Contains(t, regions, "SG")
+}
+
+func TestAddWarning_DedupesExactDuplicates(t *testing.T) {
+	c := &Client{}
+	c.AddWarning("skipping application app-1: PingOne system application types are not exportable")
+	c.AddWarning("skipping application app-1: PingOne system application types are not exportable")
+	c.AddWarning("skipping application app-1: PingOne system application types are not exportable")
+
+	assert.Equal(t, []string{"skipping application app-1: PingOne system application types are not exportable"}, c.Warnings())
+}
+
+func TestAddWarning_KeepsDistinctMessages(t *testing.T) {
+	c := &Client{}
+	c.AddWarning("skipping application app-1: not exportable")
+	c.AddWarning("skipping application app-2: not exportable")
+
+	assert.Equal(t, []string{
+		"skipping application app-1: not exportable",
+		"skipping application app-2: not exportable",
+	}, c.Warnings())
+}
+
+func TestAddWarning_NoWarningsReturnsNil(t *testing.T) {
+	c := &Client{}
+	assert.Empty(t, c.Warnings())
 }

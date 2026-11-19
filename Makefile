@@ -72,27 +72,22 @@ clean:
 
 regression-local: build
 	@echo "==> Running local regression test (current branch vs main)..."
-	@TMPDIR=$$(mktemp -d) && \
-	WORKTREE=$$TMPDIR/base-worktree && \
-	BASE_REF=$${REGRESSION_BASE:-main} && \
-	echo "  Creating worktree for $$BASE_REF..." && \
-	git worktree add -q "$$WORKTREE" "$$BASE_REF" && \
-	echo "  Building base binary from $$BASE_REF..." && \
-	(cd "$$WORKTREE" && go build -o "$$TMPDIR/binary-base" .) && \
-	echo "  Exporting with base binary..." && \
-	$$TMPDIR/binary-base export --out $$TMPDIR/output-base && \
-	echo "  Exporting with current binary..." && \
-	./$(BINARY) export --out $$TMPDIR/output-pr && \
-	echo "  Comparing outputs..." && \
-	go run ./tools/regression-compare/ --base-dir $$TMPDIR/output-base --pr-dir $$TMPDIR/output-pr; \
-	EXIT_CODE=$$?; \
-	git worktree remove --force "$$WORKTREE" 2>/dev/null; \
-	rm -rf "$$TMPDIR"; \
-	if [ $$EXIT_CODE -ne 0 ]; then exit $$EXIT_CODE; fi; \
-	echo "==> Regression test passed."
+	@./tests/regression/run-local.sh
+
+e2e: build
+	@echo "==> Running provisioned-environment E2E test..."
+	@./tests/regression-provisioned/run-local.sh
+
+review-bundle:
+	@echo "==> Generating resource review bundle (dry-run without PINGCLI_PINGONE_* creds)..."
+	@go run ./tools/review-bundle/ --base-ref main --out review-bundle $(REVIEW_ARGS)
+
+review-bundle-live: build
+	@echo "==> Generating live resource review bundle (provisions a throwaway environment)..."
+	@./tests/review/run-live.sh
 
 devcheck: build vet fmt lint test testacc
 
 devchecknotest: build vet fmt lint test
 
-.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint tflint fmt clean regression-local devcheck devchecknotest
+.PHONY: build install test testacc testcoverage vet depscheck lint golangcilint tflint fmt clean regression-local e2e review-bundle review-bundle-live devcheck devchecknotest

@@ -7,6 +7,7 @@
 metadata:
   platform: pingone
   resource_type: pingone_davinci_flow_deploy
+  service: DaVinci
   api_type: Flow
   name: DaVinci Flow Deploy
   short_name: flow_deploy
