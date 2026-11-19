@@ -32,6 +32,22 @@ resource "pingone_environment" "this" {
   ]
 }
 
+# The throwaway environment's branding theme. Lives at the root (not a fixture
+# module) because the brand is environment-specific by design — mirroring the
+# demo repos' pattern where the theme is hand-managed at the root. The
+# branding-theme-default fixture module below consumes its ID.
+resource "pingone_branding_theme" "e2e" {
+  environment_id     = pingone_environment.this.id
+  name               = "pingcli-terraformer-e2e-branding-theme"
+  template           = "default"
+  body_text_color    = "#263956"
+  button_color       = "#263956"
+  button_text_color  = "#FFFFFF"
+  card_color         = "#FCFCFC"
+  heading_text_color = "#686F77"
+  link_text_color    = "#263956"
+}
+
 module "sso_population" {
   source         = "../sso/population"
   environment_id = pingone_environment.this.id
@@ -107,4 +123,10 @@ module "sso_application_attribute_mapping" {
   source         = "../sso/application_attribute_mapping"
   environment_id = pingone_environment.this.id
   application_id = module.sso_application.application_id
+}
+
+module "platform_branding_theme_default" {
+  source            = "../platform/branding_theme_default"
+  environment_id    = pingone_environment.this.id
+  branding_theme_id = pingone_branding_theme.e2e.id
 }
